@@ -13,6 +13,7 @@ import com.lumora.model.Channel
 import com.lumora.model.ContentShelf
 import com.lumora.model.MediaType
 import com.lumora.plugin.js.PluginScript
+import com.lumora.data.remote.stremio.StremioAddonStore
 import com.lumora.parser.XtreamClient
 import com.lumora.util.isAdultCategory
 import kotlinx.coroutines.*
@@ -128,6 +129,10 @@ internal fun MainActivity.runDiscoverSearch() {
     loadDiscover(query.takeIf { it.isNotEmpty() })
 }
 
+internal fun MainActivity.hasAnyStreamSource(): Boolean =
+    enabledStreamSearchPlugin() != null ||
+        StremioAddonStore.load(prefs).any { it.enabled }
+
 /** Loads trending (null query) or search results into the Discover grid. */
 internal fun MainActivity.loadDiscover(query: String?) {
     if (!tmdbClient.hasKey()) return
@@ -139,7 +144,7 @@ internal fun MainActivity.loadDiscover(query: String?) {
         // TMDB-only title is a dead tile - its dialog offers nothing but a trailer.
         // Drop anything that isn't already in the library; with a plugin enabled the
         // plugin can play every title, so nothing gets filtered.
-        val pluginEnabled = enabledStreamSearchPlugin() != null
+        val pluginEnabled = hasAnyStreamSource()
         val visible = if (pluginEnabled) results else withContext(Dispatchers.Default) {
             results.filter { findCatalogMatch(it) != null }
         }
@@ -231,7 +236,7 @@ internal fun MainActivity.onDiscoverItemClick(item: Channel) {
             showContentDetail(match)
         })
     }
-    if (enabledStreamSearchPlugin() != null) {
+    if (hasAnyStreamSource()) {
         buttonRow.addView(actionButton("Find stream") {
             dialog.dismiss()
             startDiscoverStreamSearch(item)
@@ -250,16 +255,22 @@ internal fun MainActivity.onDiscoverItemClick(item: Channel) {
 /** Kicks off a stream-search plugin for a Discover title (episode picker for series). */
 internal fun MainActivity.startDiscoverStreamSearch(item: Channel) {
     val plugin = enabledStreamSearchPlugin(item)
-    if (plugin == null) {
+    val hasStremio = StremioAddonStore.load(prefs).any { it.enabled }
+
+    if (plugin == null && !hasStremio) {
         Toast.makeText(
             this,
-            "Enable a stream plugin in Settings → Plugins to play Discover titles.",
+            "Enable a stream plugin or Stremio addon in Settings → Plugins.",
             Toast.LENGTH_LONG
         ).show()
         return
     }
-    if (item.mediaType == MediaType.SERIES) showSeriesEpisodePicker(plugin, item)
-    else showStreamSearchDialog(plugin, item)
+
+    if (item.mediaType == MediaType.SERIES) {
+        showSeriesEpisodePicker(plugin, item)
+    } else {
+        showStreamSearchDialog(plugin, item)
+    }
 }
 
 /** Finds an already-configured provider item matching a Discover (TMDB) title, if any. */
@@ -280,7 +291,7 @@ internal fun MainActivity.normalizeMatchTitle(title: String): String =
         .replace(Regex("[^a-z0-9]+"), " ").trim()
 
 /** Fetches the show's seasons from TMDB, then lets the user pick season → episode to search. */
-internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript, item: Channel) {
+internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: Channel) {
     val tvId = item.id.substringAfterLast(':').toIntOrNull()
     if (tvId == null) { showStreamSearchDialog(plugin, item); return }
     val loading = AlertDialog.Builder(this)

@@ -185,13 +185,23 @@ internal fun MainActivity.showTrailerPlayer(youtubeKey: String) {
 internal fun MainActivity.wireFindStreamButton(item: Channel) {
     val button = binding.detailFindStreamButton
     val plugin = enabledStreamSearchPlugin(item)
-    val eligible = plugin != null && (item.mediaType == MediaType.MOVIE || item.mediaType == MediaType.SERIES)
+    val hasStremio = StremioAddonStore.load(prefs).any { it.enabled }
+
+    val eligible =
+        (plugin != null || hasStremio) &&
+            (item.mediaType == MediaType.MOVIE ||
+                item.mediaType == MediaType.SERIES)
+
     button.visibility = if (eligible) View.VISIBLE else View.GONE
-    if (!eligible || plugin == null) {
+
+    if (!eligible) {
         button.setOnClickListener(null)
         return
     }
-    button.setOnClickListener { showStreamSearchDialog(plugin, item) }
+
+    button.setOnClickListener {
+        showStreamSearchDialog(plugin, item)
+    }
 }
 
 /**
@@ -259,7 +269,7 @@ internal fun MainActivity.enabledStreamSearchPlugin(item: Channel? = null): Plug
  * http(s) URL the player hits directly, so there's nothing to hold open past the pick.
  */
 internal fun MainActivity.showStreamSearchDialog(
-    plugin: PluginScript,
+    plugin: PluginScript?,
     item: Channel,
     season: Int? = null,
     episode: Int? = null
@@ -321,7 +331,7 @@ internal fun MainActivity.showStreamSearchDialog(
         .create()
 
     val pluginSource =
-        pluginScriptManager.readSource(plugin)
+        plugin?.let { pluginScriptManager.readSource(it) }
 
     val results = mutableListOf<StreamEntry>()
     val stremioClient = StremioAddonClient()
@@ -360,23 +370,30 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
 
                 else -> {
-                    if (plugin.resolvesNatively) {
-                        resolveTorrentStream(
-                            result.token,
-                            season,
-                            episode
-                        ) { line ->
-                            runOnUiThread {
-                                status.text = line
+                    when {
+                        plugin == null || pluginSource == null ->
+                            ResolveResult.Failed(
+                                "The source plugin is unavailable"
+                            )
+
+                        plugin.resolvesNatively ->
+                            resolveTorrentStream(
+                                result.token,
+                                season,
+                                episode
+                            ) { line ->
+                                runOnUiThread {
+                                    status.text = line
+                                }
                             }
-                        }
-                    } else {
-                        jsPluginEngine.resolve(
-                            pluginSource,
-                            result.token,
-                            season,
-                            episode
-                        )
+
+                        else ->
+                            jsPluginEngine.resolve(
+                                pluginSource,
+                                result.token,
+                                season,
+                                episode
+                            )
                     }
                 }
             }
@@ -407,7 +424,7 @@ internal fun MainActivity.showStreamSearchDialog(
                                 },
                             pluginId =
                                 if (entry.resolver == "plugin") {
-                                    plugin.id
+                                    plugin?.id
                                 } else {
                                     null
                                 }
@@ -491,35 +508,37 @@ internal fun MainActivity.showStreamSearchDialog(
 
     val searchJob = scope.launch {
         coroutineScope {
-            launch {
-                jsPluginEngine.runSearch(
-                    source = pluginSource,
-                    query = item.name,
-                    year = item.year?.toIntOrNull(),
-                    season = season,
-                    episode = episode,
-                    onProgress = {
-                        if (results.isEmpty()) {
-                            status.text = it
-                        }
-                    },
-                    onResult = { result ->
-                        val atFront =
-                            prefs.getBoolean(
-                                PREF_PREFER_DUB_AUDIO,
-                                false
-                            ) &&
-                                result.audio == "dub"
+            if (plugin != null && pluginSource != null) {
+                launch {
+                    jsPluginEngine.runSearch(
+                        source = pluginSource,
+                        query = item.name,
+                        year = item.year?.toIntOrNull(),
+                        season = season,
+                        episode = episode,
+                        onProgress = {
+                            if (results.isEmpty()) {
+                                status.text = it
+                            }
+                        },
+                        onResult = { result ->
+                            val atFront =
+                                prefs.getBoolean(
+                                    PREF_PREFER_DUB_AUDIO,
+                                    false
+                                ) &&
+                                    result.audio == "dub"
 
-                        addResult(
-                            StreamEntry(
-                                result = result,
-                                resolver = "plugin"
-                            ),
-                            atFront
-                        )
-                    }
-                )
+                            addResult(
+                                StreamEntry(
+                                    result = result,
+                                    resolver = "plugin"
+                                ),
+                                atFront
+                            )
+                        }
+                    )
+                }
             }
 
             launch {
