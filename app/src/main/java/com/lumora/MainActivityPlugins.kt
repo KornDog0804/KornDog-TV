@@ -264,31 +264,55 @@ internal fun MainActivity.showStreamSearchDialog(
     season: Int? = null,
     episode: Int? = null
 ) {
-    val epTag = if (season != null && episode != null)
-        " S%02dE%02d".format(season, episode) else ""
+    data class StreamEntry(
+        val result: TorrentResult,
+        val resolver: String
+    )
+
+    val epTag =
+        if (season != null && episode != null) {
+            " S%02dE%02d".format(season, episode)
+        } else {
+            ""
+        }
 
     val container = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        val pad = (16 * resources.displayMetrics.density).toInt()
+        val pad =
+            (16 * resources.displayMetrics.density).toInt()
         setPadding(pad, pad, pad, pad)
     }
+
     val status = TextView(this).apply {
         text = "Searching…"
-        setTextColor(ContextCompat.getColor(this@showStreamSearchDialog, R.color.text_secondary))
+        setTextColor(
+            ContextCompat.getColor(
+                this@showStreamSearchDialog,
+                R.color.text_secondary
+            )
+        )
     }
+
     val resultsHost = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         clipChildren = false
         clipToPadding = false
     }
+
     val scroll = ScrollView(this).apply {
         isFillViewport = true
         addView(resultsHost)
     }
+
     container.addView(status)
-    container.addView(scroll, LinearLayout.LayoutParams(
-        ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f
-    ))
+    container.addView(
+        scroll,
+        LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+    )
 
     val dialog = AlertDialog.Builder(this)
         .setTitle("Find Stream — ${item.name}$epTag")
@@ -296,119 +320,312 @@ internal fun MainActivity.showStreamSearchDialog(
         .setNegativeButton("Cancel", null)
         .create()
 
-    val source = pluginScriptManager.readSource(plugin)
-    val results = mutableListOf<TorrentResult>()
+    val pluginSource =
+        pluginScriptManager.readSource(plugin)
 
-    fun playResult(result: TorrentResult) {
+    val results = mutableListOf<StreamEntry>()
+    val stremioClient = StremioAddonClient()
+
+    fun stableId(entry: StreamEntry): String {
+        val hash = entry.result.token.hashCode()
+            .toUInt()
+            .toString(16)
+
+        return "stream:${entry.resolver}:$hash" +
+            (episode?.let { ":e$it" } ?: "")
+    }
+
+    fun playResult(entry: StreamEntry) {
+        val result = entry.result
+
         status.text = "Loading ${result.title}…"
         resultsHost.removeAllViews()
+
         scope.launch {
-            val resolved = if (plugin.resolvesNatively) {
-                // TorrentEngine.start calls onProgress from its IO thread, so the TextView
-                // update has to hop to the main thread.
-                resolveTorrentStream(result.token, season, episode) { line ->
-                    runOnUiThread { status.text = line }
+            val resolved = when (entry.resolver) {
+                "direct" -> {
+                    ResolveResult.Ready(result.token)
                 }
-            } else {
-                jsPluginEngine.resolve(source, result.token, season, episode)
+
+                "torrent" -> {
+                    resolveTorrentStream(
+                        result.token,
+                        season,
+                        episode
+                    ) { line ->
+                        runOnUiThread {
+                            status.text = line
+                        }
+                    }
+                }
+
+                else -> {
+                    if (plugin.resolvesNatively) {
+                        resolveTorrentStream(
+                            result.token,
+                            season,
+                            episode
+                        ) { line ->
+                            runOnUiThread {
+                                status.text = line
+                            }
+                        }
+                    } else {
+                        jsPluginEngine.resolve(
+                            pluginSource,
+                            result.token,
+                            season,
+                            episode
+                        )
+                    }
+                }
             }
+
             when (resolved) {
                 is ResolveResult.Ready -> {
                     dialog.dismiss()
                     hideContentDetail()
+
                     showPlayerFor(
                         Channel(
-                            // Derived from the token and episode rather than a hash of the
-                            // moment: the saved-position key has to be the same string the
-                            // next time this episode is played, or nothing ever resumes.
-                            id = pluginChannelId(plugin, result.token, episode),
+                            id = stableId(entry),
                             name = item.name + epTag,
                             url = resolved.url,
-                            // Carried so the Continue Watching tile isn't a blank card, and
-                            // so isAdultHomeItem has the same signals every other entry has.
                             posterUrl = item.posterUrl,
                             logoUrl = item.logoUrl,
                             group = item.group,
                             categoryName = item.categoryName,
                             mediaType = MediaType.MOVIE,
                             episodeNum = episode,
-                            // Headers the CDN needs (e.g. a Referer) so the player doesn't 403.
-                            streamHeaders = resolved.headers.ifEmpty { null },
-                            // What lets a resume re-resolve this instead of replaying a URL
-                            // that has since expired (see showPlayerFor's plugin branch).
-                            pluginToken = result.token,
-                            pluginId = plugin.id
+                            streamHeaders =
+                                resolved.headers.ifEmpty { null },
+                            pluginToken =
+                                if (entry.resolver == "plugin") {
+                                    result.token
+                                } else {
+                                    null
+                                },
+                            pluginId =
+                                if (entry.resolver == "plugin") {
+                                    plugin.id
+                                } else {
+                                    null
+                                }
                         ),
-                        externalSubtitles = resolved.subtitles.map(::externalSubtitleFor),
+                        externalSubtitles =
+                            resolved.subtitles.map(
+                                ::externalSubtitleFor
+                            ),
                         pluginStreamAlreadyResolved = true,
                         audio = result.audio
                     )
-                    // Back out of a plugin-played episode to the title it was picked from,
-                    // the same as any other VOD item (see hidePlayer).
+
                     detailReturnItem = item
                 }
+
                 is ResolveResult.Failed -> {
-                    Toast.makeText(this@showStreamSearchDialog, resolved.message, Toast.LENGTH_LONG).show()
+                    Toast.makeText(
+                        this@showStreamSearchDialog,
+                        resolved.message,
+                        Toast.LENGTH_LONG
+                    ).show()
+
                     dialog.dismiss()
                 }
             }
         }
     }
 
-    fun addResultRow(result: TorrentResult, atFront: Boolean) {
-        val row = layoutInflater.inflate(R.layout.item_stream_result, resultsHost, false)
-        row.findViewById<TextView>(R.id.streamTitle).text = result.title
-        row.findViewById<TextView>(R.id.streamMeta).text = listOfNotNull(
-            result.quality,
-            result.seeders?.let { "$it seeders" },
-            result.size,
-            result.source
+    fun addResult(
+        entry: StreamEntry,
+        atFront: Boolean = false
+    ) {
+        if (results.any {
+                it.result.token == entry.result.token
+            }
+        ) {
+            return
+        }
+
+        if (atFront) {
+            results.add(0, entry)
+        } else {
+            results.add(entry)
+        }
+
+        val row = layoutInflater.inflate(
+            R.layout.item_stream_result,
+            resultsHost,
+            false
+        )
+
+        row.findViewById<TextView>(
+            R.id.streamTitle
+        ).text = entry.result.title
+
+        row.findViewById<TextView>(
+            R.id.streamMeta
+        ).text = listOfNotNull(
+            entry.result.quality,
+            entry.result.seeders?.let { "$it seeders" },
+            entry.result.size,
+            entry.result.source
         ).joinToString("  ·  ")
-        row.setOnClickListener { playResult(result) }
-        if (atFront) resultsHost.addView(row, 0) else resultsHost.addView(row)
-        // The first result to arrive takes focus, so the common case - the top result is
-        // the one you want - is one press away instead of a hunt down the list. Results
-        // stream in one at a time, so this is the first one reported, not a re-focus on
-        // every addition: taking focus again mid-search would yank it back off whatever
-        // the user had already moved to.
+
+        row.setOnClickListener {
+            playResult(entry)
+        }
+
+        if (atFront) {
+            resultsHost.addView(row, 0)
+        } else {
+            resultsHost.addView(row)
+        }
+
+        status.text = "${results.size} result(s)"
+
         if (resultsHost.childCount == 1) {
             row.post { row.requestFocus() }
         }
     }
 
     val searchJob = scope.launch {
-        val query = item.name
-        val year = item.year?.toIntOrNull()
-        val outcome = jsPluginEngine.runSearch(
-            source = source, query = query, year = year, season = season, episode = episode,
-            onProgress = { if (results.isEmpty()) status.text = it },
-            onResult = { result ->
-                // With "Prefer dubbed audio" on, a known-dub source jumps the queue so the
-                // most likely pick surfaces first instead of being buried under the subs.
-                val atFront = prefs.getBoolean(PREF_PREFER_DUB_AUDIO, false) && result.audio == "dub"
-                if (atFront) results.add(0, result) else results.add(result)
-                status.text = "${results.size} result(s)"
-                addResultRow(result, atFront)
+        coroutineScope {
+            launch {
+                jsPluginEngine.runSearch(
+                    source = pluginSource,
+                    query = item.name,
+                    year = item.year?.toIntOrNull(),
+                    season = season,
+                    episode = episode,
+                    onProgress = {
+                        if (results.isEmpty()) {
+                            status.text = it
+                        }
+                    },
+                    onResult = { result ->
+                        val atFront =
+                            prefs.getBoolean(
+                                PREF_PREFER_DUB_AUDIO,
+                                false
+                            ) &&
+                                result.audio == "dub"
+
+                        addResult(
+                            StreamEntry(
+                                result = result,
+                                resolver = "plugin"
+                            ),
+                            atFront
+                        )
+                    }
+                )
             }
-        )
-        if (results.isEmpty()) {
-            status.text = when (outcome) {
-                is SearchResult.Finished -> outcome.message ?: "No streams found"
-                is SearchResult.Failed -> outcome.message
+
+            launch {
+                val addons = StremioAddonStore
+                    .load(prefs)
+                    .filter { it.enabled }
+
+                if (addons.isEmpty()) {
+                    return@launch
+                }
+
+                val tmdb = tmdbTypeAndId(item.id)
+                    ?: tmdbClient.resolveId(
+                        item.name,
+                        item.year,
+                        item.mediaType == MediaType.SERIES
+                    )
+                    ?: return@launch
+
+                val imdbId = tmdbClient.imdbId(
+                    tmdb.first,
+                    tmdb.second
+                ) ?: return@launch
+
+                val type =
+                    if (item.mediaType == MediaType.SERIES) {
+                        "series"
+                    } else {
+                        "movie"
+                    }
+
+                val contentId = when {
+                    type == "movie" -> imdbId
+
+                    season != null && episode != null ->
+                        "$imdbId:$season:$episode"
+
+                    else -> return@launch
+                }
+
+                addons.map { addon ->
+                    async {
+                        val manifest =
+                            stremioClient.fetchManifest(
+                                addon.manifestUrl
+                            ).getOrNull()
+                                ?: return@async emptyList()
+
+                        stremioClient.streams(
+                            manifest = manifest,
+                            type = type,
+                            contentId = contentId
+                        ).getOrDefault(emptyList())
+                    }
+                }
+                    .awaitAll()
+                    .flatten()
+                    .forEach { stream ->
+                        val token =
+                            stream.url ?: stream.magnet
+                                ?: return@forEach
+
+                        addResult(
+                            StreamEntry(
+                                result = TorrentResult(
+                                    title = stream.title,
+                                    token = token,
+                                    seeders = null,
+                                    size = null,
+                                    quality = Regex(
+                                        "(2160p|4k|1080p|720p|480p)",
+                                        RegexOption.IGNORE_CASE
+                                    ).find(stream.title)?.value,
+                                    source = stream.source,
+                                    audio = null
+                                ),
+                                resolver =
+                                    if (stream.url != null) {
+                                        "direct"
+                                    } else {
+                                        "torrent"
+                                    }
+                            )
+                        )
+                    }
             }
         }
+
+        if (results.isEmpty()) {
+            status.text = "No streams found"
+        }
     }
+
     dialog.setOnCancelListener {
         searchJob.cancel()
-        // A native-torrent resolve in progress won't stop on its own past this point (see
-        // resolveTorrentStream's kdoc) - only reachable while it hasn't succeeded yet, since
-        // a successful resolve already dismissed this dialog before the user could cancel it.
-        if (plugin.resolvesNatively) {
-            activeTorrentSession?.let { engine -> Thread { runCatching { engine.stop() } }.start() }
-            activeTorrentSession = null
-            TorrentForegroundService.stop(this)
+
+        activeTorrentSession?.let { engine ->
+            Thread {
+                runCatching { engine.stop() }
+            }.start()
         }
+
+        activeTorrentSession = null
+        TorrentForegroundService.stop(this)
     }
+
     dialog.show()
 }
 
