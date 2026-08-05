@@ -19,6 +19,8 @@ import com.lumora.model.MediaType
 import com.lumora.model.Provider
 import com.lumora.model.IptvProviderConfig
 import com.lumora.data.IptvProviderStore
+import com.lumora.data.remote.stremio.StremioAddonClient
+import com.lumora.data.remote.stremio.StremioAddonStore
 import com.lumora.plugin.DiscoveredProvider
 import com.lumora.plugin.DiscoveryResult
 import com.lumora.plugin.ResolveResult
@@ -533,6 +535,236 @@ internal fun MainActivity.wirePluginsPane(dialogView: View, onProviderAdded: () 
         showAddPluginScriptFromUrlDialog()
     }
     wirePluginStoresSection(dialogView, manager) { renderPluginList() }
+
+    val stremioList =
+        dialogView.findViewById<LinearLayout>(
+            R.id.settingsStremioAddonList
+        )
+
+    val stremioEmpty =
+        dialogView.findViewById<TextView>(
+            R.id.settingsStremioAddonListEmpty
+        )
+
+    val stremioAddButton =
+        dialogView.findViewById<View>(
+            R.id.settingsStremioAddonAdd
+        )
+
+    val stremioClient = StremioAddonClient()
+
+    lateinit var renderStremioAddons: () -> Unit
+
+    fun showAddStremioAddonDialog() {
+        val input = EditText(this).apply {
+            hint = "https://example.com/manifest.json"
+            inputType =
+                android.text.InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine()
+        }
+
+        val pad =
+            (20 * resources.displayMetrics.density).toInt()
+
+        val container = FrameLayout(this).apply {
+            setPadding(pad, pad / 2, pad, 0)
+            addView(input)
+        }
+
+        val addDialog = AlertDialog.Builder(this)
+            .setTitle("Add Stremio addon")
+            .setMessage(
+                "Enter the addon's manifest.json URL."
+            )
+            .setView(container)
+            .setPositiveButton("Add", null)
+            .setNegativeButton("Cancel", null)
+            .create()
+
+        addDialog.setOnShowListener {
+            addDialog
+                .getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener {
+                    val url =
+                        input.text.toString().trim()
+
+                    if (
+                        !url.startsWith("https://") &&
+                        !url.startsWith("http://")
+                    ) {
+                        input.error =
+                            "Enter a valid HTTP or HTTPS URL"
+                        return@setOnClickListener
+                    }
+
+                    input.isEnabled = false
+
+                    scope.launch {
+                        val result =
+                            stremioClient.fetchManifest(url)
+
+                        val manifest =
+                            result.getOrElse { error ->
+                                input.isEnabled = true
+                                Toast.makeText(
+                                    this@wirePluginsPane,
+                                    error.message
+                                        ?: "Could not load addon",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                                return@launch
+                            }
+
+                        if ("stream" !in manifest.resources) {
+                            input.isEnabled = true
+                            Toast.makeText(
+                                this@wirePluginsPane,
+                                "${manifest.name} does not provide streams",
+                                Toast.LENGTH_LONG
+                            ).show()
+                            return@launch
+                        }
+
+                        StremioAddonStore.add(
+                            prefs = prefs,
+                            name = manifest.name,
+                            manifestUrl = url
+                        )
+
+                        renderStremioAddons()
+                        addDialog.dismiss()
+
+                        Toast.makeText(
+                            this@wirePluginsPane,
+                            "Added ${manifest.name}",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+        }
+
+        addDialog.show()
+    }
+
+    renderStremioAddons = {
+        stremioList.removeAllViews()
+
+        val addons =
+            StremioAddonStore.load(prefs)
+
+        stremioEmpty.visibility =
+            if (addons.isEmpty()) View.VISIBLE
+            else View.GONE
+
+        addons.forEach { addon ->
+            val row = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = android.view.Gravity.CENTER_VERTICAL
+
+                val verticalPadding =
+                    (12 * resources.displayMetrics.density)
+                        .toInt()
+
+                setPadding(
+                    0,
+                    verticalPadding,
+                    0,
+                    verticalPadding
+                )
+            }
+
+            val labels = LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+            }
+
+            val title = TextView(this).apply {
+                text = addon.name
+                setTextColor(
+                    ContextCompat.getColor(
+                        this@wirePluginsPane,
+                        R.color.text_primary
+                    )
+                )
+                textSize = 16f
+            }
+
+            val urlText = TextView(this).apply {
+                text = addon.manifestUrl
+                setTextColor(
+                    ContextCompat.getColor(
+                        this@wirePluginsPane,
+                        R.color.text_secondary
+                    )
+                )
+                textSize = 12f
+                maxLines = 2
+            }
+
+            labels.addView(title)
+            labels.addView(urlText)
+
+            row.addView(
+                labels,
+                LinearLayout.LayoutParams(
+                    0,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    1f
+                )
+            )
+
+            val enabled = CheckBox(this).apply {
+                isChecked = addon.enabled
+                contentDescription =
+                    "Enable ${addon.name}"
+
+                setOnCheckedChangeListener { _, checked ->
+                    StremioAddonStore.setEnabled(
+                        prefs,
+                        addon.id,
+                        checked
+                    )
+                }
+            }
+
+            val remove = Button(this).apply {
+                text = "Remove"
+
+                setOnClickListener {
+                    AlertDialog.Builder(
+                        this@wirePluginsPane
+                    )
+                        .setTitle(
+                            "Remove ${addon.name}?"
+                        )
+                        .setMessage(
+                            "This removes the saved addon URL."
+                        )
+                        .setPositiveButton("Remove") { _, _ ->
+                            StremioAddonStore.remove(
+                                prefs,
+                                addon.id
+                            )
+                            renderStremioAddons()
+                        }
+                        .setNegativeButton(
+                            "Cancel",
+                            null
+                        )
+                        .show()
+                }
+            }
+
+            row.addView(enabled)
+            row.addView(remove)
+            stremioList.addView(row)
+        }
+    }
+
+    stremioAddButton.setOnClickListener {
+        showAddStremioAddonDialog()
+    }
+
+    renderStremioAddons()
 
     fun addCandidateRow(
         candidateList: LinearLayout,

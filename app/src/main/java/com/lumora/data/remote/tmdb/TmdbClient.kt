@@ -112,6 +112,24 @@ class TmdbClient {
         return parts[1] to tmdbId
     }
 
+    /**
+     * Resolves a TMDB movie or television ID to its IMDb ID.
+     * Stremio stream addons commonly identify movies as tt1234567
+     * and episodes as tt1234567:season:episode.
+     */
+    suspend fun imdbId(mediaType: String, tmdbId: Int): String? =
+        withContext(Dispatchers.IO) {
+            val type = if (mediaType == "tv") "tv" else "movie"
+            val body = fetchBody(
+                "/$type/$tmdbId/external_ids",
+                "language=en-US"
+            ) ?: return@withContext null
+
+            JSONObject(body)
+                .optString("imdb_id")
+                .takeIf { it.matches(Regex("^tt\\d+$")) }
+        }
+
     /** Seasons of a TV show (season 0 / specials dropped), for the episode picker. */
     suspend fun tvSeasons(tvId: Int): List<TvSeason> = withContext(Dispatchers.IO) {
         val body = fetchBody("/tv/$tvId", "language=en-US") ?: return@withContext emptyList()
