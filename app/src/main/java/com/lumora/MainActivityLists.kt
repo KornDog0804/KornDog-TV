@@ -90,6 +90,60 @@ internal fun MainActivity.refreshDownloadsList() {
 
 // ── Tabs ───────────────────────────────────────
 
+internal fun MainActivity.showTmdbSeriesTab() {
+    applySidebarVisibility(tabWantsSidebar = false)
+
+    binding.contentRow.visibility = View.VISIBLE
+    binding.seriesContent.visibility = View.VISIBLE
+    binding.filmsContent.visibility = View.GONE
+    binding.liveRow.visibility = View.GONE
+
+    binding.seriesContent.layoutManager =
+        LinearLayoutManager(this)
+    binding.seriesContent.adapter = seriesShelfAdapter
+
+    seriesShelfAdapter.submitList(tmdbSeriesShelves)
+    binding.seriesContent.scrollToPosition(0)
+
+    setStatus(
+        if (tmdbSeriesShelves.isEmpty()) {
+            "Loading series…"
+        } else {
+            ""
+        },
+        visible = tmdbSeriesShelves.isEmpty()
+    )
+
+    applyStatus()
+}
+
+internal fun MainActivity.showTmdbMoviesTab() {
+    applySidebarVisibility(tabWantsSidebar = false)
+
+    binding.contentRow.visibility = View.VISIBLE
+    binding.filmsContent.visibility = View.VISIBLE
+    binding.seriesContent.visibility = View.GONE
+    binding.liveRow.visibility = View.GONE
+
+    binding.filmsContent.layoutManager =
+        LinearLayoutManager(this)
+    binding.filmsContent.adapter = filmsShelfAdapter
+
+    filmsShelfAdapter.submitList(tmdbMovieShelves)
+    binding.filmsContent.scrollToPosition(0)
+
+    setStatus(
+        if (tmdbMovieShelves.isEmpty()) {
+            "Loading movies…"
+        } else {
+            ""
+        },
+        visible = tmdbMovieShelves.isEmpty()
+    )
+
+    applyStatus()
+}
+
 internal fun MainActivity.selectTab(index: Int) {
     activeSettingsOverlay?.dismiss()
     activeSearchOverlay?.dismiss()
@@ -126,6 +180,24 @@ internal fun MainActivity.selectTab(index: Int) {
     }
 
     updateTabStyles(listOf(binding.tabLive, binding.tabSeries, binding.tabFilms)[index])
+
+    // Hybrid KornDog layout:
+    // Live stays provider-backed; Movies and Series browse TMDB directly.
+    if (index == 1) {
+        showTmdbSeriesTab()
+        if (tmdbSeriesShelves.isEmpty()) {
+            loadTmdbVodCatalog()
+        }
+        return
+    }
+
+    if (index == 2) {
+        showTmdbMoviesTab()
+        if (tmdbMovieShelves.isEmpty()) {
+            loadTmdbVodCatalog()
+        }
+        return
+    }
 
     selectedCategoryIds = null
     selectedBrandChannelIds = null

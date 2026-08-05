@@ -106,21 +106,99 @@ internal fun MainActivity.selectDiscover() {
 }
 
 internal fun MainActivity.loadTmdbVodCatalog() {
-    if (!tmdbClient.hasKey() || tmdbVodCatalog.isNotEmpty()) return
+    if (!tmdbClient.hasKey()) return
 
     scope.launch {
         val loaded = coroutineScope {
-            val movies = async { tmdbClient.popularMovies() }
-            val series = async { tmdbClient.popularSeries() }
-            movies.await() + series.await()
-        }.distinctBy { it.id }
+            val trendingMovies =
+                async { tmdbClient.trendingMovies() }
+            val popularMovies =
+                async { tmdbClient.popularMovies(3) }
+            val nowPlayingMovies =
+                async { tmdbClient.nowPlayingMovies() }
+            val topRatedMovies =
+                async { tmdbClient.topRatedMovies() }
+            val upcomingMovies =
+                async { tmdbClient.upcomingMovies() }
 
-        if (loaded.isEmpty()) return@launch
+            val trendingSeries =
+                async { tmdbClient.trendingSeries() }
+            val popularSeries =
+                async { tmdbClient.popularSeries(3) }
+            val onTheAirSeries =
+                async { tmdbClient.onTheAirSeries() }
+            val airingTodaySeries =
+                async { tmdbClient.airingTodaySeries() }
+            val topRatedSeries =
+                async { tmdbClient.topRatedSeries() }
 
-        tmdbVodCatalog = loaded
+            val movieShelves = listOf(
+                ContentShelf(
+                    "Trending Movies",
+                    trendingMovies.await()
+                ),
+                ContentShelf(
+                    "Popular Movies",
+                    popularMovies.await()
+                ),
+                ContentShelf(
+                    "Now Playing",
+                    nowPlayingMovies.await()
+                ),
+                ContentShelf(
+                    "Top Rated Movies",
+                    topRatedMovies.await()
+                ),
+                ContentShelf(
+                    "Upcoming",
+                    upcomingMovies.await()
+                )
+            ).filter { it.items.isNotEmpty() }
 
-        // Rebuild only Movies/Series. Live TV stays provider-backed.
-        deriveFilmsSeries()
+            val seriesShelves = listOf(
+                ContentShelf(
+                    "Trending Series",
+                    trendingSeries.await()
+                ),
+                ContentShelf(
+                    "Popular Series",
+                    popularSeries.await()
+                ),
+                ContentShelf(
+                    "On The Air",
+                    onTheAirSeries.await()
+                ),
+                ContentShelf(
+                    "Airing Today",
+                    airingTodaySeries.await()
+                ),
+                ContentShelf(
+                    "Top Rated Series",
+                    topRatedSeries.await()
+                )
+            ).filter { it.items.isNotEmpty() }
+
+            movieShelves to seriesShelves
+        }
+
+        tmdbMovieShelves = loaded.first
+        tmdbSeriesShelves = loaded.second
+
+        tmdbVodCatalog =
+            (tmdbMovieShelves.flatMap { it.items } +
+                tmdbSeriesShelves.flatMap { it.items })
+                .distinctBy { it.id }
+
+        // Refresh the current TMDB tab as soon as network loading finishes.
+        when {
+            activeTab == 1 &&
+                !showingHome &&
+                !showingDiscover -> showTmdbSeriesTab()
+
+            activeTab == 2 &&
+                !showingHome &&
+                !showingDiscover -> showTmdbMoviesTab()
+        }
     }
 }
 

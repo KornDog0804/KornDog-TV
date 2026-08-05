@@ -58,6 +58,48 @@ class TmdbClient {
         return out.distinctBy { it.id }
     }
 
+    suspend fun trendingMovies(pages: Int = 3): List<Channel> =
+        paged("/trending/movie/week", "movie", pages)
+
+    suspend fun nowPlayingMovies(pages: Int = 3): List<Channel> =
+        paged("/movie/now_playing", "movie", pages)
+
+    suspend fun topRatedMovies(pages: Int = 3): List<Channel> =
+        paged("/movie/top_rated", "movie", pages)
+
+    suspend fun upcomingMovies(pages: Int = 3): List<Channel> =
+        paged("/movie/upcoming", "movie", pages)
+
+    suspend fun trendingSeries(pages: Int = 3): List<Channel> =
+        paged("/trending/tv/week", "tv", pages)
+
+    suspend fun topRatedSeries(pages: Int = 3): List<Channel> =
+        paged("/tv/top_rated", "tv", pages)
+
+    suspend fun onTheAirSeries(pages: Int = 3): List<Channel> =
+        paged("/tv/on_the_air", "tv", pages)
+
+    suspend fun airingTodaySeries(pages: Int = 3): List<Channel> =
+        paged("/tv/airing_today", "tv", pages)
+
+    private suspend fun paged(
+        path: String,
+        forcedType: String,
+        pages: Int
+    ): List<Channel> {
+        val out = mutableListOf<Channel>()
+
+        for (page in 1..pages.coerceIn(1, 10)) {
+            out += get(
+                path,
+                "language=en-US&page=$page",
+                forcedType = forcedType
+            )
+        }
+
+        return out.distinctBy { it.id }
+    }
+
     /** Multi-search across movies and TV; people/other media_types are dropped. */
     suspend fun search(query: String): List<Channel> {
         if (query.isBlank()) return emptyList()
