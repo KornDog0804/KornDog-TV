@@ -700,6 +700,7 @@ class MainActivity : AppCompatActivity() {
         onItemLongClick = { item -> toggleFavoriteVodItem(item) }
     ) { item -> playItem(item) }
     internal val tmdbClient = com.lumora.data.remote.tmdb.TmdbClient()
+    internal var tmdbVodCatalog: List<com.lumora.model.Channel> = emptyList()
     internal val discoverGridAdapter = com.lumora.adapter.PosterGridAdapter { item -> onDiscoverItemClick(item) }
     internal var discoverSearchJob: Job? = null
     internal var providerLoadJob: Job? = null

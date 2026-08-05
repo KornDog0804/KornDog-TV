@@ -209,7 +209,22 @@ internal fun MainActivity.deriveFilmsSeries() {
     val snapshot = allChannels
     filmsSeriesDeriveJob = scope.launch(Dispatchers.Default) {
         if (allChannels !== snapshot) return@launch
-        val result = deriveFilmsSeriesHalf(snapshot)
+
+        val tmdbCatalog = if (tmdbVodCatalog.isNotEmpty()) {
+            tmdbVodCatalog
+        } else if (tmdbClient.hasKey()) {
+            val loaded = coroutineScope {
+                val movies = async { tmdbClient.popularMovies() }
+                val series = async { tmdbClient.popularSeries() }
+                movies.await() + series.await()
+            }
+            tmdbVodCatalog = loaded
+            loaded
+        } else {
+            emptyList()
+        }
+
+        val result = deriveFilmsSeriesHalf(snapshot + tmdbCatalog)
         withContext(Dispatchers.Main) {
             // Guard again before touching the UI: the shelf build is seconds of work on
             // a big catalog, and a newer load may have swapped allChannels mid-derive.

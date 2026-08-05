@@ -32,6 +32,32 @@ class TmdbClient {
     suspend fun trending(): List<Channel> =
         get("/trending/all/week", "language=en-US")
 
+    /** Popular movie catalog used by the Movies tab. */
+    suspend fun popularMovies(pages: Int = 5): List<Channel> {
+        val out = mutableListOf<Channel>()
+        for (page in 1..pages) {
+            out += get(
+                "/movie/popular",
+                "language=en-US&page=$page",
+                forcedType = "movie"
+            )
+        }
+        return out.distinctBy { it.id }
+    }
+
+    /** Popular television catalog used by the Series tab. */
+    suspend fun popularSeries(pages: Int = 5): List<Channel> {
+        val out = mutableListOf<Channel>()
+        for (page in 1..pages) {
+            out += get(
+                "/tv/popular",
+                "language=en-US&page=$page",
+                forcedType = "tv"
+            )
+        }
+        return out.distinctBy { it.id }
+    }
+
     /** Multi-search across movies and TV; people/other media_types are dropped. */
     suspend fun search(query: String): List<Channel> {
         if (query.isBlank()) return emptyList()
@@ -102,8 +128,12 @@ class TmdbClient {
     }
 
     /** Tries each configured key in turn, so a dead/rate-limited key falls back to the next. */
-    private suspend fun get(path: String, params: String): List<Channel> =
-        fetchBody(path, params)?.let { parse(it) } ?: emptyList()
+    private suspend fun get(
+        path: String,
+        params: String,
+        forcedType: String? = null
+    ): List<Channel> =
+        fetchBody(path, params)?.let { parse(it, forcedType) } ?: emptyList()
 
     private suspend fun fetchBody(path: String, params: String): String? = withContext(Dispatchers.IO) {
         for (key in KEYS) {
@@ -128,12 +158,12 @@ class TmdbClient {
         null
     }
 
-    private fun parse(body: String): List<Channel> {
+    private fun parse(body: String, forcedType: String? = null): List<Channel> {
         val results = JSONObject(body).optJSONArray("results") ?: return emptyList()
         val out = ArrayList<Channel>(results.length())
         for (i in 0 until results.length()) {
             val o = results.optJSONObject(i) ?: continue
-            val type = o.optString("media_type")
+            val type = forcedType ?: o.optString("media_type")
             val mediaType = when (type) {
                 "movie" -> MediaType.MOVIE
                 "tv" -> MediaType.SERIES
