@@ -769,6 +769,7 @@ class MainActivity : AppCompatActivity() {
         playerDiagnostics = PlayerDiagnostics(playerManager.getExoPlayer())
         playerManager.getExoPlayer().addAnalyticsListener(playerDiagnostics.getAnalyticsListener())
         database = LumoraDatabase.getInstance(this)
+        seedKornDogDefaults()
 
         // Initialize background sync
         com.lumora.data.sync.BackgroundWorkEnabler.initialize(this)
