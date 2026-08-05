@@ -1015,7 +1015,7 @@ internal fun MainActivity.showProviderSettings() {
     } catch (e: Exception) { "unknown" }
     dialogView.findViewById<View>(R.id.settingsGithubLink).setOnClickListener {
         try {
-            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://github.com/disclosurez/Lumora")))
+            startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse("https://github.com/KornDog0804/KornDog-TV")))
         } catch (e: android.content.ActivityNotFoundException) {
             Toast.makeText(this, "No browser available", Toast.LENGTH_SHORT).show()
         }

@@ -14,7 +14,7 @@ import java.util.concurrent.TimeUnit
 class AppUpdateChecker(private val context: Context) {
 
     private val TAG = "AppUpdate"
-    private val GITHUB_REPO = "disclosurez/Lumora"
+    private val GITHUB_REPO = "KornDog0804/KornDog-TV"
     private val client = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
@@ -36,7 +36,7 @@ class AppUpdateChecker(private val context: Context) {
             val url = "https://api.github.com/repos/$GITHUB_REPO/releases/latest"
             val request = Request.Builder().url(url)
                 .header("Accept", "application/vnd.github.v3+json")
-                .header("User-Agent", "Lumora/2.0")
+                .header("User-Agent", "KornDog-TV/1.0")
                 .build()
 
             val response = client.newCall(request).execute()

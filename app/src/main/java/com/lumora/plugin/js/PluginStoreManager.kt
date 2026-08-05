@@ -37,7 +37,7 @@ class PluginStoreManager(
 ) {
     fun storeUrls(): List<PluginStore> {
         val custom = customStoreUrls()
-        val stores = mutableListOf(PluginStore(url = DEFAULT_STORE_URL, name = "Lumora Plugins", removable = false))
+        val stores = mutableListOf(PluginStore(url = DEFAULT_STORE_URL, name = "KornDog Plugins", removable = false))
         custom.filterNot { it == DEFAULT_STORE_URL }.forEach { stores.add(PluginStore(url = it, name = null, removable = true)) }
         return stores
     }
@@ -120,6 +120,6 @@ class PluginStoreManager(
 
     companion object {
         private const val PREF_STORE_URLS = "plugin_store_urls"
-        const val DEFAULT_STORE_URL = "https://raw.githubusercontent.com/disclosurez/Lumora-Plugins/master/scripts/index.json"
+        const val DEFAULT_STORE_URL = "https://korndog-sports-addon.netlify.app/lumora-plugins/index.json"
     }
 }

@@ -18,7 +18,7 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.lumora"
+        applicationId = "com.korndog.tv"
         minSdk = 25
         targetSdk = 36
         versionCode = 19

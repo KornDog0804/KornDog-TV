@@ -25,7 +25,7 @@ class AppUpdateInstaller(private val context: Context) {
      * Returns the DownloadManager ID for tracking progress.
      */
     fun downloadApk(downloadUrl: String, versionName: String): Long {
-        val fileName = "Lumora_v$versionName.apk"
+        val fileName = "KornDog-TV_v$versionName.apk"
         val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // The public Downloads dir (setDestinationInExternalPublicDir) requires
@@ -33,7 +33,7 @@ class AppUpdateInstaller(private val context: Context) {
         // it throws SecurityException and crashes the app outright. The app-specific
         // external dir needs no such permission and is still reachable by FileProvider.
         val request = DownloadManager.Request(Uri.parse(downloadUrl))
-            .setTitle("Lumora Update")
+            .setTitle("KornDog TV Update")
             .setDescription("Downloading v$versionName")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
@@ -61,7 +61,7 @@ class AppUpdateInstaller(private val context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
             !context.packageManager.canRequestPackageInstalls()
         ) {
-            Toast.makeText(context, "Allow Lumora to install updates, then try again", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, "Allow KornDog TV to install updates, then try again", Toast.LENGTH_LONG).show()
             val settingsIntent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
                 data = Uri.parse("package:${context.packageName}")
                 flags = Intent.FLAG_ACTIVITY_NEW_TASK
