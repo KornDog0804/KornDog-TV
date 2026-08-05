@@ -15,3 +15,7 @@ keystore.properties
 node_modules/
 package-lock.json
 package.json
+
+# KornDog TV release signing
+korndog-release.jks
+keystore.properties

@@ -104,6 +104,25 @@ internal fun MainActivity.selectDiscover() {
     applyStatus()
 }
 
+internal fun MainActivity.loadTmdbVodCatalog() {
+    if (!tmdbClient.hasKey() || tmdbVodCatalog.isNotEmpty()) return
+
+    scope.launch {
+        val loaded = coroutineScope {
+            val movies = async { tmdbClient.popularMovies() }
+            val series = async { tmdbClient.popularSeries() }
+            movies.await() + series.await()
+        }.distinctBy { it.id }
+
+        if (loaded.isEmpty()) return@launch
+
+        tmdbVodCatalog = loaded
+
+        // Rebuild only Movies/Series. Live TV stays provider-backed.
+        deriveFilmsSeries()
+    }
+}
+
 internal fun MainActivity.runDiscoverSearch() {
     val query = binding.discoverSearchInput.text?.toString()?.trim().orEmpty()
     loadDiscover(query.takeIf { it.isNotEmpty() })

@@ -299,7 +299,7 @@ internal fun MainActivity.renderLivePartial() {
 
 internal fun MainActivity.computeDerivedContent(allChannels: List<Channel>, hideNonEnglish: Boolean, hideAdult: Boolean): MainActivity.DerivedContent {
     deriveLiveHalf(allChannels)
-    val result = deriveFilmsSeriesHalf(allChannels)
+    val result = deriveFilmsSeriesHalf(allChannels + tmdbVodCatalog)
     filmList = result.filmList
     filmVersions = result.filmVersions
     filmShelves = result.filmShelves

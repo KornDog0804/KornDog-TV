@@ -771,6 +771,7 @@ class MainActivity : AppCompatActivity() {
         playerManager.getExoPlayer().addAnalyticsListener(playerDiagnostics.getAnalyticsListener())
         database = LumoraDatabase.getInstance(this)
         seedKornDogDefaults()
+        loadTmdbVodCatalog()
 
         // Initialize background sync
         com.lumora.data.sync.BackgroundWorkEnabler.initialize(this)
