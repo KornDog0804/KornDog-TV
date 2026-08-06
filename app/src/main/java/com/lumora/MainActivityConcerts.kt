@@ -198,11 +198,15 @@ private fun MainActivity.showConcertQueuePlayer(
     val controls = android.widget.LinearLayout(this).apply {
         orientation = android.widget.LinearLayout.HORIZONTAL
         gravity = android.view.Gravity.CENTER
+        layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        )
         setPadding(
             (8 * density).toInt(),
-            (6 * density).toInt(),
             (8 * density).toInt(),
-            (12 * density).toInt()
+            (8 * density).toInt(),
+            (30 * density).toInt()
         )
 
         addView(previous)
