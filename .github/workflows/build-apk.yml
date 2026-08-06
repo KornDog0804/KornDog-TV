@@ -32,13 +32,28 @@ jobs:
       - name: Make Gradle executable
         run: chmod +x gradlew
 
-      - name: Build release APK
+      - name: Restore KornDog signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KORNDOG_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KORNDOG_KEYSTORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KORNDOG_KEY_PASSWORD }}
+        run: |
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > korndog-release.jks
+
+          cat > keystore.properties <<EOF
+          storeFile=korndog-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=korndog
+          keyPassword=$KEY_PASSWORD
+          EOF
+
+      - name: Build signed release APK
         run: ./gradlew :app:assembleRelease --build-cache
 
       - name: Name release APK
         run: |
           OUTPUT="KornDog-TV-v3.2.${GITHUB_RUN_NUMBER}-build-${GITHUB_RUN_NUMBER}.apk"
-          cp app/build/outputs/apk/release/app-release-unsigned.apk "$OUTPUT"
+          cp app/build/outputs/apk/release/app-release.apk "$OUTPUT"
           echo "OUTPUT_APK=$OUTPUT" >> "$GITHUB_ENV"
 
       - name: Upload KornDog TV release
