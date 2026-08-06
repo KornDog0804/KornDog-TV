@@ -604,6 +604,17 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
                     .awaitAll()
                     .flatten()
+                    .distinctBy { it.url ?: it.magnet ?: it.title }
+                    .sortedByDescending { stream ->
+                        when {
+                            stream.title.contains("2160p", true) ||
+                                stream.title.contains("4k", true) -> 4
+                            stream.title.contains("1080p", true) -> 3
+                            stream.title.contains("720p", true) -> 2
+                            else -> 1
+                        }
+                    }
+                    .take(10)
                     .forEach { stream ->
                         val token =
                             stream.url ?: stream.magnet
