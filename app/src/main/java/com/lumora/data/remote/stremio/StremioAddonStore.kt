@@ -16,19 +16,9 @@ object StremioAddonStore {
 
     private const val KEY = "stremio_addons_json"
 
-    private val DEFAULT_ELFHOSTED = StremioAddonConfig(
-        id = "builtin-comet-elfhosted",
-        name = "Comet | ElfHosted",
-        manifestUrl = "https://comet.elfhosted.com/eyJtYXhSZXN1bHRzUGVyUmVzb2x1dGlvbiI6MCwibWF4U2l6ZSI6MCwiY2FjaGVkT25seSI6ZmFsc2UsInNvcnRDYWNoZWRVbmNhY2hlZFRvZ2V0aGVyIjpmYWxzZSwicmVtb3ZlVHJhc2giOnRydWUsInJlc3VsdEZvcm1hdCI6WyJhbGwiXSwiZGVicmlkU2VydmljZXMiOltdLCJlbmFibGVUb3JyZW50IjpmYWxzZSwiZGVkdXBsaWNhdGVTdHJlYW1zIjpmYWxzZSwic2NyYXBlRGVicmlkQWNjb3VudFRvcnJlbnRzIjpmYWxzZSwiZGVicmlkU3RyZWFtUHJveHlQYXNzd29yZCI6IiIsImxhbmd1YWdlcyI6eyJyZXF1aXJlZCI6W10sImFsbG93ZWQiOltdLCJleGNsdWRlIjpbXSwicHJlZmVycmVkIjpbXX0sInJlc29sdXRpb25zIjp7fSwib3B0aW9ucyI6eyJyZW1vdmVfcmFua3NfdW5kZXIiOi0xMDAwMDAwMDAwMCwiYWxsb3dfZW5nbGlzaF9pbl9sYW5ndWFnZXMiOmZhbHNlLCJyZW1vdmVfdW5rbm93bl9sYW5ndWFnZXMiOmZhbHNlfX0=/manifest.json",
-        enabled = true
-    )
 
     fun load(prefs: SharedPreferences): List<StremioAddonConfig> {
-        val raw = prefs.getString(KEY, null)
-
-        if (raw == null) {
-            return listOf(DEFAULT_ELFHOSTED)
-        }
+        val raw = prefs.getString(KEY, null) ?: return emptyList()
 
         val saved = runCatching {
             val array = JSONArray(raw)
@@ -59,16 +49,7 @@ object StremioAddonStore {
             }
         }.getOrDefault(emptyList())
 
-        val savedDefault = saved.firstOrNull {
-            it.id == DEFAULT_ELFHOSTED.id ||
-                it.manifestUrl == DEFAULT_ELFHOSTED.manifestUrl
-        }
-
-        return listOf(savedDefault ?: DEFAULT_ELFHOSTED) +
-            saved.filterNot {
-                it.id == DEFAULT_ELFHOSTED.id ||
-                    it.manifestUrl == DEFAULT_ELFHOSTED.manifestUrl
-            }
+        return saved
     }
 
     fun save(
