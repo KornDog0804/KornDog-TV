@@ -4,6 +4,7 @@ import android.view.View
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.lumora.data.remote.concerts.ConcertCatalogClient
 import com.lumora.model.Channel
+import kotlinx.coroutines.launch
 
 internal fun MainActivity.playConcertItem(item: Channel) {
     val key = youtubeVideoId(item.url)
