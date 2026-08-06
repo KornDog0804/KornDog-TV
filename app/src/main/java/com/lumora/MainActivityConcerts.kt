@@ -116,10 +116,28 @@ private fun MainActivity.showConcertQueuePlayer(
         action: () -> Unit
     ) = android.widget.Button(this).apply {
         text = label
+        isAllCaps = false
+        textSize = 13f
+        minWidth = 0
+        minimumWidth = 0
+        setPadding(
+            (6 * density).toInt(),
+            (8 * density).toInt(),
+            (6 * density).toInt(),
+            (8 * density).toInt()
+        )
+        layoutParams = android.widget.LinearLayout.LayoutParams(
+            0,
+            android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+            1f
+        ).apply {
+            marginStart = (3 * density).toInt()
+            marginEnd = (3 * density).toInt()
+        }
         setOnClickListener { action() }
     }
 
-    val previous = controlButton("Previous") {
+    val previous = controlButton("Prev") {
         webView.evaluateJavascript(
             "window.korndogPrevious && window.korndogPrevious();",
             null
