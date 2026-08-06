@@ -158,6 +158,39 @@ private fun MainActivity.showConcertQueuePlayer(
         )
     }
 
+    val youtube = controlButton("YouTube") {
+        webView.evaluateJavascript(
+            "window.korndogCurrentIndex ? window.korndogCurrentIndex() : '0';"
+        ) { raw ->
+            val index = raw
+                .trim()
+                .trim('"')
+                .toIntOrNull()
+                ?: 0
+
+            val track = tracks.getOrNull(index)
+                ?: return@evaluateJavascript
+
+            val intent = android.content.Intent(
+                android.content.Intent.ACTION_VIEW,
+                android.net.Uri.parse(track.first.url)
+            ).apply {
+                setPackage("com.google.android.youtube")
+            }
+
+            runCatching {
+                startActivity(intent)
+            }.getOrElse {
+                startActivity(
+                    android.content.Intent(
+                        android.content.Intent.ACTION_VIEW,
+                        android.net.Uri.parse(track.first.url)
+                    )
+                )
+            }
+        }
+    }
+
     val close = controlButton("Close") {
         dialog.dismiss()
     }
@@ -175,6 +208,7 @@ private fun MainActivity.showConcertQueuePlayer(
         addView(previous)
         addView(playPause)
         addView(next)
+        addView(youtube)
         addView(close)
     }
 
@@ -277,6 +311,10 @@ private fun MainActivity.showConcertQueuePlayer(
                         index += 1;
                         loadCurrent();
                     }
+                };
+
+                window.korndogCurrentIndex = function() {
+                    return index;
                 };
 
                 window.korndogToggle = function() {
