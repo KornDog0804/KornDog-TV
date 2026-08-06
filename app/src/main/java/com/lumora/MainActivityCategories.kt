@@ -1255,6 +1255,7 @@ internal fun MainActivity.updateTabStyles(selected: View) {
         indicator?.visibility = if (isSelected) View.VISIBLE else View.GONE
     }
     selected.requestFocus()
+        binding.tabBar.post { binding.tabBar.smoothScrollTo((selected.left - 40).coerceAtLeast(0), 0) }
 }
 
 internal fun MainActivity.selectHome() {
