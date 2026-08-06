@@ -276,7 +276,8 @@ internal fun MainActivity.showStreamSearchDialog(
 ) {
     data class StreamEntry(
         val result: TorrentResult,
-        val resolver: String
+        val resolver: String,
+        val headers: Map<String, String> = emptyMap()
     )
 
     val epTag =
@@ -354,7 +355,10 @@ internal fun MainActivity.showStreamSearchDialog(
         scope.launch {
             val resolved = when (entry.resolver) {
                 "direct" -> {
-                    ResolveResult.Ready(result.token)
+                    ResolveResult.Ready(
+                        url = result.token,
+                        headers = entry.headers
+                    )
                 }
 
                 "torrent" -> {
@@ -620,7 +624,8 @@ internal fun MainActivity.showStreamSearchDialog(
                                         "direct"
                                     } else {
                                         "torrent"
-                                    }
+                                    },
+                                headers = stream.requestHeaders
                             )
                         )
                     }

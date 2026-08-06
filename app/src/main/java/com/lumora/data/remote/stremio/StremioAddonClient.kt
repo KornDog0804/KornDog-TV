@@ -23,7 +23,8 @@ data class StremioStream(
     val url: String? = null,
     val magnet: String? = null,
     val source: String? = null,
-    val behaviorHints: Map<String, String> = emptyMap()
+    val behaviorHints: Map<String, String> = emptyMap(),
+    val requestHeaders: Map<String, String> = emptyMap()
 )
 
 class StremioAddonClient {
@@ -155,11 +156,37 @@ class StremioAddonClient {
                     if (directUrl == null && magnet == null) continue
 
                     val hints = mutableMapOf<String, String>()
+                    val requestHeaders = mutableMapOf<String, String>()
+
                     item.optJSONObject("behaviorHints")?.let { behavior ->
                         behavior.keys().forEach { key ->
-                            behavior.optString(key)
+                            val value = behavior.opt(key)
+                            if (value is String && value.isNotBlank()) {
+                                hints[key] = value
+                            }
+                        }
+
+                        behavior
+                            .optJSONObject("proxyHeaders")
+                            ?.optJSONObject("request")
+                            ?.let { headers ->
+                                headers.keys().forEach { key ->
+                                    headers.optString(key)
+                                        .takeIf(String::isNotBlank)
+                                        ?.let { value ->
+                                            requestHeaders[key] = value
+                                        }
+                                }
+                            }
+                    }
+
+                    item.optJSONObject("headers")?.let { headers ->
+                        headers.keys().forEach { key ->
+                            headers.optString(key)
                                 .takeIf(String::isNotBlank)
-                                ?.let { value -> hints[key] = value }
+                                ?.let { value ->
+                                    requestHeaders[key] = value
+                                }
                         }
                     }
 
@@ -169,7 +196,8 @@ class StremioAddonClient {
                             url = directUrl,
                             magnet = magnet,
                             source = manifest.name,
-                            behaviorHints = hints
+                            behaviorHints = hints,
+                            requestHeaders = requestHeaders
                         )
                     )
                 }
