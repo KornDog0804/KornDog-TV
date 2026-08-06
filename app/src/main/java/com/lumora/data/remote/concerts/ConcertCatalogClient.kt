@@ -11,10 +11,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
 
+data class ConcertCatalogResult(
+    val shelves: List<ContentShelf>,
+    val queues: Map<String, List<Channel>>
+)
+
 class ConcertCatalogClient(
     private val http: OkHttpClient = OkHttpClient()
 ) {
-    suspend fun loadShelves(): Result<List<ContentShelf>> =
+    suspend fun loadCatalog(): Result<ConcertCatalogResult> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val request = Request.Builder()
@@ -34,7 +39,9 @@ class ConcertCatalogClient(
 
                 val root = JSONArray(body)
 
-                buildList {
+                val queues = linkedMapOf<String, List<Channel>>()
+
+                val shelves = buildList {
                     for (index in 0 until root.length()) {
                         val section = root.optJSONObject(index) ?: continue
                         val title = section.optString("title").trim()
@@ -46,7 +53,8 @@ class ConcertCatalogClient(
                         collectPlayableItems(
                             node = section,
                             sectionTitle = cleanSectionTitle(title),
-                            output = items
+                            output = items,
+                            queues = queues
                         )
 
                         if (items.isNotEmpty()) {
@@ -59,13 +67,19 @@ class ConcertCatalogClient(
                         }
                     }
                 }
+
+                ConcertCatalogResult(
+                    shelves = shelves,
+                    queues = queues
+                )
             }
         }
 
     private fun collectPlayableItems(
         node: JSONObject,
         sectionTitle: String,
-        output: MutableList<Channel>
+        output: MutableList<Channel>,
+        queues: MutableMap<String, List<Channel>>
     ) {
         val mode = node.optString("mode")
         val tracks = node.optJSONArray("tracks")
@@ -75,35 +89,68 @@ class ConcertCatalogClient(
             tracks != null &&
             tracks.length() > 0
         ) {
-            val firstTrack = tracks.optJSONObject(0)
-            val firstUrl = firstTrack?.optString("url")
+            val title = node.optString("title")
+                .ifBlank { "Concert" }
+
+            val artist = node.optString("artist")
+                .takeIf(String::isNotBlank)
+
+            val year = node.opt("year")
+                ?.toString()
                 ?.takeIf(String::isNotBlank)
 
-            if (firstUrl != null) {
-                val title = node.optString("title")
-                    .ifBlank {
-                        firstTrack.optString("title")
-                            .ifBlank { "Concert" }
-                    }
+            val trackChannels = buildList {
+                for (trackIndex in 0 until tracks.length()) {
+                    val track = tracks.optJSONObject(trackIndex) ?: continue
 
-                val artist = node.optString("artist")
-                    .takeIf(String::isNotBlank)
+                    val trackUrl = track.optString("url")
+                        .takeIf(String::isNotBlank)
+                        ?: continue
 
-                val year = node.opt("year")
-                    ?.toString()
-                    ?.takeIf(String::isNotBlank)
+                    val trackTitle = track.optString("title")
+                        .ifBlank { "Track ${trackIndex + 1}" }
+
+                    val thumbnail = node.optString("thumb")
+                        .takeIf {
+                            it.startsWith("http://") ||
+                                it.startsWith("https://")
+                        }
+                        ?: youtubeThumbnail(trackUrl)
+
+                    add(
+                        Channel(
+                            id = "concert-track:${stableHash("$title|$trackIndex|$trackUrl")}",
+                            name = trackTitle,
+                            url = trackUrl,
+                            posterUrl = thumbnail,
+                            backdropUrl = thumbnail,
+                            group = title,
+                            mediaType = MediaType.MOVIE,
+                            categoryName = sectionTitle,
+                            description = artist,
+                            episodeNum = trackIndex + 1,
+                            year = year
+                        )
+                    )
+                }
+            }
+
+            val firstTrack = trackChannels.firstOrNull()
+
+            if (firstTrack != null) {
+                val itemId = "concert:${stableHash("$title|${firstTrack.url}")}"
 
                 val thumbnail = node.optString("thumb")
                     .takeIf {
                         it.startsWith("http://") ||
                             it.startsWith("https://")
                     }
-                    ?: youtubeThumbnail(firstUrl)
+                    ?: firstTrack.posterUrl
 
-                output += Channel(
-                    id = "concert:${stableHash("$title|$firstUrl")}",
+                val catalogItem = Channel(
+                    id = itemId,
                     name = title,
-                    url = firstUrl,
+                    url = firstTrack.url,
                     posterUrl = thumbnail,
                     backdropUrl = thumbnail,
                     group = "Concert Corner",
@@ -112,13 +159,16 @@ class ConcertCatalogClient(
                     description = buildString {
                         artist?.let { append(it) }
 
-                        if (tracks.length() > 1) {
+                        if (trackChannels.size > 1) {
                             if (isNotEmpty()) append(" · ")
-                            append("${tracks.length()} tracks")
+                            append("${trackChannels.size} tracks")
                         }
                     }.takeIf(String::isNotBlank),
                     year = year
                 )
+
+                output += catalogItem
+                queues[itemId] = trackChannels
             }
         }
 
@@ -129,7 +179,8 @@ class ConcertCatalogClient(
                 collectPlayableItems(
                     node = child,
                     sectionTitle = sectionTitle,
-                    output = output
+                    output = output,
+                    queues = queues
                 )
             }
         }

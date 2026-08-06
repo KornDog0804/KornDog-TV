@@ -7,18 +7,301 @@ import com.lumora.model.Channel
 import kotlinx.coroutines.launch
 
 internal fun MainActivity.playConcertItem(item: Channel) {
-    val key = youtubeVideoId(item.url)
+    val sourceQueue = concertQueues[item.id]
+        ?.takeIf { it.isNotEmpty() }
+        ?: listOf(item)
 
-    if (key == null) {
+    val playableQueue = sourceQueue.mapNotNull { track ->
+        youtubeVideoId(track.url)?.let { key ->
+            track to key
+        }
+    }
+
+    if (playableQueue.isEmpty()) {
         android.widget.Toast.makeText(
             this,
-            "That concert link could not be opened.",
+            "That concert could not be opened.",
             android.widget.Toast.LENGTH_LONG
         ).show()
         return
     }
 
-    showTrailerPlayer(key)
+    showConcertQueuePlayer(
+        title = item.name,
+        tracks = playableQueue
+    )
+}
+
+private fun MainActivity.showConcertQueuePlayer(
+    title: String,
+    tracks: List<Pair<Channel, String>>
+) {
+    val density = resources.displayMetrics.density
+
+    val trackTitle = android.widget.TextView(this).apply {
+        setTextColor(
+            androidx.core.content.ContextCompat.getColor(
+                this@showConcertQueuePlayer,
+                R.color.text_primary
+            )
+        )
+        textSize = 16f
+        maxLines = 2
+        ellipsize = android.text.TextUtils.TruncateAt.END
+        setPadding(
+            (16 * density).toInt(),
+            (10 * density).toInt(),
+            (16 * density).toInt(),
+            (8 * density).toInt()
+        )
+    }
+
+    val webView = android.webkit.WebView(this).apply {
+        layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+
+        settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
+        settings.mediaPlaybackRequiresUserGesture = false
+
+        webViewClient = object : android.webkit.WebViewClient() {
+            override fun shouldOverrideUrlLoading(
+                view: android.webkit.WebView,
+                request: android.webkit.WebResourceRequest
+            ): Boolean {
+                return request.isForMainFrame
+            }
+        }
+    }
+
+    val dialog = android.app.Dialog(
+        this,
+        android.R.style.Theme_Black_NoTitleBar_Fullscreen
+    )
+
+    class ConcertBridge {
+        @android.webkit.JavascriptInterface
+        fun onTrackChanged(index: Int) {
+            runOnUiThread {
+                val channel = tracks.getOrNull(index)?.first
+                    ?: return@runOnUiThread
+
+                trackTitle.text =
+                    "${index + 1} / ${tracks.size}  ·  ${channel.name}"
+            }
+        }
+
+        @android.webkit.JavascriptInterface
+        fun onQueueFinished() {
+            runOnUiThread {
+                android.widget.Toast.makeText(
+                    this@showConcertQueuePlayer,
+                    "Stitched set finished.",
+                    android.widget.Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+    }
+
+    webView.addJavascriptInterface(
+        ConcertBridge(),
+        "ConcertBridge"
+    )
+
+    fun controlButton(
+        label: String,
+        action: () -> Unit
+    ) = android.widget.Button(this).apply {
+        text = label
+        setOnClickListener { action() }
+    }
+
+    val previous = controlButton("Previous") {
+        webView.evaluateJavascript(
+            "window.korndogPrevious && window.korndogPrevious();",
+            null
+        )
+    }
+
+    val playPause = controlButton("Pause") {
+        webView.evaluateJavascript(
+            "window.korndogToggle && window.korndogToggle();",
+            null
+        )
+    }
+
+    val next = controlButton("Next") {
+        webView.evaluateJavascript(
+            "window.korndogNext && window.korndogNext();",
+            null
+        )
+    }
+
+    val close = controlButton("Close") {
+        dialog.dismiss()
+    }
+
+    val controls = android.widget.LinearLayout(this).apply {
+        orientation = android.widget.LinearLayout.HORIZONTAL
+        gravity = android.view.Gravity.CENTER
+        setPadding(
+            (8 * density).toInt(),
+            (6 * density).toInt(),
+            (8 * density).toInt(),
+            (12 * density).toInt()
+        )
+
+        addView(previous)
+        addView(playPause)
+        addView(next)
+        addView(close)
+    }
+
+    val root = android.widget.LinearLayout(this).apply {
+        orientation = android.widget.LinearLayout.VERTICAL
+        setBackgroundColor(android.graphics.Color.BLACK)
+
+        addView(trackTitle)
+        addView(webView)
+        addView(controls)
+    }
+
+    val idsJson = org.json.JSONArray().apply {
+        tracks.forEach { (_, key) ->
+            put(key)
+        }
+    }.toString()
+
+    val html = """
+        <!doctype html>
+        <html>
+        <head>
+            <meta name="viewport"
+                  content="width=device-width,initial-scale=1,maximum-scale=1">
+            <style>
+                html, body, #player {
+                    width: 100%;
+                    height: 100%;
+                    margin: 0;
+                    padding: 0;
+                    overflow: hidden;
+                    background: #000;
+                }
+            </style>
+        </head>
+        <body>
+            <div id="player"></div>
+
+            <script src="https://www.youtube.com/iframe_api"></script>
+            <script>
+                const queue = $idsJson;
+                let index = 0;
+                let player = null;
+
+                function notifyTrack() {
+                    if (window.ConcertBridge) {
+                        ConcertBridge.onTrackChanged(index);
+                    }
+                }
+
+                function loadCurrent() {
+                    if (!player || !queue[index]) return;
+
+                    player.loadVideoById(queue[index]);
+                    notifyTrack();
+                }
+
+                window.onYouTubeIframeAPIReady = function() {
+                    player = new YT.Player('player', {
+                        width: '100%',
+                        height: '100%',
+                        videoId: queue[0],
+                        playerVars: {
+                            autoplay: 1,
+                            playsinline: 1,
+                            rel: 0,
+                            modestbranding: 1
+                        },
+                        events: {
+                            onReady: function() {
+                                notifyTrack();
+                                player.playVideo();
+                            },
+                            onStateChange: function(event) {
+                                if (event.data === YT.PlayerState.ENDED) {
+                                    if (index + 1 < queue.length) {
+                                        index += 1;
+                                        loadCurrent();
+                                    } else if (window.ConcertBridge) {
+                                        ConcertBridge.onQueueFinished();
+                                    }
+                                }
+                            }
+                        }
+                    });
+                };
+
+                window.korndogPrevious = function() {
+                    if (index > 0) {
+                        index -= 1;
+                        loadCurrent();
+                    } else if (player) {
+                        player.seekTo(0, true);
+                        player.playVideo();
+                    }
+                };
+
+                window.korndogNext = function() {
+                    if (index + 1 < queue.length) {
+                        index += 1;
+                        loadCurrent();
+                    }
+                };
+
+                window.korndogToggle = function() {
+                    if (!player) return;
+
+                    const state = player.getPlayerState();
+
+                    if (state === YT.PlayerState.PLAYING) {
+                        player.pauseVideo();
+                    } else {
+                        player.playVideo();
+                    }
+                };
+            </script>
+        </body>
+        </html>
+    """.trimIndent()
+
+    dialog.setContentView(root)
+
+    dialog.setOnDismissListener {
+        runCatching {
+            webView.evaluateJavascript(
+                "if (window.player) player.stopVideo();",
+                null
+            )
+        }
+
+        webView.removeJavascriptInterface("ConcertBridge")
+        webView.stopLoading()
+        webView.destroy()
+    }
+
+    webView.loadDataWithBaseURL(
+        "https://www.youtube-nocookie.com",
+        html,
+        "text/html",
+        "utf-8",
+        null
+    )
+
+    dialog.show()
+    previous.requestFocus()
 }
 
 private fun youtubeVideoId(url: String): String? {
@@ -46,7 +329,11 @@ private fun youtubeVideoId(url: String): String? {
     }
 
     return key
-        ?.takeIf { it.matches(Regex("[A-Za-z0-9_-]{6,20}")) }
+        ?.takeIf {
+            it.matches(
+                Regex("[A-Za-z0-9_-]{6,20}")
+            )
+        }
 }
 
 internal fun MainActivity.setupConcertCorner() {
@@ -97,9 +384,9 @@ internal fun MainActivity.selectConcertCorner() {
 
 internal fun MainActivity.loadConcertCorner() {
     scope.launch {
-        val result = ConcertCatalogClient().loadShelves()
+        val result = ConcertCatalogClient().loadCatalog()
 
-        val shelves = result.getOrElse {
+        val catalog = result.getOrElse {
             if (
                 binding.concertContent.visibility == View.VISIBLE
             ) {
@@ -111,7 +398,10 @@ internal fun MainActivity.loadConcertCorner() {
             return@launch
         }
 
-        concertShelves = shelves
+        concertShelves = catalog.shelves
+        concertQueues = catalog.queues
+
+        val shelves = catalog.shelves
 
         if (
             binding.concertContent.visibility == View.VISIBLE

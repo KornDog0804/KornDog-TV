@@ -694,6 +694,9 @@ class MainActivity : AppCompatActivity() {
     internal var concertShelves:
         List<com.lumora.model.ContentShelf> = emptyList()
 
+    internal var concertQueues:
+        Map<String, List<com.lumora.model.Channel>> = emptyMap()
+
     internal val homeShelfAdapter = ShelfAdapter(
         onItemClick = { item -> onHomeItemClick(item) },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
