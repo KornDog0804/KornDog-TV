@@ -1349,7 +1349,6 @@
                             android:paddingBottom="8dp" />
                     </LinearLayout>
             </FrameLayout>
-        </LinearLayout>
 
                 <!-- Content area: Series grid -->
                 <androidx.recyclerview.widget.RecyclerView
