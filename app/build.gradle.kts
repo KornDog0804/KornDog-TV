@@ -21,8 +21,18 @@ android {
         applicationId = "com.korndog.tv"
         minSdk = 25
         targetSdk = 36
-        versionCode = 19
-        versionName = "3.2"
+        val ciBuildNumber =
+            System.getenv("GITHUB_RUN_NUMBER")
+                ?.toIntOrNull()
+                ?: 0
+
+        versionCode = 320000 + ciBuildNumber
+        versionName =
+            if (ciBuildNumber > 0) {
+                "3.2.$ciBuildNumber"
+            } else {
+                "3.2.local"
+            }
 
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
@@ -50,7 +60,7 @@ android {
             applicationIdSuffix = ".debug"
         }
         release {
-            isMinifyEnabled = true
+            isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

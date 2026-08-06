@@ -27,25 +27,23 @@ jobs:
       - name: Install Android SDK 36
         run: |
           yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager \
-            "platforms;android-36" \
-            "build-tools;36.0.0" \
-            "platform-tools"
+          sdkmanager             "platforms;android-36"             "build-tools;36.0.0"             "platform-tools"
 
       - name: Make Gradle executable
         run: chmod +x gradlew
 
-      - name: Build debug APK
-        run: ./gradlew :app:assembleDebug
+      - name: Build release APK
+        run: ./gradlew :app:assembleRelease --build-cache
 
-      - name: Rename KornDog TV APK
+      - name: Name release APK
         run: |
-          cp app/build/outputs/apk/debug/app-debug.apk \
-            app/build/outputs/apk/debug/KornDog-TV-debug.apk
+          OUTPUT="KornDog-TV-v3.2.${GITHUB_RUN_NUMBER}-build-${GITHUB_RUN_NUMBER}.apk"
+          cp app/build/outputs/apk/release/app-release-unsigned.apk "$OUTPUT"
+          echo "OUTPUT_APK=$OUTPUT" >> "$GITHUB_ENV"
 
-      - name: Upload KornDog TV APK
+      - name: Upload KornDog TV release
         uses: actions/upload-artifact@v4
         with:
-          name: KornDog-TV-debug
-          path: app/build/outputs/apk/debug/KornDog-TV-debug.apk
+          name: KornDog-TV-v3.2.${{ github.run_number }}
+          path: ${{ env.OUTPUT_APK }}
           if-no-files-found: error
