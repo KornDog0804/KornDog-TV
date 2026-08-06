@@ -174,23 +174,14 @@ internal fun MainActivity.showLivePreviewPane() {
  *  which channel occupies "behind the preview" changes as the guide scrolls. */
 
 internal fun MainActivity.updateGuideRowWrap() {
-    val showingPreview = binding.livePreviewGutter.visibility == View.VISIBLE
-    val reservedPx = if (showingPreview) {
-        // The pane's real on-screen width, exactly - no added buffer. An extra margin
-        // here was tried twice (first 16dp, then 32dp) to guard against focus-scale
-        // bleed that turned out not to be the real bug, and each just left a visible
-        // gap between a reserved row's content and the pane's actual left edge.
-        binding.livePreviewPane.getGlobalVisibleRect(previewGlobalRect)
-        previewGlobalRect.width()
-    } else 0
+    // The preview now occupies real space above the guide rather than floating
+    // over rows, so every row can use the full available width.
     for (i in 0 until binding.liveContent.childCount) {
         val child = binding.liveContent.getChildAt(i)
-        val overlapsPreview = showingPreview && run {
-            child.getGlobalVisibleRect(guideRowGlobalRect)
-            guideRowGlobalRect.bottom > previewGlobalRect.top && guideRowGlobalRect.top < previewGlobalRect.bottom
-        }
-        (binding.liveContent.getChildViewHolder(child) as? LiveGuideAdapter.RowViewHolder)
-            ?.setReservedEnd(if (overlapsPreview) reservedPx else 0)
+
+        (binding.liveContent.getChildViewHolder(child)
+            as? LiveGuideAdapter.RowViewHolder)
+            ?.setReservedEnd(0)
     }
 }
 
