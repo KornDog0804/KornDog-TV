@@ -200,7 +200,11 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
     }
 
     button.setOnClickListener {
-        showStreamSearchDialog(plugin, item)
+        if (item.mediaType == MediaType.SERIES) {
+            showSeriesEpisodePicker(plugin, item)
+        } else {
+            showStreamSearchDialog(plugin, item)
+        }
     }
 }
 
