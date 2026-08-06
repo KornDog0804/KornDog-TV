@@ -47,6 +47,13 @@ jobs:
           keyPassword=$KEY_PASSWORD
           EOF
 
+      - name: Verify restored signing key
+        env:
+          KEYSTORE_PASSWORD: ${{ secrets.KORNDOG_KEYSTORE_PASSWORD }}
+        run: |
+          keytool -list             -keystore korndog-release.jks             -alias korndog             -storepass "$KEYSTORE_PASSWORD" >/dev/null
+          echo "Signing key verified"
+
       - name: Build signed release APK
         run: ./gradlew :app:assembleRelease --build-cache
 
