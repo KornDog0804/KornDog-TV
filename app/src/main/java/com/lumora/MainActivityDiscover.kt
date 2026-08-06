@@ -93,6 +93,7 @@ internal fun MainActivity.selectDiscover() {
     binding.contentRow.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.discoverContent.visibility = View.VISIBLE
     updateTabStyles(binding.tabDiscover)
     // Recompute span now the pane is on-screen and actually has a width.

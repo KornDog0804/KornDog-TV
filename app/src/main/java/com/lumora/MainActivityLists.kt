@@ -158,6 +158,7 @@ internal fun MainActivity.selectTab(index: Int) {
     // preview down again right after they were built.
     showingHome = false
     binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.VISIBLE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE

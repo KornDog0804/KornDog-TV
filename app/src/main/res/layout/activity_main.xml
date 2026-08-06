@@ -398,7 +398,7 @@
                 android:paddingTop="@dimen/tab_padding_vertical"
                 android:paddingBottom="@dimen/tab_padding_vertical"
                 android:nextFocusLeft="@id/tabCatchup"
-                android:nextFocusRight="@id/btnSearch"
+                android:nextFocusRight="@id/tabConcerts"
                 android:stateListAnimator="@animator/focus_scale_flat"
                 android:layerType="none">
 
@@ -445,7 +445,7 @@
                  click and the visibility gating by this id, and both apply unchanged to
                  this element. -->
             <LinearLayout
-                android:id="@+id/btnSearch"
+                android:id="@+id/tabConcerts"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginHorizontal="3dp"
@@ -458,6 +458,59 @@
                 android:paddingTop="@dimen/tab_padding_vertical"
                 android:paddingBottom="@dimen/tab_padding_vertical"
                 android:nextFocusLeft="@id/tabDiscover"
+                android:nextFocusRight="@id/btnSearch"
+                android:stateListAnimator="@animator/focus_scale_flat"
+                android:layerType="none">
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <ImageView
+                        android:id="@+id/tabConcertsIcon"
+                        android:layout_width="20dp"
+                        android:layout_height="20dp"
+                        android:src="@drawable/ic_series"
+                        android:tint="@color/text_secondary" />
+
+                    <TextView
+                        android:id="@+id/tabConcertsLabel"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:fontFamily="@font/inter_medium"
+                        android:maxLines="1"
+                        android:text="Concert Corner"
+                        android:textColor="@color/text_secondary"
+                        android:textSize="@dimen/tab_text" />
+                </LinearLayout>
+
+                <View
+                    android:id="@+id/tabConcertsIndicator"
+                    android:layout_width="24dp"
+                    android:layout_height="4dp"
+                    android:layout_marginTop="4dp"
+                    android:background="@drawable/tab_indicator"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+
+            <LinearLayout
+                android:id="@+id/btnSearch"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginHorizontal="3dp"
+                android:background="@drawable/bg_tab_item"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingHorizontal="@dimen/tab_padding_horizontal"
+                android:paddingTop="@dimen/tab_padding_vertical"
+                android:paddingBottom="@dimen/tab_padding_vertical"
+                android:nextFocusLeft="@id/tabConcerts"
                 android:nextFocusRight="@id/btnSettings"
                 android:stateListAnimator="@animator/focus_scale_flat"
                 android:layerType="none">
@@ -1084,6 +1137,20 @@
                      channel stays on the left while the days fly out beside it and that
                      day's programmes beside those, so the whole path you took is on screen
                      at once and stepping back is a LEFT press rather than a redraw. -->
+                <!-- Content area: Concert Corner -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/concertContent"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:defaultFocusHighlightEnabled="true"
+                    android:paddingHorizontal="10dp"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="8dp"
+                    android:visibility="gone" />
+
+
                 <LinearLayout
                     android:id="@+id/catchupContent"
                     android:layout_width="match_parent"

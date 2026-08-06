@@ -684,6 +684,16 @@ class MainActivity : AppCompatActivity() {
         onHideClick = { shelf -> if (shelf.title == "Continue Watching") clearContinueWatching() else toggleHiddenShelfCategory(2, shelf) },
         onSeeAllClick = { shelf -> showSeeAll(shelf) }
     )
+    internal val concertShelfAdapter = ShelfAdapter(
+        onItemClick = { item -> playConcertItem(item) },
+        onItemLongClick = { item -> toggleFavoriteVodItem(item) },
+        onSeeAllClick = { shelf -> showSeeAll(shelf) },
+        showPinButton = false
+    )
+
+    internal var concertShelves:
+        List<com.lumora.model.ContentShelf> = emptyList()
+
     internal val homeShelfAdapter = ShelfAdapter(
         onItemClick = { item -> onHomeItemClick(item) },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
@@ -784,6 +794,7 @@ class MainActivity : AppCompatActivity() {
 
         setupChannelList()
         setupTabs()
+        setupConcertCorner()
         setupPlayerControls()
         setupToolbar()
         loadDeadStreams()

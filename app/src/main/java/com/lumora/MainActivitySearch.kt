@@ -188,6 +188,7 @@ internal fun MainActivity.showSearchDialog(initialQuery: String? = null) {
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
     binding.emptyState.visibility = View.GONE
 

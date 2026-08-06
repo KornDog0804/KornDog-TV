@@ -1181,6 +1181,7 @@ internal fun MainActivity.setupTabs() {
     binding.tabSeries.setOnClickListener { selectTab(1) }
     binding.tabFilms.setOnClickListener { selectTab(2) }
     binding.tabDiscover.setOnClickListener { showingHome = false; selectDiscover() }
+    binding.tabConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.tabDownloads.setOnClickListener { showingHome = false; selectDownloads() }
     setupDiscover()
     // D-pad focus moving between tabs leaves a stale sliver of the previous tab's
@@ -1188,7 +1189,7 @@ internal fun MainActivity.setupTabs() {
     // self-invalidate on unfocus doesn't always clear it. Forcing the whole bar to
     // redraw on every focus change is a blunt but reliable fix.
     val invalidateBarOnFocus = View.OnFocusChangeListener { _, _ -> binding.tabBar.invalidate() }
-    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabDownloads)) {
+    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
         tv.onFocusChangeListener = invalidateBarOnFocus
     }
     // Hide tab bar + search until an enabled provider exists
@@ -1196,7 +1197,7 @@ internal fun MainActivity.setupTabs() {
 }
 
 internal fun MainActivity.updateTabStyles(selected: View) {
-    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabDownloads)) {
+    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
         val isSelected = tv === selected
         tv.isSelected = isSelected
         val (labelId, iconId, indicatorId) = when (tv.id) {
@@ -1206,6 +1207,7 @@ internal fun MainActivity.updateTabStyles(selected: View) {
             R.id.tabFilms -> Triple(R.id.tabFilmsLabel, R.id.tabFilmsIcon, R.id.tabFilmsIndicator)
             R.id.tabHome -> Triple(R.id.tabHomeLabel, R.id.tabHomeIcon, R.id.tabHomeIndicator)
             R.id.tabDiscover -> Triple(R.id.tabDiscoverLabel, R.id.tabDiscoverIcon, R.id.tabDiscoverIndicator)
+            R.id.tabConcerts -> Triple(R.id.tabConcertsLabel, R.id.tabConcertsIcon, R.id.tabConcertsIndicator)
             R.id.tabDownloads -> Triple(R.id.tabDownloadsLabel, R.id.tabDownloadsIcon, R.id.tabDownloadsIndicator)
             else -> continue
         }
@@ -1234,6 +1236,7 @@ internal fun MainActivity.selectHome() {
     hideCatchup()
     releaseLivePreview()
     binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
     binding.homeContent.visibility = View.VISIBLE
     // Search on Home is only useful with something to search; with no enabled provider
@@ -1265,6 +1268,7 @@ internal fun MainActivity.selectDownloads() {
     hideCatchup()
     releaseLivePreview()
     binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.VISIBLE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE

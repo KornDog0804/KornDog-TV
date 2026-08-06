@@ -73,6 +73,7 @@ internal fun MainActivity.selectCatchup() {
     showingDownloads = false
     releaseLivePreview()
     binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.downloadsContent.visibility = View.GONE
