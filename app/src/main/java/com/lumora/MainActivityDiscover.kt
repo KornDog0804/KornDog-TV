@@ -91,6 +91,7 @@ internal fun MainActivity.selectDiscover() {
     showingDiscover = true
     releaseLivePreview()
     binding.contentRow.visibility = View.GONE
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.concertContent.visibility = View.GONE

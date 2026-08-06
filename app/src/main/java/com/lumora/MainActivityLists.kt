@@ -160,6 +160,7 @@ internal fun MainActivity.selectTab(index: Int) {
     binding.discoverContent.visibility = View.GONE
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.VISIBLE
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.liveRow.visibility = if (index == 0) View.VISIBLE else View.GONE

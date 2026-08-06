@@ -1176,6 +1176,36 @@ internal fun MainActivity.applyStatus() {
 
 internal fun MainActivity.setupTabs() {
     binding.tabHome.setOnClickListener { selectHome() }
+
+    binding.dashboardLive.setOnClickListener {
+        showingHome = false
+        selectTab(0)
+    }
+
+    binding.dashboardGuide.setOnClickListener {
+        showingHome = false
+        selectTab(0)
+    }
+
+    binding.dashboardMovies.setOnClickListener {
+        showingHome = false
+        selectTab(2)
+    }
+
+    binding.dashboardSeries.setOnClickListener {
+        showingHome = false
+        selectTab(1)
+    }
+
+    binding.dashboardConcerts.setOnClickListener {
+        showingHome = false
+        selectConcertCorner()
+    }
+
+    binding.dashboardDiscover.setOnClickListener {
+        showingHome = false
+        selectDiscover()
+    }
     binding.tabLive.setOnClickListener { selectTab(0) }
     binding.tabCatchup.setOnClickListener { showingHome = false; selectCatchup() }
     binding.tabSeries.setOnClickListener { selectTab(1) }
@@ -1238,6 +1268,7 @@ internal fun MainActivity.selectHome() {
     binding.discoverContent.visibility = View.GONE
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
+    binding.homeDashboard.visibility = View.VISIBLE
     binding.homeContent.visibility = View.VISIBLE
     // Search on Home is only useful with something to search; with no enabled provider
     // updateTopChromeVisibility() keeps it hidden. selectHome used to force it visible
@@ -1270,6 +1301,7 @@ internal fun MainActivity.selectDownloads() {
     binding.discoverContent.visibility = View.GONE
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.VISIBLE
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     applySidebarVisibility(tabWantsSidebar = false)

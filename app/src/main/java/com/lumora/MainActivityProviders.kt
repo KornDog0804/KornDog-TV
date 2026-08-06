@@ -169,6 +169,7 @@ internal fun MainActivity.vodStateChanged() {
  *  responding entirely (the "can't navigate when nothing's returned" trap). */
 internal fun MainActivity.showEmptyState() {
     binding.contentRow.visibility = View.GONE
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     // The status row shares this weight=1 slot; leaving it up splits the screen and

@@ -185,6 +185,7 @@ internal fun MainActivity.showSearchDialog(initialQuery: String? = null) {
     // dismiss search via selectTab and silently lose the query.
     val tabBarWasVisible = binding.tabBar.visibility == View.VISIBLE
     if (tabBarWasVisible) binding.tabBar.visibility = View.GONE
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.discoverContent.visibility = View.GONE

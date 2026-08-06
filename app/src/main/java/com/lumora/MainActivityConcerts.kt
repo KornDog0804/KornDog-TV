@@ -415,6 +415,7 @@ internal fun MainActivity.selectConcertCorner() {
     hideCatchup()
     releaseLivePreview()
 
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.discoverContent.visibility = View.GONE

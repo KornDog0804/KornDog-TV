@@ -1056,6 +1056,7 @@ internal fun MainActivity.showProviderSettings() {
     // Settings in the same weight=1 slot - restored on dismiss below. That includes
     // Home's search bar and the Discover pane, which sit outside homeContent/contentRow
     // and so used to stay on screen above Settings as if they belonged to it.
+    binding.homeDashboard.visibility = View.GONE
     binding.homeContent.visibility = View.GONE
     binding.homeSearchBar.visibility = View.GONE
     binding.discoverContent.visibility = View.GONE
