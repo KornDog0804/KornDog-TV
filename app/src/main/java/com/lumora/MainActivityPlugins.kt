@@ -320,6 +320,7 @@ internal fun MainActivity.showStreamSearchDialog(
     }
 
     container.addView(status)
+    container.addView(qualityFilterRow)
     container.addView(
         scroll,
         LinearLayout.LayoutParams(
@@ -340,6 +341,36 @@ internal fun MainActivity.showStreamSearchDialog(
 
     val results = mutableListOf<StreamEntry>()
     val stremioClient = StremioAddonClient()
+    var currentQualityFilter = "All"
+    fun qualityTierOf(title: String): String = when {
+        title.contains("2160") || title.contains("4K", true) -> "4K"
+        title.contains("1080") -> "1080p"
+        title.contains("720") -> "720p"
+        else -> "Other"
+    }
+    val qualityFilterRow = LinearLayout(this@showStreamSearchDialog).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(0, 8, 0, 8)
+    }
+    fun applyQualityFilter() {
+        for (i in 0 until resultsHost.childCount) {
+            val child = resultsHost.getChildAt(i)
+            val tier = child.tag as? String ?: "Other"
+            child.visibility = if (currentQualityFilter == "All" || currentQualityFilter == tier) android.view.View.VISIBLE else android.view.View.GONE
+        }
+    }
+    listOf("All", "4K", "1080p", "720p").forEach { label ->
+        val btn = TextView(this@showStreamSearchDialog).apply {
+            text = label
+            textSize = 13f
+            setPadding(24, 12, 24, 12)
+            setOnClickListener {
+                currentQualityFilter = label
+                applyQualityFilter()
+            }
+        }
+        qualityFilterRow.addView(btn)
+    }
 
     fun stableId(entry: StreamEntry): String {
         val hash = entry.result.token.hashCode()
@@ -487,6 +518,8 @@ internal fun MainActivity.showStreamSearchDialog(
         row.findViewById<TextView>(
             R.id.streamTitle
         ).text = entry.result.title
+        row.tag = qualityTierOf(entry.result.title)
+        row.visibility = if (currentQualityFilter == "All" || currentQualityFilter == row.tag) android.view.View.VISIBLE else android.view.View.GONE
 
         row.findViewById<TextView>(
             R.id.streamMeta
@@ -808,6 +841,36 @@ internal fun MainActivity.wirePluginsPane(dialogView: View, onProviderAdded: () 
         )
 
     val stremioClient = StremioAddonClient()
+    var currentQualityFilter = "All"
+    fun qualityTierOf(title: String): String = when {
+        title.contains("2160") || title.contains("4K", true) -> "4K"
+        title.contains("1080") -> "1080p"
+        title.contains("720") -> "720p"
+        else -> "Other"
+    }
+    val qualityFilterRow = LinearLayout(this@showStreamSearchDialog).apply {
+        orientation = LinearLayout.HORIZONTAL
+        setPadding(0, 8, 0, 8)
+    }
+    fun applyQualityFilter() {
+        for (i in 0 until resultsHost.childCount) {
+            val child = resultsHost.getChildAt(i)
+            val tier = child.tag as? String ?: "Other"
+            child.visibility = if (currentQualityFilter == "All" || currentQualityFilter == tier) android.view.View.VISIBLE else android.view.View.GONE
+        }
+    }
+    listOf("All", "4K", "1080p", "720p").forEach { label ->
+        val btn = TextView(this@showStreamSearchDialog).apply {
+            text = label
+            textSize = 13f
+            setPadding(24, 12, 24, 12)
+            setOnClickListener {
+                currentQualityFilter = label
+                applyQualityFilter()
+            }
+        }
+        qualityFilterRow.addView(btn)
+    }
 
     lateinit var renderStremioAddons: () -> Unit
 
