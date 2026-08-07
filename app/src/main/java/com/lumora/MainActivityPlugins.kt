@@ -648,7 +648,7 @@ internal fun MainActivity.showStreamSearchDialog(
                             else -> 1
                         }
                     }
-                    .take(10)
+                    .take(50)
                     .forEach { stream ->
                         val token =
                             stream.url ?: stream.magnet
