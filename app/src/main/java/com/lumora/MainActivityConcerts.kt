@@ -216,13 +216,48 @@ private fun MainActivity.showConcertQueuePlayer(
         addView(close)
     }
 
+    val hideHandler = android.os.Handler(android.os.Looper.getMainLooper())
+    val hideControls = Runnable {
+        controls.visibility = android.view.View.GONE
+        trackTitle.visibility = android.view.View.GONE
+    }
+    fun showControlsTemporarily() {
+        controls.visibility = android.view.View.VISIBLE
+        trackTitle.visibility = android.view.View.VISIBLE
+        hideHandler.removeCallbacks(hideControls)
+        hideHandler.postDelayed(hideControls, 4000)
+    }
+    val videoTapCatcher = android.view.View(this).apply {
+        layoutParams = android.widget.FrameLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        )
+        setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        setOnClickListener { showControlsTemporarily() }
+    }
+    val videoContainer = android.widget.FrameLayout(this).apply {
+        layoutParams = android.widget.LinearLayout.LayoutParams(
+            android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f
+        )
+        addView(
+            webView,
+            android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
+        addView(videoTapCatcher)
+    }
     val root = android.widget.LinearLayout(this).apply {
         orientation = android.widget.LinearLayout.VERTICAL
         setBackgroundColor(android.graphics.Color.BLACK)
 
         addView(trackTitle)
-        addView(webView)
+        addView(videoContainer)
         addView(controls)
+    hideHandler.postDelayed(hideControls, 4000)
     }
 
     val idsJson = org.json.JSONArray().apply {
