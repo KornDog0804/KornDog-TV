@@ -813,7 +813,7 @@ internal fun MainActivity.retryJellyfinPlayback() {
 }
 
 internal fun MainActivity.tryNextQualityVersion(message: String = "Switching to alternate quality…"): Boolean {
-    if (nowPlayingChannel?.mediaType != MediaType.LIVE) return false
+    if (currentVersionGroup.size <= 1) return false
     currentVersionGroup.getOrNull(currentVersionIndex)?.let { markStreamDead(it) }
     var nextIndex = currentVersionIndex + 1
     while (nextIndex < currentVersionGroup.size && isStreamDead(currentVersionGroup[nextIndex])) nextIndex++
