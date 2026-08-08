@@ -168,10 +168,18 @@ internal fun MainActivity.setupPlayerControls() {
             onCastSessionConnected = { session ->
                 val channel = nowPlayingChannel
                 if (channel != null) {
-                    if (castChannel(channel, channel.name)) {
-                        playerManager.pause()
-                    } else {
-                        Toast.makeText(this@setupPlayerControls, "Cast failed: check TV and try again", Toast.LENGTH_LONG).show()
+                    castChannel(channel, channel.name) { success, message ->
+                        runOnUiThread {
+                            if (success) {
+                                playerManager.pause()
+                            } else {
+                                Toast.makeText(
+                                    this@setupPlayerControls,
+                                    "Cast failed: ${message ?: "check TV and try again"}",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
                     }
                 } else {
                     Toast.makeText(this@setupPlayerControls, "Play content first, then Cast", Toast.LENGTH_SHORT).show()

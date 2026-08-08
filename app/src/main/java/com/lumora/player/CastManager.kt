@@ -84,10 +84,28 @@ class CastManager(private val context: Context) {
     /**
      * Cast a channel to the connected device.
      */
-    fun castChannel(channel: Channel, title: String? = null): Boolean {
-        val session = castSession ?: return false
-        val remoteMediaClient = session.remoteMediaClient ?: return false
-        val url = channel.url.ifBlank { return false }
+    fun castChannel(
+        channel: Channel,
+        title: String? = null,
+        onResult: (success: Boolean, message: String?) -> Unit
+    ) {
+        val session = castSession
+        if (session == null || !session.isConnected) {
+            onResult(false, "Cast session is not connected")
+            return
+        }
+
+        val remoteMediaClient = session.remoteMediaClient
+        if (remoteMediaClient == null) {
+            onResult(false, "Cast receiver is not ready")
+            return
+        }
+
+        val url = channel.url
+        if (url.isBlank()) {
+            onResult(false, "This item has no direct stream URL")
+            return
+        }
 
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, title ?: channel.name)
@@ -110,12 +128,36 @@ class CastManager(private val context: Context) {
             .build()
 
         try {
+            android.util.Log.d(
+                "CastManager",
+                "Submitting Cast load: $url (type=$contentType, stream=$streamType)"
+            )
+
             remoteMediaClient.load(mediaInfo, loadOptions)
-            android.util.Log.d("CastManager", "Loaded $url (type=$contentType, stream=$streamType)")
-            return true
+                .setResultCallback { result ->
+                    val status = result.status
+
+                    if (status.isSuccess) {
+                        android.util.Log.d(
+                            "CastManager",
+                            "Cast receiver accepted load: $url"
+                        )
+                        onResult(true, null)
+                    } else {
+                        val message = status.statusMessage
+                            ?: "Cast load failed (${status.statusCode})"
+
+                        android.util.Log.e(
+                            "CastManager",
+                            "Cast receiver rejected load: code=${status.statusCode}, message=$message, url=$url"
+                        )
+
+                        onResult(false, message)
+                    }
+                }
         } catch (e: Exception) {
-            android.util.Log.e("CastManager", "Failed to load media", e)
-            return false
+            android.util.Log.e("CastManager", "Failed to submit Cast load", e)
+            onResult(false, e.message ?: "Couldn't send media to Cast receiver")
         }
     }
 
