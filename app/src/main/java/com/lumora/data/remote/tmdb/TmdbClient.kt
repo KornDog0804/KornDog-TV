@@ -107,6 +107,25 @@ class TmdbClient {
             "language=en-US&page=${page.coerceAtLeast(1)}"
         )
 
+    /** One mixed Discover page assembled from several TMDB feeds.
+     *  This gives scrolling real variety instead of repeating trending forever. */
+    suspend fun discoverPage(page: Int): List<Channel> {
+        val p = page.coerceIn(1, 10)
+
+        val feeds = listOf(
+            get("/trending/all/week", "language=en-US&page=$p"),
+            get("/movie/popular", "language=en-US&page=$p", forcedType = "movie"),
+            get("/tv/popular", "language=en-US&page=$p", forcedType = "tv"),
+            get("/movie/now_playing", "language=en-US&page=$p", forcedType = "movie"),
+            get("/tv/on_the_air", "language=en-US&page=$p", forcedType = "tv")
+        )
+
+        return feeds
+            .flatten()
+            .distinctBy { it.id }
+    }
+
+
     /** Multi-search across movies and TV; people/other media_types are dropped. */
     suspend fun search(query: String): List<Channel> {
         if (query.isBlank()) return emptyList()

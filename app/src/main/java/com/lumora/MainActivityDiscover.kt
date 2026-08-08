@@ -114,51 +114,48 @@ internal fun MainActivity.loadTmdbVodCatalog() {
             val topRatedSeries =
                 async { tmdbClient.topRatedSeries() }
 
-            val movieShelves = listOf(
-                ContentShelf(
-                    "Trending Movies",
-                    trendingMovies.await()
-                ),
-                ContentShelf(
-                    "Popular Movies",
-                    popularMovies.await()
-                ),
-                ContentShelf(
-                    "Now Playing",
-                    nowPlayingMovies.await()
-                ),
-                ContentShelf(
-                    "Top Rated Movies",
-                    topRatedMovies.await()
-                ),
-                ContentShelf(
-                    "Upcoming",
-                    upcomingMovies.await()
-                )
-            ).filter { it.items.isNotEmpty() }
+            fun uniqueShelves(
+                entries: List<Pair<String, List<Channel>>>
+            ): List<ContentShelf> {
+                val used = mutableSetOf<String>()
 
-            val seriesShelves = listOf(
-                ContentShelf(
-                    "Trending Series",
-                    trendingSeries.await()
-                ),
-                ContentShelf(
-                    "Popular Series",
-                    popularSeries.await()
-                ),
-                ContentShelf(
-                    "On The Air",
-                    onTheAirSeries.await()
-                ),
-                ContentShelf(
-                    "Airing Today",
-                    airingTodaySeries.await()
-                ),
-                ContentShelf(
-                    "Top Rated Series",
-                    topRatedSeries.await()
+                return entries.mapNotNull { (title, items) ->
+                    val unique = items.filter { item ->
+                        val key = item.id.ifBlank { item.url }
+
+                        if (key.isBlank() || key in used) {
+                            false
+                        } else {
+                            used += key
+                            true
+                        }
+                    }
+
+                    unique
+                        .takeIf { it.isNotEmpty() }
+                        ?.let { ContentShelf(title, it) }
+                }
+            }
+
+            val movieShelves = uniqueShelves(
+                listOf(
+                    "Trending Movies" to trendingMovies.await(),
+                    "Popular Movies" to popularMovies.await(),
+                    "Now Playing" to nowPlayingMovies.await(),
+                    "Top Rated Movies" to topRatedMovies.await(),
+                    "Upcoming" to upcomingMovies.await()
                 )
-            ).filter { it.items.isNotEmpty() }
+            )
+
+            val seriesShelves = uniqueShelves(
+                listOf(
+                    "Trending Series" to trendingSeries.await(),
+                    "Popular Series" to popularSeries.await(),
+                    "On The Air" to onTheAirSeries.await(),
+                    "Airing Today" to airingTodaySeries.await(),
+                    "Top Rated Series" to topRatedSeries.await()
+                )
+            )
 
             movieShelves to seriesShelves
         }
@@ -210,7 +207,7 @@ internal fun MainActivity.loadDiscover(query: String?) {
     discoverSearchJob = scope.launch {
         val results =
             if (query == null) {
-                tmdbClient.trendingPage(1)
+                tmdbClient.discoverPage(1)
             } else {
                 tmdbClient.search(query)
             }
@@ -270,7 +267,7 @@ internal fun MainActivity.loadMoreDiscover() {
 
     scope.launch {
         try {
-            val results = tmdbClient.trendingPage(nextPage)
+            val results = tmdbClient.discoverPage(nextPage)
 
             if (results.isEmpty()) {
                 discoverHasMore = false
@@ -293,7 +290,7 @@ internal fun MainActivity.loadMoreDiscover() {
             discoverGridAdapter.append(visible)
             discoverPage = nextPage
 
-            if (results.size < 20) {
+            if (nextPage >= 10) {
                 discoverHasMore = false
             }
         } finally {
@@ -833,7 +830,6 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     val discoverFavorites =
         com.lumora.cache.DiscoverFavoritesStore
             .getAll(this)
-            .filter { it.id in favIds }
 
     val favItems =
         (discoverFavorites + providerFavorites)

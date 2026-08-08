@@ -38,6 +38,20 @@
         android:textSize="@dimen/poster_badge_text"
         android:visibility="gone" />
 
+    <TextView
+        android:id="@+id/itemFavoriteBadge"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_toolbar_button"
+        android:fontFamily="@font/inter_semibold"
+        android:gravity="center"
+        android:text="★"
+        android:textColor="@color/primary"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
     <com.lumora.ui.OutlineTextView
         android:id="@+id/itemTitle"
         android:layout_width="match_parent"

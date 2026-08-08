@@ -29,6 +29,7 @@ class PosterGridAdapter(
      *  Declared before [onItemClick] so the click handler stays the trailing lambda every
      *  call site passes it as. */
     private val onItemLongClick: ((Channel) -> Unit)? = null,
+    private val isFavorite: ((Channel) -> Boolean)? = null,
     private val onItemClick: (Channel) -> Unit
 ) : ListAdapter<Channel, PosterGridAdapter.ViewHolder>(DiffCallback()) {
 
