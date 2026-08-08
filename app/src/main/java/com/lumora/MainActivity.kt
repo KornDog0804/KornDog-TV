@@ -579,6 +579,10 @@ class MainActivity : AppCompatActivity() {
     // One-shot fresh-URL retry guard for Jellyfin direct-play: a transient server timeout or
     // expired direct-play URL gets one re-resolve before the generic "Playback error".
     internal var jellyfinRetryAttempted = false
+
+    // Find Stream fallback chain. Comet, AIO and other stream sources can arm
+    // this callback so a failed source automatically advances to the next one.
+    internal var streamSearchFailover: (() -> Boolean)? = null
     internal var jellyfinPlayingItemId: String? = null
     internal var jellyfinChapters: List<JellyfinProvider.Chapter> = emptyList()
     internal var jellyfinTrickplay: JellyfinProvider.TrickplayInfo? = null
