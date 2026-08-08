@@ -197,6 +197,14 @@ internal fun MainActivity.toggleFavoriteVodItem(item: Channel) {
         return
     }
     val nowFavorite = FavoritesStore.toggleFavoriteSeries(this, item.id)
+
+    if (item.id.startsWith("tmdb:")) {
+        com.lumora.cache.DiscoverFavoritesStore.set(
+            this,
+            item,
+            nowFavorite
+        )
+    }
     Toast.makeText(
         this,
         if (nowFavorite) "Added to Favourites" else "Removed from Favourites",

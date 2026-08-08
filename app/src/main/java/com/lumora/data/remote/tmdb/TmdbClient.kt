@@ -100,6 +100,13 @@ class TmdbClient {
         return out.distinctBy { it.id }
     }
 
+    /** One page of mixed Discover results. */
+    suspend fun trendingPage(page: Int): List<Channel> =
+        get(
+            "/trending/all/week",
+            "language=en-US&page=${page.coerceAtLeast(1)}"
+        )
+
     /** Multi-search across movies and TV; people/other media_types are dropped. */
     suspend fun search(query: String): List<Channel> {
         if (query.isBlank()) return emptyList()

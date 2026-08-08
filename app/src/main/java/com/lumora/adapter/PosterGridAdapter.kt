@@ -84,6 +84,15 @@ class PosterGridAdapter(
         submitList(items, commitCallback)
     }
 
+    fun append(items: List<Channel>) {
+        if (items.isEmpty()) return
+
+        val merged = (currentList + items)
+            .distinctBy { it.id.ifBlank { it.url } }
+
+        submitList(merged)
+    }
+
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
         val view = LayoutInflater.from(parent.context).inflate(R.layout.item_poster_grid, parent, false)
         posterHeightDimen?.let { dimen ->

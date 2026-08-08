@@ -26,6 +26,39 @@ internal fun MainActivity.setupDiscover() {
     setGridSpan(binding.discoverGrid, discoverGridAdapter, R.id.tabDiscover)
     // setGridSpan only wires the layout manager/span; the adapter still has to be attached.
     binding.discoverGrid.adapter = discoverGridAdapter
+
+    binding.discoverGrid.addOnScrollListener(
+        object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
+            override fun onScrolled(
+                recyclerView: androidx.recyclerview.widget.RecyclerView,
+                dx: Int,
+                dy: Int
+            ) {
+                super.onScrolled(recyclerView, dx, dy)
+
+                if (dy <= 0 ||
+                    discoverCurrentQuery != null ||
+                    discoverLoadingMore ||
+                    !discoverHasMore
+                ) {
+                    return
+                }
+
+                val layout =
+                    recyclerView.layoutManager
+                        as? androidx.recyclerview.widget.GridLayoutManager
+                        ?: return
+
+                val total = discoverGridAdapter.itemCount
+                val lastVisible = layout.findLastVisibleItemPosition()
+
+                // Start fetching before the user actually hits the wall.
+                if (total > 0 && lastVisible >= total - 8) {
+                    loadMoreDiscover()
+                }
+            }
+        }
+    )
 }
 
 /** Discover is its own pane (like Downloads): browse/search TMDB, no category sidebar. */
@@ -158,26 +191,114 @@ internal fun MainActivity.hasAnyStreamSource(): Boolean =
 /** Loads trending (null query) or search results into the Discover grid. */
 internal fun MainActivity.loadDiscover(query: String?) {
     if (!tmdbClient.hasKey()) return
+
     discoverSearchJob?.cancel()
-    setDiscoverStatus(if (query == null) "Loading trending…" else "Searching \"$query\"…")
-    discoverSearchJob = scope.launch {
-        val results = if (query == null) tmdbClient.trending() else tmdbClient.search(query)
-        // Without a stream-search plugin (the torrent plugin being the common one), a
-        // TMDB-only title is a dead tile - its dialog offers nothing but a trailer.
-        // Drop anything that isn't already in the library; with a plugin enabled the
-        // plugin can play every title, so nothing gets filtered.
-        val pluginEnabled = hasAnyStreamSource()
-        val visible = if (pluginEnabled) results else withContext(Dispatchers.Default) {
-            results.filter { findCatalogMatch(it) != null }
+
+    discoverCurrentQuery = query
+    discoverPage = 1
+    discoverLoadingMore = false
+    discoverHasMore = query == null
+
+    setDiscoverStatus(
+        if (query == null) {
+            "Loading Discover…"
+        } else {
+            "Searching \"$query\"…"
         }
+    )
+
+    discoverSearchJob = scope.launch {
+        val results =
+            if (query == null) {
+                tmdbClient.trendingPage(1)
+            } else {
+                tmdbClient.search(query)
+            }
+
+        val pluginEnabled = hasAnyStreamSource()
+
+        val visible =
+            if (pluginEnabled) {
+                results
+            } else {
+                withContext(Dispatchers.Default) {
+                    results.filter {
+                        findCatalogMatch(it) != null
+                    }
+                }
+            }
+
         discoverGridAdapter.replaceAll(visible)
+
+        // TMDB normally returns 20 items per page. A short page means
+        // we've reached the end of this feed.
+        discoverHasMore =
+            query == null && results.size >= 20
+
         setDiscoverStatus(
             when {
                 visible.isNotEmpty() -> null
-                results.isEmpty() -> if (query == null) "Couldn't load titles. Check your connection." else "No results for \"$query\"."
-                else -> "Enable a stream plugin to browse titles outside your library."
+
+                results.isEmpty() ->
+                    if (query == null) {
+                        "Couldn't load titles. Check your connection."
+                    } else {
+                        "No results for \"$query\"."
+                    }
+
+                else ->
+                    "Enable a stream plugin to browse titles outside your library."
             }
         )
+    }
+}
+
+/**
+ * Fetches the next TMDB Discover page and appends it without moving the
+ * user's scroll position.
+ */
+internal fun MainActivity.loadMoreDiscover() {
+    if (discoverCurrentQuery != null ||
+        discoverLoadingMore ||
+        !discoverHasMore
+    ) {
+        return
+    }
+
+    discoverLoadingMore = true
+    val nextPage = discoverPage + 1
+
+    scope.launch {
+        try {
+            val results = tmdbClient.trendingPage(nextPage)
+
+            if (results.isEmpty()) {
+                discoverHasMore = false
+                return@launch
+            }
+
+            val pluginEnabled = hasAnyStreamSource()
+
+            val visible =
+                if (pluginEnabled) {
+                    results
+                } else {
+                    withContext(Dispatchers.Default) {
+                        results.filter {
+                            findCatalogMatch(it) != null
+                        }
+                    }
+                }
+
+            discoverGridAdapter.append(visible)
+            discoverPage = nextPage
+
+            if (results.size < 20) {
+                discoverHasMore = false
+            }
+        } finally {
+            discoverLoadingMore = false
+        }
     }
 }
 
@@ -704,8 +825,29 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     // FavoritesStore.KEY_FAVORITE_SERIES) - a favourited film used to be saved and then
     // never shown anywhere, because only seriesList was searched for the ids.
     val favIds = FavoritesStore.getFavoriteSeriesIds(this)
-    val favItems = (seriesList + filmList).filter { it.id in favIds }.filterNot(::isAdultHomeItem)
-    if (favItems.isNotEmpty()) shelves.add(ContentShelf("Favorites", favItems))
+
+    val providerFavorites =
+        (seriesList + filmList)
+            .filter { it.id in favIds }
+
+    val discoverFavorites =
+        com.lumora.cache.DiscoverFavoritesStore
+            .getAll(this)
+            .filter { it.id in favIds }
+
+    val favItems =
+        (discoverFavorites + providerFavorites)
+            .distinctBy { it.id.ifBlank { it.url } }
+            .filterNot(::isAdultHomeItem)
+
+    if (favItems.isNotEmpty()) {
+        shelves.add(
+            ContentShelf(
+                "Favorites",
+                favItems
+            )
+        )
+    }
 
     return shelves.filter { it.title !in hidden }
 }

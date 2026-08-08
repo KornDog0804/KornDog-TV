@@ -475,10 +475,10 @@ class MainActivity : AppCompatActivity() {
      *  geometrically nearest, which can be a different season entirely. */
     internal var selectedSeasonChip: View? = null
     internal var activeTab = 0
-    // Live TV is the landing screen: this is a TV app first, and Home's shelves are only
-    // meaningful once there's watch history to fill them. The first render after a catalog
-    // load routes on this flag (see the tail of classifyAndShow).
-    internal var showingHome = false
+    // Home is the landing screen on every fresh app launch. activeTab remains 0 because
+    // Home is a standalone pane rather than one of the Live / Series / Films tabs.
+    // The first catalog render routes through this flag in classifyAndShow().
+    internal var showingHome = true
     internal var showingDownloads = false
     internal var showingDiscover = false
     /** Catch Up is a pane of its own rather than a fourth catalogue tab: it browses the
@@ -724,8 +724,19 @@ class MainActivity : AppCompatActivity() {
 
     internal var tmdbSeriesShelves:
         List<com.lumora.model.ContentShelf> = emptyList()
-    internal val discoverGridAdapter = com.lumora.adapter.PosterGridAdapter { item -> onDiscoverItemClick(item) }
+    internal val discoverGridAdapter =
+        com.lumora.adapter.PosterGridAdapter(
+            onItemLongClick = { item ->
+                toggleFavoriteVodItem(item)
+            }
+        ) { item ->
+            onDiscoverItemClick(item)
+        }
     internal var discoverSearchJob: Job? = null
+    internal var discoverPage = 1
+    internal var discoverLoadingMore = false
+    internal var discoverHasMore = true
+    internal var discoverCurrentQuery: String? = null
     internal var providerLoadJob: Job? = null
     internal val categoryAdapter = CategoryAdapter(
         onCategoryClick = { category -> onCategorySelected(category) },
