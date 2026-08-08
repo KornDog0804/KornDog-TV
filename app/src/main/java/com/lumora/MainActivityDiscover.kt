@@ -26,67 +26,6 @@ internal fun MainActivity.setupDiscover() {
     setGridSpan(binding.discoverGrid, discoverGridAdapter, R.id.tabDiscover)
     // setGridSpan only wires the layout manager/span; the adapter still has to be attached.
     binding.discoverGrid.adapter = discoverGridAdapter
-    // The inline field isn't a real input (no platform IME on TV, and a focused field
-    // with the IME suppressed is a dead end for the remote) - both the field and the
-    // Search button open the on-screen-keyboard overlay instead.
-    binding.discoverSearchField.setOnClickListener { showDiscoverSearchOverlay() }
-    binding.discoverSearchButton.setOnClickListener { showDiscoverSearchOverlay() }
-}
-
-/** Opens the Discover (TMDB) search overlay - the keyboard pattern from the main
- *  search overlay, minus a results surface (Discover's own grid shows the matches once
- *  the query is submitted). Dismissing leaves the query behind in the inline field. */
-internal fun MainActivity.showDiscoverSearchOverlay() {
-    if (activeSettingsOverlay != null || activeSearchOverlay != null) return
-    val view = layoutInflater.inflate(R.layout.dialog_discover_search, null)
-    val input = view.findViewById<EditText>(R.id.discoverSearchQuery)
-    val keyboard = view.findViewById<com.lumora.ui.OnScreenKeyboard>(R.id.discoverSearchKeyboard)
-    applyPanelWidth(view.findViewById(R.id.discoverSearchPanel), R.dimen.search_panel_width)
-    input.showSoftInputOnFocus = false
-    keyboard.onKey = { ch -> input.setText(input.text.toString() + ch) }
-    keyboard.onBackspace = { input.setText(input.text.toString().dropLast(1)) }
-    keyboard.onClear = { input.setText("") }
-
-
-    // Hardware (BT/USB) keyboard routes here while the overlay is up.
-    searchKeyHandler = { ch ->
-        if (ch == null) keyboard.onBackspace?.invoke()
-        else input.setText(input.text.toString() + ch)
-    }
-    val overlay = MainActivity.FullScreenOverlay(
-        binding.searchContainer,
-        view,
-        closeButton = view.findViewById(R.id.discoverSearchClose),
-        initialFocus = { keyboard.firstKey() ?: input }
-    )
-
-    fun submitSearch() {
-        val query = input.text.toString().trim()
-        overlay.dismiss()
-        if (query.isNotEmpty()) {
-            binding.discoverSearchInput.setText(query)
-            loadDiscover(query)
-        }
-    }
-    keyboard.onSubmit = { submitSearch() }
-
-    view.findViewById<View>(R.id.discoverSearchSubmit).setOnClickListener {
-        submitSearch()
-    }
-    val tabBarWasVisible = binding.tabBar.visibility == View.VISIBLE
-    if (tabBarWasVisible) binding.tabBar.visibility = View.GONE
-    overlay.setOnDismissListener {
-        searchKeyHandler = null
-        activeSearchOverlay = null
-        if (tabBarWasVisible) binding.tabBar.visibility = View.VISIBLE
-        applyStatus()
-        // The overlay's dismissal detaches the focused subtree (the keyboard); leave
-        // nothing focused and the Discover pane is a dead D-pad. Focus the field that
-        // opened it, retried on the next frame like MainActivity.FullScreenOverlay's own focus logic.
-        binding.discoverSearchField.post { binding.discoverSearchField.requestFocus() }
-    }
-    activeSearchOverlay = overlay
-    overlay.show()
 }
 
 /** Discover is its own pane (like Downloads): browse/search TMDB, no category sidebar. */
@@ -210,11 +149,6 @@ internal fun MainActivity.loadTmdbVodCatalog() {
                 !showingDiscover -> showTmdbMoviesTab()
         }
     }
-}
-
-internal fun MainActivity.runDiscoverSearch() {
-    val query = binding.discoverSearchInput.text?.toString()?.trim().orEmpty()
-    loadDiscover(query.takeIf { it.isNotEmpty() })
 }
 
 internal fun MainActivity.hasAnyStreamSource(): Boolean =
