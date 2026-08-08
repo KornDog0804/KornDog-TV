@@ -187,6 +187,43 @@ class TmdbClient {
         out
     }
 
+    /** Full episode metadata for one TV season. */
+    suspend fun tvEpisodes(
+        tvId: Int,
+        seasonNumber: Int
+    ): List<TvEpisode> = withContext(Dispatchers.IO) {
+        val body = fetchBody(
+            "/tv/$tvId/season/$seasonNumber",
+            "language=en-US"
+        ) ?: return@withContext emptyList()
+
+        val arr = JSONObject(body).optJSONArray("episodes")
+            ?: return@withContext emptyList()
+
+        val out = ArrayList<TvEpisode>(arr.length())
+
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+
+            val number = o.optInt("episode_number", -1)
+            if (number < 1) continue
+
+            out.add(
+                TvEpisode(
+                    number = number,
+                    name = o.optString("name")
+                        .takeIf { it.isNotBlank() },
+                    airDate = o.optString("air_date")
+                        .takeIf { it.isNotBlank() },
+                    overview = o.optString("overview")
+                        .takeIf { it.isNotBlank() }
+                )
+            )
+        }
+
+        out
+    }
+
     /** Tries each configured key in turn, so a dead/rate-limited key falls back to the next. */
     private suspend fun get(
         path: String,
@@ -253,7 +290,18 @@ class TmdbClient {
         return out
     }
 
-    data class TvSeason(val number: Int, val episodeCount: Int, val name: String)
+    data class TvSeason(
+        val number: Int,
+        val episodeCount: Int,
+        val name: String
+    )
+
+    data class TvEpisode(
+        val number: Int,
+        val name: String?,
+        val airDate: String?,
+        val overview: String?
+    )
 
     companion object {
         /** TMDB v3 API keys, tried in order (fallback on failure). Empty list = Discover disabled. */

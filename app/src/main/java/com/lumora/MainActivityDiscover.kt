@@ -401,14 +401,74 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
             .setTitle("${item.name} — choose a season")
             .setItems(seasonLabels) { _, si ->
                 val season = seasons[si]
-                val epLabels = (1..season.episodeCount).map { "Episode $it" }.toTypedArray()
-                AlertDialog.Builder(this@showSeriesEpisodePicker)
+
+                val episodeLoading = AlertDialog.Builder(
+                    this@showSeriesEpisodePicker
+                )
                     .setTitle(season.name)
-                    .setItems(epLabels) { _, ei ->
-                        showStreamSearchDialog(plugin, item, season.number, ei + 1)
-                    }
-                    .setNegativeButton("Back") { _, _ -> showSeriesEpisodePicker(plugin, item) }
-                    .show()
+                    .setMessage("Loading episodes…")
+                    .setNegativeButton("Cancel", null)
+                    .create()
+
+                episodeLoading.show()
+
+                scope.launch {
+                    val episodes = tmdbClient.tvEpisodes(
+                        tvId,
+                        season.number
+                    )
+
+                    episodeLoading.dismiss()
+
+                    val epLabels =
+                        if (episodes.isNotEmpty()) {
+                            episodes.map { ep ->
+                                buildString {
+                                    append("E")
+                                    append(
+                                        ep.number
+                                            .toString()
+                                            .padStart(2, '0')
+                                    )
+
+                                    ep.name?.let {
+                                        append("  ·  ")
+                                        append(it)
+                                    }
+
+                                    ep.airDate?.let {
+                                        append("  ·  ")
+                                        append(it)
+                                    }
+                                }
+                            }.toTypedArray()
+                        } else {
+                            (1..season.episodeCount)
+                                .map { "Episode $it" }
+                                .toTypedArray()
+                        }
+
+                    AlertDialog.Builder(
+                        this@showSeriesEpisodePicker
+                    )
+                        .setTitle(season.name)
+                        .setItems(epLabels) { _, ei ->
+                            val episodeNumber =
+                                episodes.getOrNull(ei)?.number
+                                    ?: (ei + 1)
+
+                            showStreamSearchDialog(
+                                plugin,
+                                item,
+                                season.number,
+                                episodeNumber
+                            )
+                        }
+                        .setNegativeButton("Back") { _, _ ->
+                            showSeriesEpisodePicker(plugin, item)
+                        }
+                        .show()
+                }
             }
             .setNegativeButton("Cancel", null)
             .show()

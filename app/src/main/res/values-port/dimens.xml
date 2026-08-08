@@ -45,12 +45,13 @@
          48dp touch-target floor, and with the portrait layout stacking the keyboard
          full-width above the results (layout-port/dialog_search.xml) the keys are the
          primary input - bump them to a real thumb target. -->
-    <dimen name="keyboard_key_height">48dp</dimen>
-    <dimen name="keyboard_key_gap">4dp</dimen>
-    <dimen name="keyboard_key_text">15sp</dimen>
-    <dimen name="keyboard_action_text">12sp</dimen>
+    <dimen name="keyboard_key_height">58dp</dimen>
+    <dimen name="keyboard_key_gap">5dp</dimen>
+    <dimen name="keyboard_key_text">18sp</dimen>
+    <dimen name="keyboard_action_text">14sp</dimen>
     <dimen name="catchup_category_column_width">150dp</dimen>
     <!-- Catch Up columns: channel list stays put while days/programmes fly out beside it. -->
     <dimen name="catchup_channel_column_width">160dp</dimen>
     <dimen name="catchup_day_column_width">110dp</dimen>
+    <dimen name="search_keyboard_width">340dp</dimen>
 </resources>
