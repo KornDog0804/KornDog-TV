@@ -54,6 +54,8 @@ class OnScreenKeyboard @JvmOverloads constructor(
     var onBackspace: (() -> Unit)? = null
     /** Clear the whole query. */
     var onClear: (() -> Unit)? = null
+    /** Submit the current query. */
+    var onSubmit: (() -> Unit)? = null
 
     /**
      * Where DOWN from the bottom row should go (typically the results grid). If it's a
@@ -108,8 +110,8 @@ class OnScreenKeyboard @JvmOverloads constructor(
         // Bottom row: the shift key toggles the punctuation layer, SPACE keeps its wide
         // key (the most-used key in a multi-word query), then DEL and CLEAR.
         val bottom = keyRow(
-            labels = listOf(shiftLabel, "SPACE", "DEL", "CLEAR"),
-            weights = listOf(1f, 2f, 1f, 1f)
+            labels = listOf(shiftLabel, "SPACE", "DEL", "CLEAR", "SEARCH"),
+            weights = listOf(1f, 2f, 1f, 1f, 1.3f)
         )
         addView(bottom)
         toggleKey = bottom.getChildAt(0) as TextView
@@ -199,6 +201,7 @@ class OnScreenKeyboard @JvmOverloads constructor(
             "SPACE" -> onKey?.invoke(" ")
             "DEL" -> onBackspace?.invoke()
             "CLEAR" -> onClear?.invoke()
+            "SEARCH" -> onSubmit?.invoke()
             shiftLabel, abcLabel -> {
                 // Swap the letter rows for punctuation (or back) in place - the key views
                 // are reused, so whatever holds focus keeps it through the swap.

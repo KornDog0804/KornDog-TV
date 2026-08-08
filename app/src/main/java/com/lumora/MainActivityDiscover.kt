@@ -46,6 +46,15 @@ internal fun MainActivity.showDiscoverSearchOverlay() {
     keyboard.onKey = { ch -> input.setText(input.text.toString() + ch) }
     keyboard.onBackspace = { input.setText(input.text.toString().dropLast(1)) }
     keyboard.onClear = { input.setText("") }
+
+    fun submitSearch() {
+        val query = input.text.toString().trim()
+        overlay.dismiss()
+        if (query.isNotEmpty()) {
+            binding.discoverSearchInput.setText(query)
+            loadDiscover(query)
+        }
+    }
     // Hardware (BT/USB) keyboard routes here while the overlay is up.
     searchKeyHandler = { ch ->
         if (ch == null) keyboard.onBackspace?.invoke()
@@ -57,13 +66,10 @@ internal fun MainActivity.showDiscoverSearchOverlay() {
         closeButton = view.findViewById(R.id.discoverSearchClose),
         initialFocus = { keyboard.firstKey() ?: input }
     )
+    keyboard.onSubmit = { submitSearch() }
+
     view.findViewById<View>(R.id.discoverSearchSubmit).setOnClickListener {
-        val query = input.text.toString().trim()
-        overlay.dismiss()
-        if (query.isNotEmpty()) {
-            binding.discoverSearchInput.setText(query)
-            loadDiscover(query)
-        }
+        submitSearch()
     }
     val tabBarWasVisible = binding.tabBar.visibility == View.VISIBLE
     if (tabBarWasVisible) binding.tabBar.visibility = View.GONE
