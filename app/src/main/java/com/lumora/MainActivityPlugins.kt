@@ -382,8 +382,37 @@ internal fun MainActivity.showStreamSearchDialog(
             (episode?.let { ":e$it" } ?: "")
     }
 
+    val attemptedStreamTokens = mutableSetOf<String>()
+
     fun playResult(entry: StreamEntry) {
         val result = entry.result
+        attemptedStreamTokens += result.token
+
+        // Keep the whole merged Find Stream result set alive as a fallback pool.
+        // If Media3 rejects this source, onPlayerError invokes this callback and
+        // we resolve/play the next source that hasn't already been tried.
+        streamSearchFailover = fallback@{
+            val next = results.firstOrNull {
+                it.result.token !in attemptedStreamTokens
+            } ?: run {
+                streamSearchFailover = null
+                return@fallback false
+            }
+
+            attemptedStreamTokens += next.result.token
+
+            runOnUiThread {
+                Toast.makeText(
+                    this@showStreamSearchDialog,
+                    "Trying ${next.result.source ?: "another source"}…",
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                playResult(next)
+            }
+
+            true
+        }
 
         status.text = "Loading ${result.title}…"
         resultsHost.removeAllViews()
@@ -481,13 +510,19 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
 
                 is ResolveResult.Failed -> {
-                    Toast.makeText(
-                        this@showStreamSearchDialog,
-                        resolved.message,
-                        Toast.LENGTH_LONG
-                    ).show()
+                    val fallbackStarted =
+                        streamSearchFailover?.invoke() == true
 
-                    dialog.dismiss()
+                    if (!fallbackStarted) {
+                        streamSearchFailover = null
+                        Toast.makeText(
+                            this@showStreamSearchDialog,
+                            resolved.message,
+                            Toast.LENGTH_LONG
+                        ).show()
+
+                        dialog.dismiss()
+                    }
                 }
             }
         }

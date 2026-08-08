@@ -373,12 +373,22 @@ internal fun MainActivity.setupPlayerControls() {
             resetStallTracking()
             blackFrameStreak = 0
             if (!tryNextQualityVersion()) {
-                // Jellyfin direct-play: one fresh-URL re-resolve before giving up - a
-                // transient server timeout or an expired direct-play URL often recovers.
-                if (nowPlayingChannel?.isJellyfin == true && !jellyfinRetryAttempted) {
+                // Find Stream results from Comet/AIO/etc. are independent sources.
+                // Walk the remaining search results before giving up on the title.
+                val searchFallbackStarted = streamSearchFailover?.invoke() == true
+
+                if (searchFallbackStarted) {
+                    binding.bufferingSpinner.visibility = View.VISIBLE
+                } else if (nowPlayingChannel?.isJellyfin == true && !jellyfinRetryAttempted) {
+                    // Jellyfin direct-play: one fresh-URL re-resolve before giving up.
                     retryJellyfinPlayback()
                 } else {
-                    Toast.makeText(this@setupPlayerControls, "Playback error", Toast.LENGTH_SHORT).show()
+                    streamSearchFailover = null
+                    Toast.makeText(
+                        this@setupPlayerControls,
+                        "Playback error",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -454,6 +464,12 @@ internal fun MainActivity.showPlayerFor(
     currentEpisodeQueueIndex = -1
     isPlayerVisible = true
     nowPlayingChannel = channel
+
+    // A Find Stream caller arms streamSearchFailover immediately before entering
+    // this method. Normal IPTV/library playback must not inherit an old search pool.
+    if (!pluginStreamAlreadyResolved) {
+        streamSearchFailover = null
+    }
     // Cleared unconditionally, same as the episode queue above - the series version
     // context only applies to playback started from a series detail screen, which re-sets
     // it right after this call.
