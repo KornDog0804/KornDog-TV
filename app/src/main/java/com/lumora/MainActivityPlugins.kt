@@ -661,17 +661,41 @@ internal fun MainActivity.showStreamSearchDialog(
 
                 addons.map { addon ->
                     async {
-                        val manifest =
+                        val manifestResult =
                             stremioClient.fetchManifest(
                                 addon.manifestUrl
-                            ).getOrNull()
-                                ?: return@async emptyList()
+                            )
 
-                        stremioClient.streams(
-                            manifest = manifest,
-                            type = type,
-                            contentId = contentId
-                        ).getOrDefault(emptyList())
+                        val manifest = manifestResult.getOrNull()
+
+                        if (manifest == null) {
+                            runOnUiThread {
+                                status.text = "${addon.name}: manifest failed"
+                            }
+                            return@async emptyList()
+                        }
+
+                        val streamsResult =
+                            stremioClient.streams(
+                                manifest = manifest,
+                                type = type,
+                                contentId = contentId
+                            )
+
+                        val addonStreams =
+                            streamsResult.getOrElse {
+                                runOnUiThread {
+                                    status.text = "${manifest.name}: stream request failed"
+                                }
+                                emptyList()
+                            }
+
+                        runOnUiThread {
+                            status.text =
+                                "${manifest.name}: ${addonStreams.size} result(s)"
+                        }
+
+                        addonStreams
                     }
                 }
                     .awaitAll()

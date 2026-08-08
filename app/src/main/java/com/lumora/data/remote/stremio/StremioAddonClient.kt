@@ -102,8 +102,16 @@ class StremioAddonClient {
                 return@runCatching emptyList()
             }
 
-            val encodedId = URLEncoder.encode(contentId, "UTF-8")
-                .replace("+", "%20")
+            if (type !in manifest.types) {
+                return@runCatching emptyList()
+            }
+
+            val encodedId = contentId
+                .split(":")
+                .joinToString(":") { segment ->
+                    URLEncoder.encode(segment, "UTF-8")
+                        .replace("+", "%20")
+                }
 
             val url =
                 "${manifest.baseUrl}/stream/$type/$encodedId.json"
