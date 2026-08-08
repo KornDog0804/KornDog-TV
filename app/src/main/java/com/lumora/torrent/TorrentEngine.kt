@@ -105,7 +105,17 @@ class TorrentEngine(private val context: android.content.Context) {
         }
 
         val info = th.torrentFile() ?: throw IllegalStateException("No metadata")
-        val fileIndex = pickVideoFile(info, season, episode)
+        val requestedFileIndex = Regex(
+            "(?:[?&])fileIdx=(\\d+)",
+            RegexOption.IGNORE_CASE
+        ).find(magnet)
+            ?.groupValues
+            ?.getOrNull(1)
+            ?.toIntOrNull()
+            ?.takeIf { it in 0 until info.numFiles() }
+
+        val fileIndex = requestedFileIndex
+            ?: pickVideoFile(info, season, episode)
             ?: throw IllegalStateException("No video file found in torrent")
         val files = info.files()
         val relPath = files.filePath(fileIndex)

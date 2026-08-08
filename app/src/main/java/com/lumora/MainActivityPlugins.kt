@@ -522,14 +522,52 @@ internal fun MainActivity.showStreamSearchDialog(
         row.tag = qualityTierOf(entry.result.title)
         row.visibility = if (currentQualityFilter == "All" || currentQualityFilter == row.tag) android.view.View.VISIBLE else android.view.View.GONE
 
+        val displayTitle = entry.result.title
+
+        val derivedQuality =
+            entry.result.quality
+                ?: Regex(
+                    "(2160p|4k|1080p|720p|480p)",
+                    RegexOption.IGNORE_CASE
+                ).find(displayTitle)?.value
+
+        val codec =
+            Regex(
+                "(HEVC|H\\.?265|H\\.?264|AV1|x265|x264)",
+                RegexOption.IGNORE_CASE
+            ).find(displayTitle)?.value
+
+        val hdr =
+            Regex(
+                "(HDR10\\+?|HDR|DV|Dolby Vision)",
+                RegexOption.IGNORE_CASE
+            ).find(displayTitle)?.value
+
+        val audio =
+            Regex(
+                "(Atmos|Dolby Digital Plus|DDP?\\+?|AAC|DTS(?:-HD)?|TrueHD)",
+                RegexOption.IGNORE_CASE
+            ).find(displayTitle)?.value
+
+        val sizeFromTitle =
+            Regex(
+                "(\\d+(?:\\.\\d+)?\\s?(?:GB|MB))",
+                RegexOption.IGNORE_CASE
+            ).find(displayTitle)?.value
+
         row.findViewById<TextView>(
             R.id.streamMeta
         ).text = listOfNotNull(
-            entry.result.quality,
+            derivedQuality,
+            codec,
+            hdr,
+            audio,
             entry.result.seeders?.let { "$it seeders" },
-            entry.result.size,
+            entry.result.size ?: sizeFromTitle,
             entry.result.source
-        ).joinToString("  ·  ")
+        )
+            .distinct()
+            .joinToString("  ·  ")
 
         row.setOnClickListener {
             playResult(entry)
