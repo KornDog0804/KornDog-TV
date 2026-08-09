@@ -3,7 +3,6 @@ package com.lumora.player
 import android.content.Context
 import android.net.Uri
 import android.view.SurfaceView
-import com.lumora.BaseApplication
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
@@ -93,6 +92,24 @@ class PlayerManager(
     )
 
     /**
+     * Everything needed to replay the current item exactly as submitted.
+     * Used for one targeted HLS retry when Media3 cannot infer a disguised
+     * HLS stream from its URL.
+     */
+    private data class PlayRequest(
+        val url: String,
+        val userAgent: String?,
+        val subtitles: List<ExternalSubtitle>,
+        val startPositionMs: Long,
+        val headers: Map<String, String>?,
+        val audio: String?,
+        val preferAudioLanguage: Boolean
+    )
+
+    private var lastPlayRequest: PlayRequest? = null
+    private var lastPlayWasForcedHls = false
+
+    /**
      * Prepare and start playing a stream URL.
      *
      * [startPositionMs] seeks *before* prepare rather than after, so a resumed title buffers
@@ -106,61 +123,29 @@ class PlayerManager(
         startPositionMs: Long = 0L,
         headers: Map<String, String>? = null,
         audio: String? = null,
-        preferAudioLanguage: Boolean = false
+        preferAudioLanguage: Boolean = false,
+        forceHls: Boolean = false
     ) {
+        lastPlayRequest = PlayRequest(
+            url = url,
+            userAgent = userAgent,
+            subtitles = subtitles,
+            startPositionMs = startPositionMs,
+            headers = headers,
+            audio = audio,
+            preferAudioLanguage = preferAudioLanguage
+        )
+        lastPlayWasForcedHls = forceHls
+
         val dataSourceFactory = buildDataSourceFactory(userAgent, headers)
 
-        var detectedMimeType: String? = null
-
-        if (!url.startsWith("file:", ignoreCase = true)) {
-            runCatching {
-                val requestBuilder = okhttp3.Request.Builder()
-                    .url(url)
-                    .header("Range", "bytes=0-511")
-
-                if (!userAgent.isNullOrBlank()) {
-                    requestBuilder.header("User-Agent", userAgent)
-                }
-
-                headers?.forEach { (name, value) ->
-                    requestBuilder.header(name, value)
-                }
-
-                BaseApplication.instance.okHttpClient
-                    .newCall(requestBuilder.build())
-                    .execute()
-                    .use { response ->
-                        val contentType = response.header("Content-Type")
-                            ?.substringBefore(';')
-                            ?.trim()
-                            ?.lowercase()
-
-                        detectedMimeType = when (contentType) {
-                            "application/vnd.apple.mpegurl",
-                            "application/x-mpegurl",
-                            "audio/mpegurl",
-                            "audio/x-mpegurl" -> MimeTypes.APPLICATION_M3U8
-                            else -> null
-                        }
-
-                        android.util.Log.d(
-                            "LumoraMediaProbe",
-                            "url=$url code=${response.code} type=$contentType detected=$detectedMimeType"
-                        )
-                    }
-            }.onFailure { error ->
-                android.util.Log.w(
-                    "LumoraMediaProbe",
-                    "Probe failed url=$url",
-                    error
-                )
-            }
-        }
-
+        // Do not pre-fetch the stream just to identify it. Some signed/plugin VOD
+        // URLs are short-lived or sensitive to duplicate requests. Media3 gets the
+        // first request; only a confirmed container-parse failure triggers an HLS retry.
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(Uri.parse(url))
             .apply {
-                detectedMimeType?.let { setMimeType(it) }
+                if (forceHls) setMimeType(MimeTypes.APPLICATION_M3U8)
             }
             .setMediaMetadata(
                 androidx.media3.common.MediaMetadata.Builder()
@@ -273,6 +258,31 @@ class PlayerManager(
             attachOneShotForcedSubtitlePreference(preferredSubtitleLanguage())
         }
         player.play()
+    }
+
+    /**
+     * Retry the current request once as HLS. This is intentionally narrow:
+     * callers should only use it after Media3 reports a container parsing failure.
+     */
+    fun retryCurrentAsHls(): Boolean {
+        val request = lastPlayRequest ?: return false
+        if (lastPlayWasForcedHls) return false
+
+        val retryPosition = player.currentPosition
+            .takeIf { it > 0L }
+            ?: request.startPositionMs
+
+        playUrl(
+            url = request.url,
+            userAgent = request.userAgent,
+            subtitles = request.subtitles,
+            startPositionMs = retryPosition,
+            headers = request.headers,
+            audio = request.audio,
+            preferAudioLanguage = request.preferAudioLanguage,
+            forceHls = true
+        )
+        return true
     }
 
     /**

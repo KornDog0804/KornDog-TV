@@ -385,6 +385,25 @@ internal fun MainActivity.setupPlayerControls() {
             binding.bufferingSpinner.visibility = View.GONE
             resetStallTracking()
             blackFrameStreak = 0
+
+            // Some VOD providers return HLS behind URLs that look like MP4/MKV or have
+            // no useful extension at all. Let Media3 try normally first; only when it
+            // specifically says the container could not be parsed do we retry the exact
+            // same URL, headers, subtitles and resume position explicitly as HLS.
+            if (
+                error.errorCode == PlaybackException.ERROR_CODE_PARSING_CONTAINER_UNSUPPORTED &&
+                playerManager.retryCurrentAsHls()
+            ) {
+                android.util.Log.w(
+                    "LumoraPlayback",
+                    "Container parse failed; retrying current stream explicitly as HLS"
+                )
+                beginStreamAttempt()
+                startBlackFrameWatch()
+                binding.bufferingSpinner.visibility = View.VISIBLE
+                return
+            }
+
             if (!tryNextQualityVersion()) {
                 // Find Stream results from Comet/AIO/etc. are independent sources.
                 // Walk the remaining search results before giving up on the title.
