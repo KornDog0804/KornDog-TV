@@ -39,8 +39,10 @@ internal class CastRelayServer(
 
     private fun d(msg: String) {
         Log.d(TAG, msg)
-        debugLog.add("${System.currentTimeMillis() % 100000}: $msg")
-        if (debugLog.size > 300) debugLog.removeAt(0)
+        try {
+            val f = java.io.File("/sdcard/Download/castrelay.log")
+            f.appendText("${System.currentTimeMillis() % 100000}: $msg\n")
+        } catch (_: Exception) {}
     }
 
     @Volatile
