@@ -272,6 +272,84 @@ internal fun MainActivity.enabledStreamSearchPlugin(item: Channel? = null): Plug
  * no process of its own to keep bound during playback - `resolve()` just returns a plain
  * http(s) URL the player hits directly, so there's nothing to hold open past the pick.
  */
+/**
+ * Re-runs enabled Stremio add-ons for a persisted Find Stream item and returns
+ * the best fresh direct URL. The saved Channel id is deliberately preserved so
+ * PlaybackPositionStore still finds the existing resume position even though
+ * the disposable CDN URL changed.
+ */
+internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Channel? {
+    val itemId = channel.streamSearchItemId ?: return null
+    val season = channel.streamSearchSeason
+    val episode = channel.episodeNum
+
+    val addons = StremioAddonStore.load(prefs).filter { it.enabled }
+    if (addons.isEmpty()) return null
+
+    val item = allChannels.firstOrNull { it.id == itemId }
+
+    val tmdb = tmdbTypeAndId(itemId)
+        ?: item?.let {
+            tmdbClient.resolveId(
+                it.name,
+                it.year,
+                it.mediaType == MediaType.SERIES
+            )
+        }
+        ?: return null
+
+    val imdbId = tmdbClient.imdbId(tmdb.first, tmdb.second) ?: return null
+
+    val type =
+        if (channel.mediaType == MediaType.SERIES) "series" else "movie"
+
+    val contentId = when {
+        type == "movie" -> imdbId
+        season != null && episode != null -> "$imdbId:$season:$episode"
+        else -> return null
+    }
+
+    val stremioClient = StremioAddonClient()
+
+    val streams = coroutineScope {
+        addons.map { addon ->
+            async {
+                val manifest = stremioClient.fetchManifest(addon.manifestUrl)
+                    .getOrNull()
+                    ?: return@async emptyList()
+
+                stremioClient.streams(
+                    manifest = manifest,
+                    type = type,
+                    contentId = contentId
+                ).getOrDefault(emptyList())
+            }
+        }.awaitAll().flatten()
+    }
+
+    val fresh = streams
+        .filter { !it.url.isNullOrBlank() }
+        .distinctBy { it.url }
+        .sortedByDescending { stream ->
+            when {
+                stream.title.contains("2160p", true) ||
+                    stream.title.contains("4k", true) -> 4
+                stream.title.contains("1080p", true) -> 3
+                stream.title.contains("720p", true) -> 2
+                else -> 1
+            }
+        }
+        .firstOrNull()
+        ?: return null
+
+    return channel.copy(
+        url = fresh.url!!,
+        streamHeaders = fresh.requestHeaders,
+        streamSearchItemId = itemId,
+        streamSearchSeason = season
+    )
+}
+
 internal fun MainActivity.showStreamSearchDialog(
     plugin: PluginScript?,
     item: Channel,
@@ -481,8 +559,10 @@ internal fun MainActivity.showStreamSearchDialog(
                             logoUrl = item.logoUrl,
                             group = item.group,
                             categoryName = item.categoryName,
-                            mediaType = MediaType.MOVIE,
+                            mediaType = item.mediaType,
                             episodeNum = episode,
+                            streamSearchItemId = item.id,
+                            streamSearchSeason = season,
                             streamHeaders =
                                 resolved.headers.ifEmpty { null },
                             pluginToken =

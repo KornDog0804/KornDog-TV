@@ -158,6 +158,8 @@ object PlaybackPositionStore {
                                 stalkerCmd = c.optString("stalkerCmd", null),
                                 pluginToken = c.optString("pluginToken", null),
                                 pluginId = c.optString("pluginId", null),
+                                streamSearchItemId = c.optString("streamSearchItemId", null),
+                                streamSearchSeason = c.optInt("streamSearchSeason", -1).takeIf { it >= 0 },
                                 streamHeaders = c.optJSONObject("streamHeaders")?.let { h ->
                                     h.keys().asSequence().associateWith { k -> h.getString(k) }
                                 }
@@ -211,6 +213,8 @@ object PlaybackPositionStore {
                             ch.stalkerCmd?.let { put("stalkerCmd", it) }
                             ch.pluginToken?.let { put("pluginToken", it) }
                             ch.pluginId?.let { put("pluginId", it) }
+                            ch.streamSearchItemId?.let { put("streamSearchItemId", it) }
+                            ch.streamSearchSeason?.let { put("streamSearchSeason", it) }
                             ch.streamHeaders?.takeIf { it.isNotEmpty() }?.let { headers ->
                                 put("streamHeaders", JSONObject(headers as Map<*, *>))
                             }

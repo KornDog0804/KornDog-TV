@@ -180,6 +180,25 @@ class CastManager(private val context: Context) {
                             finish(true, null)
                         }
 
+                        MediaStatus.PLAYER_STATE_LOADING -> {
+                            // State 5 is a real Cast state: the receiver is still loading
+                            // the media. This is progress, not a playback failure.
+                            loadAccepted = true
+                            android.util.Log.d(
+                                "CastManager",
+                                "Cast receiver is LOADING: $url"
+                            )
+                        }
+
+                        MediaStatus.PLAYER_STATE_BUFFERING -> {
+                            // The receiver has the media and is filling its buffer.
+                            loadAccepted = true
+                            android.util.Log.d(
+                                "CastManager",
+                                "Cast receiver is BUFFERING: $url"
+                            )
+                        }
+
                         MediaStatus.PLAYER_STATE_IDLE -> {
                             // The receiver is normally IDLE before LOAD is accepted.
                             // Only treat IDLE as a failure once this load actually belongs
@@ -199,11 +218,25 @@ class CastManager(private val context: Context) {
 
             handler.postDelayed({
                 val state = remoteMediaClient.playerState
+
+                // LOADING (5) and BUFFERING (4) both mean the receiver is actively
+                // working on this load. Neither is grounds for declaring Cast dead.
+                if (
+                    state == MediaStatus.PLAYER_STATE_LOADING ||
+                    state == MediaStatus.PLAYER_STATE_BUFFERING
+                ) {
+                    android.util.Log.d(
+                        "CastManager",
+                        "Cast still starting after startup window: state=$state url=$url"
+                    )
+                    return@postDelayed
+                }
+
                 finish(
                     false,
                     "Receiver never started playback (state=$state)"
                 )
-            }, 15_000L)
+            }, 45_000L)
 
             remoteMediaClient.load(mediaInfo, loadOptions)
                 .setResultCallback { result ->

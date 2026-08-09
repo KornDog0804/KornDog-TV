@@ -70,6 +70,13 @@ data class Channel(
     val pluginToken: String? = null,
     // PluginScript.id of the script that produced pluginToken. Null for everything else.
     val pluginId: String? = null,
+
+    // Original catalog/search identity for streams found through Find Stream.
+    // The playable URL may expire, so Continue Watching must be able to repeat
+    // the search for the same movie or SxxExx instead of replaying that URL.
+    val streamSearchItemId: String? = null,
+    val streamSearchSeason: Int? = null,
+
     // Xtream `tv_archive` (0/1): the panel keeps a rolling recording of this channel, so a
     // programme that already aired can be played back from the archive. Live channels only,
     // and only Xtream reports it - M3U/Stalker/Jellyfin leave it false.

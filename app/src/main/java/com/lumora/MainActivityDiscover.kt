@@ -558,11 +558,22 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
         MediaType.LIVE -> playItem(channel)
         MediaType.MOVIE -> {
             currentIndex = filmList.indexOf(channel)
-            showPlayerFor(channel)
+
+            if (channel.streamSearchItemId != null) {
+                scope.launch {
+                    val playable = refreshSavedStreamSearch(channel) ?: channel
+                    showPlayerFor(playable)
+                }
+            } else {
+                showPlayerFor(channel)
+            }
+
             // Back out to the film's own poster, same as playing it from its detail page.
-            // Not for a plugin-resolved entry: its id is a resolve token, not a catalog
-            // item, so there is no detail page to return it to.
-            if (channel.pluginToken == null) detailReturnItem = channel
+            // Not for plugin/stream-search resolved entries: their ids are playback identities,
+            // not stable catalog items.
+            if (channel.pluginToken == null && channel.streamSearchItemId == null) {
+                detailReturnItem = channel
+            }
         }
         MediaType.SERIES -> {
             // An up-next tile (synthesized for a series whose watched trail is complete)
@@ -587,16 +598,25 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
             // series items can carry one. If the episode's series can't be resolved,
             // fall back to resuming the episode directly.
             if (channel.episodeNum != null) {
-                // Continue Watching must play a freshly reconstructed episode rather than the
-                // persisted snapshot. Xtream/Jellyfin/plugin playback URLs and provider fields
-                // can change or expire while the tile itself remains perfectly valid.
                 scope.launch {
-                    val playable = refreshHomeEpisodeSnapshot(channel)
+                    // Find Stream / Stremio results need a completely fresh search because
+                    // their CDN URLs can expire. IPTV/Jellyfin episodes instead rebuild from
+                    // provider metadata as before.
+                    val playable =
+                        if (channel.streamSearchItemId != null) {
+                            refreshSavedStreamSearch(channel) ?: channel
+                        } else {
+                            refreshHomeEpisodeSnapshot(channel)
+                        }
+
                     showPlayerFor(playable)
 
-                    // A Continue Watching tile is a lone episode with no queue behind it.
-                    // Rebuild its cross-season chain so normal auto-advance still works.
-                    populateHomeTileEpisodeQueue(playable)
+                    // IPTV episode snapshots can rebuild an auto-advance queue. Stream-search
+                    // results currently resume as a single episode, which is still better than
+                    // replaying an expired URL.
+                    if (playable.streamSearchItemId == null) {
+                        populateHomeTileEpisodeQueue(playable)
+                    }
                 }
             } else {
                 showContentDetail(channel)
