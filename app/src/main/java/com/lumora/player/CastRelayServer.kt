@@ -174,7 +174,7 @@ internal class CastRelayServer(
         } catch (e: Exception) {
             Log.e(TAG, "Upstream relay failed: $upstreamUrl", e)
             return newFixedLengthResponse(
-                Response.Status.BAD_GATEWAY,
+                Response.Status.INTERNAL_ERROR,
                 MIME_PLAINTEXT,
                 e.message ?: "Upstream request failed"
             )
@@ -227,7 +227,7 @@ internal class CastRelayServer(
             } else {
                 upstream.close()
                 return newFixedLengthResponse(
-                    Response.Status.BAD_GATEWAY,
+                    Response.Status.INTERNAL_ERROR,
                     MIME_PLAINTEXT,
                     "Upstream HTTP ${upstream.code}"
                 )
