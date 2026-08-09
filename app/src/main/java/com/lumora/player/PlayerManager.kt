@@ -137,9 +137,7 @@ class PlayerManager(
                             val firstBytes = response
                                 .peekBody(32)
                                 .bytes()
-                                .joinToString(" ") { byte ->
-                                    "%02x".format(byte.toInt() and 0xff)
-                                }
+                                .joinToString(" ")
 
                             val diagnostic =
                                 "HTTP ${response.code}\n" +
