@@ -177,60 +177,28 @@ internal fun MainActivity.setupPlayerControls() {
                     return@castConnected
                 }
 
-                scope.launch {
-                    // Find Stream VOD URLs can be signed to the requester's IP and
-                    // expire quickly. A URL already playing locally is therefore
-                    // the worst possible thing to hand blindly to Chromecast.
-                    //
-                    // Re-run the stream lookup immediately before Cast LOAD so the
-                    // receiver gets a freshly-minted URL rather than the persisted
-                    // or hours-old player URI.
-                    val needsFreshStream =
-                        channel.mediaType != MediaType.LIVE &&
-                            (
-                                channel.streamSearchItemId != null ||
-                                channel.id.startsWith("stream:")
-                            )
+                // Cast exactly what the phone is successfully playing right now.
+                // For VOD, CastManager relays it through this phone instead of
+                // handing the provider URL directly to Chromecast.
+                val castUrl = playerManager.currentMediaUri()
+                    ?: channel.url
 
-                    val castItem =
-                        if (needsFreshStream) {
-                            refreshSavedStreamSearch(channel)
+                castChannel(
+                    channel,
+                    channel.name,
+                    playbackUrl = castUrl,
+                    requestHeaders = channel.streamHeaders,
+                    userAgent = channel.streamUserAgent
+                ) { success, message ->
+                    runOnUiThread {
+                        if (success) {
+                            playerManager.pause()
                         } else {
-                            channel
-                        }
-
-                    if (castItem == null) {
-                        Toast.makeText(
-                            this@setupPlayerControls,
-                            "Couldn't refresh this stream for Cast",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@launch
-                    }
-
-                    val castUrl =
-                        if (needsFreshStream) {
-                            castItem.url
-                        } else {
-                            playerManager.currentMediaUri()
-                                ?: castItem.url
-                        }
-
-                    castChannel(
-                        castItem,
-                        castItem.name,
-                        playbackUrl = castUrl
-                    ) { success, message ->
-                        runOnUiThread {
-                            if (success) {
-                                playerManager.pause()
-                            } else {
-                                Toast.makeText(
-                                    this@setupPlayerControls,
-                                    "Cast failed: ${message ?: "check TV and try again"}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
+                            Toast.makeText(
+                                this@setupPlayerControls,
+                                "Cast failed: ${message ?: "check TV and try again"}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                 }

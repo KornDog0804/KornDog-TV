@@ -399,6 +399,13 @@ internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Ch
         mediaType = if (isSeries) MediaType.SERIES else MediaType.MOVIE,
         episodeNum = episode,
         streamHeaders = fresh.requestHeaders.ifEmpty { null },
+
+        // This result is already a fresh Stremio direct stream. Do not carry an
+        // old JS-plugin token into showPlayerFor(), or it can resolve again and
+        // replace this fresh URL with an unrelated/expired one.
+        pluginToken = null,
+        pluginId = null,
+
         streamSearchItemId = durableId,
         streamSearchSeason = season
     )

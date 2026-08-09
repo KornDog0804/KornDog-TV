@@ -132,6 +132,10 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:okhttp-tls:4.12.0")
 
+    // Local HTTP relay used only for Chromecast VOD. Chromecast fetches from the
+    // phone; the phone fetches signed/header-protected upstream media.
+    implementation("org.nanohttpd:nanohttpd:2.3.1")
+
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
 

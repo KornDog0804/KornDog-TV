@@ -16,12 +16,22 @@ import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.common.images.WebImage
 import android.net.Uri
+import okhttp3.OkHttpClient
 
 /**
  * Manages Google Cast (Chromecast) playback.
  * Handles session lifecycle and media loading to cast devices.
  */
 class CastManager(private val context: Context) {
+
+    private val relayClient = OkHttpClient.Builder()
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .build()
+
+    private val vodRelay by lazy {
+        CastRelayServer(relayClient)
+    }
 
     private var castContext: CastContext? = null
     private var castSession: CastSession? = null
@@ -92,6 +102,8 @@ class CastManager(private val context: Context) {
         channel: Channel,
         title: String? = null,
         playbackUrl: String? = null,
+        requestHeaders: Map<String, String>? = null,
+        userAgent: String? = null,
         onResult: (success: Boolean, message: String?) -> Unit
     ) {
         val session = castSession
@@ -122,6 +134,28 @@ class CastManager(private val context: Context) {
             return
         }
 
+        // Live TV already casts correctly and must stay on the existing direct path.
+        //
+        // VOD goes through the phone relay. This keeps the upstream request on the
+        // same network origin as phone playback and lets us preserve Referer/UA/etc.
+        val castUrl =
+            if (channel.mediaType == MediaType.LIVE) {
+                url
+            } else {
+                try {
+                    vodRelay.ensureStarted()
+                    vodRelay.register(
+                        upstreamUrl = url,
+                        headers = requestHeaders ?: channel.streamHeaders,
+                        userAgent = userAgent ?: channel.streamUserAgent
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.e("CastManager", "Couldn't start VOD relay", e)
+                    onResult(false, e.message ?: "Couldn't start Cast relay")
+                    return
+                }
+            }
+
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, title ?: channel.name)
             channel.logoUrl?.let { addImage(WebImage(Uri.parse(it))) }
@@ -130,9 +164,11 @@ class CastManager(private val context: Context) {
         val streamType = if (channel.mediaType == MediaType.LIVE)
             MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
 
+        // MIME still comes from the real upstream URL. The relay URL deliberately
+        // has no media extension.
         val contentType = guessContentType(url)
 
-        val mediaInfo = MediaInfo.Builder(url)
+        val mediaInfo = MediaInfo.Builder(castUrl)
             .setStreamType(streamType)
             .setContentType(contentType)
             .setMetadata(metadata)
@@ -145,7 +181,7 @@ class CastManager(private val context: Context) {
         try {
             android.util.Log.d(
                 "CastManager",
-                "Submitting Cast load: $url (type=$contentType, stream=$streamType)"
+                "Submitting Cast load: $castUrl upstream=$url (type=$contentType, stream=$streamType)"
             )
 
             var finished = false
@@ -284,5 +320,8 @@ class CastManager(private val context: Context) {
         } catch (_: Exception) {}
         castSession = null
         castContext = null
+        if (vodRelay.isAlive) {
+            vodRelay.stop()
+        }
     }
 }

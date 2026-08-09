@@ -563,7 +563,10 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                 scope.launch {
                     val playable = refreshSavedStreamSearch(channel)
                     if (playable != null) {
-                        showPlayerFor(playable)
+                        showPlayerFor(
+                        playable,
+                        pluginStreamAlreadyResolved = true
+                    )
                     } else {
                         Toast.makeText(
                             this@onHomeItemClick,
@@ -621,7 +624,10 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                         }
 
                     if (playable != null) {
-                        showPlayerFor(playable)
+                        showPlayerFor(
+                        playable,
+                        pluginStreamAlreadyResolved = true
+                    )
 
                         // IPTV episode snapshots can rebuild an auto-advance queue.
                         if (playable.streamSearchItemId == null) {
