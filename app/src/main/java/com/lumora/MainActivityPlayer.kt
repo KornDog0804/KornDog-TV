@@ -397,10 +397,22 @@ internal fun MainActivity.setupPlayerControls() {
                     retryJellyfinPlayback()
                 } else {
                     streamSearchFailover = null
+                    val cause = error.cause?.message
+                        ?: error.message
+                        ?: "unknown"
+
+                    val detail = "${error.errorCodeName}: $cause"
+
+                    android.util.Log.e(
+                        "LumoraPlayback",
+                        "Playback failed url=${playerManager.currentMediaUri()} code=${error.errorCodeName}",
+                        error
+                    )
+
                     Toast.makeText(
                         this@setupPlayerControls,
-                        "Playback error",
-                        Toast.LENGTH_SHORT
+                        detail.take(180),
+                        Toast.LENGTH_LONG
                     ).show()
                 }
             }
