@@ -7,6 +7,7 @@ import com.lumora.BaseApplication
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
@@ -138,7 +139,7 @@ class PlayerManager(
                             "application/vnd.apple.mpegurl",
                             "application/x-mpegurl",
                             "audio/mpegurl",
-                            "audio/x-mpegurl" -> "application/x-mpegURL"
+                            "audio/x-mpegurl" -> MimeTypes.APPLICATION_M3U8
                             else -> null
                         }
 
