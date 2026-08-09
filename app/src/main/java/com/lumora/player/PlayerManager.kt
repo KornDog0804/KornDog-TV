@@ -158,7 +158,7 @@ class PlayerManager(
                                 ).show()
                             }
                         }
-                }.onFailure { error ->
+                }.onFailure { error: Throwable ->
                     android.util.Log.e(
                         "LumoraMediaProbe",
                         "Probe failed url=$url",
