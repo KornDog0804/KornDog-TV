@@ -110,7 +110,7 @@ internal class CastRelayServer(
             )
         }
 
-        if (session.uri.trim(Character.forDigit(47, 10)) == "debug-log") {
+        if (session.uri.trim(Character.forDigit(47, 10)) == "relay/debug-log") {
             return newFixedLengthResponse(
                 Response.Status.OK,
                 MIME_PLAINTEXT,
