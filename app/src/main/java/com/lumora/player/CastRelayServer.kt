@@ -35,6 +35,14 @@ internal class CastRelayServer(
 
     private val contexts = ConcurrentHashMap<String, RelayContext>()
 
+    private val debugLog = java.util.Collections.synchronizedList(mutableListOf<String>())
+
+    private fun d(msg: String) {
+        Log.d(TAG, msg)
+        debugLog.add("${System.currentTimeMillis() % 100000}: $msg")
+        if (debugLog.size > 300) debugLog.removeAt(0)
+    }
+
     @Volatile
     private var startedPort: Int = -1
 
@@ -75,7 +83,7 @@ internal class CastRelayServer(
         userAgent: String?
     ): String {
         val port = ensureStarted()
-        Log.d(TAG, "register() upstream=$upstreamUrl port=$port localIp=${localIpv4Address()}")
+        d("register() upstream=$upstreamUrl port=$port localIp=${localIpv4Address()}")
 
         val token = UUID.randomUUID().toString()
         contexts[token] = RelayContext(
@@ -93,7 +101,7 @@ internal class CastRelayServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
-        Log.d(TAG, "serve() method=${session.method} uri=${session.uri} range=${session.headers["range"]}")
+        d("serve() method=${session.method} uri=${session.uri} range=${session.headers["range"]}")
         if (session.method != Method.GET && session.method != Method.HEAD) {
             return newFixedLengthResponse(
                 Response.Status.METHOD_NOT_ALLOWED,
@@ -102,6 +110,13 @@ internal class CastRelayServer(
             )
         }
 
+        if (session.uri.trim(Character.forDigit(47, 10)) == "debug-log") {
+            return newFixedLengthResponse(
+                Response.Status.OK,
+                MIME_PLAINTEXT,
+                debugLog.joinToString("\n")
+            )
+        }
         val pieces = session.uri.trim('/').split('/')
         if (pieces.size != 2 || pieces[0] != "relay") {
             return newFixedLengthResponse(
@@ -171,7 +186,7 @@ internal class CastRelayServer(
             requestBuilder.head()
         }
 
-        Log.d(TAG, "Fetching upstream url=$upstreamUrl headers=${relayContext.headers} ua=${relayContext.userAgent}")
+        d("Fetching upstream url=$upstreamUrl headers=${relayContext.headers} ua=${relayContext.userAgent}")
         val upstream = try {
             client.newCall(requestBuilder.build()).execute()
         } catch (e: Exception) {
@@ -183,7 +198,7 @@ internal class CastRelayServer(
             )
         }
 
-        Log.d(TAG, "Upstream response code=${upstream.code} contentType=${upstream.header("Content-Type")} contentLength=${upstream.header("Content-Length")} contentRange=${upstream.header("Content-Range")}")
+        d("Upstream response code=${upstream.code} contentType=${upstream.header("Content-Type")} contentLength=${upstream.header("Content-Length")} contentRange=${upstream.header("Content-Range")}")
         val body = upstream.body
         val upstreamType = upstream.header("Content-Type")
             ?.substringBefore(';')
@@ -208,7 +223,7 @@ internal class CastRelayServer(
                 token = token
             )
 
-        Log.d(TAG, "HLS rewritten originalLen=${text.length} rewrittenLen=${rewritten.length}")
+        d("HLS rewritten originalLen=${text.length} rewrittenLen=${rewritten.length}")
             val bytes = rewritten.toByteArray(StandardCharsets.UTF_8)
 
             return newFixedLengthResponse(
