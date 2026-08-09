@@ -271,11 +271,9 @@ internal fun MainActivity.runSearch(query: String, runId: Int, adapter: SearchRe
     searchDisplayedCount = 0
     scope.launch {
         val filter = searchFilter
-        val mediaResults = withContext(Dispatchers.Default) {
+        val localMediaResults = withContext(Dispatchers.Default) {
             val lower = query.lowercase()
-            // P1-2: compiled once per query, not per comparison - the boundary regex was
-            // built inside searchRank (called by the comparator), so sorting ~50k titles
-            // compiled ~1.5M Patterns and cost seconds on a TV stick.
+            // P1-2: compiled once per query, not per comparison.
             val boundaryRegex = Regex("\\b" + Regex.escape(lower))
             val source = when (filter) {
                 MainActivity.SearchFilter.ALL -> liveChannels + filmList + seriesList
@@ -283,11 +281,49 @@ internal fun MainActivity.runSearch(query: String, runId: Int, adapter: SearchRe
                 MainActivity.SearchFilter.MOVIE -> filmList
                 MainActivity.SearchFilter.SERIES -> seriesList
             }
+
             source
                 .filter { it.name.lowercase().contains(lower) }
-                .sortedWith(compareBy({ searchRank(it.name, lower, boundaryRegex) }, { it.name.lowercase() }))
-                .map { SearchResultItem.Media(it) }
+                .sortedWith(
+                    compareBy(
+                        { searchRank(it.name, lower, boundaryRegex) },
+                        { it.name.lowercase() }
+                    )
+                )
         }
+
+        // Global Search used to stop at the IPTV/Jellyfin catalog even when
+        // Find Stream sources were enabled. Discover already searches TMDB,
+        // so expose those same playable titles here for movie/series searches.
+        val discoverResults =
+            if (
+                hasAnyStreamSource() &&
+                filter != MainActivity.SearchFilter.LIVE
+            ) {
+                runCatching { tmdbClient.search(query) }
+                    .getOrDefault(emptyList())
+                    .filter { item ->
+                        when (filter) {
+                            MainActivity.SearchFilter.ALL -> true
+                            MainActivity.SearchFilter.MOVIE ->
+                                item.mediaType == MediaType.MOVIE
+                            MainActivity.SearchFilter.SERIES ->
+                                item.mediaType == MediaType.SERIES
+                            MainActivity.SearchFilter.LIVE -> false
+                        }
+                    }
+            } else {
+                emptyList()
+            }
+
+        val mediaResults =
+            (localMediaResults + discoverResults)
+                .distinctBy { item ->
+                    item.id.ifBlank {
+                        "${item.mediaType}:${item.name.lowercase()}:${item.year.orEmpty()}"
+                    }
+                }
+                .map { SearchResultItem.Media(it) }
         // Stale run (query changed or overlay dismissed while this was in flight) - the
         // EPG fetches make runs long enough that publishing late would clobber newer
         // results, so check before and after the slow part.

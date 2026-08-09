@@ -417,6 +417,14 @@ internal fun MainActivity.showStreamSearchDialog(
     season: Int? = null,
     episode: Int? = null
 ) {
+
+    // Continue Watching restores an episode Channel directly. Its caller may
+    // not have the original detail-page season/episode arguments anymore, but
+    // the persisted stream-search identity still does.
+    val effectiveSeason = season ?: item.streamSearchSeason
+    val effectiveEpisode = episode ?: item.episodeNum
+
+
     data class StreamEntry(
         val result: TorrentResult,
         val resolver: String,
@@ -424,8 +432,8 @@ internal fun MainActivity.showStreamSearchDialog(
     )
 
     val epTag =
-        if (season != null && episode != null) {
-            " S%02dE%02d".format(season, episode)
+        if (effectiveSeason != null && effectiveEpisode != null) {
+            " S%02dE%02d".format(effectiveSeason, effectiveEpisode)
         } else {
             ""
         }
@@ -502,9 +510,20 @@ internal fun MainActivity.showStreamSearchDialog(
             text = label
             textSize = 13f
             setPadding(24, 12, 24, 12)
+
+            // These are real controls, not labels. Without focusability Android TV /
+            // Fire TV DPAD navigation skips straight over 4K/1080p/720p.
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+
             setOnClickListener {
                 currentQualityFilter = label
                 applyQualityFilter()
+
+                // Filtering can remove the currently-focused result row. Keep focus
+                // anchored on the selected quality chip instead of letting it vanish.
+                requestFocus()
             }
         }
         qualityFilterRow.addView(btn)
@@ -518,7 +537,7 @@ internal fun MainActivity.showStreamSearchDialog(
             .toString(16)
 
         return "stream:${entry.resolver}:$hash" +
-            (episode?.let { ":e$it" } ?: "")
+            (effectiveEpisode?.let { ":e$it" } ?: "")
     }
 
     val attemptedStreamTokens = mutableSetOf<String>()
@@ -568,8 +587,8 @@ internal fun MainActivity.showStreamSearchDialog(
                 "torrent" -> {
                     resolveTorrentStream(
                         result.token,
-                        season,
-                        episode
+                        effectiveSeason,
+                        effectiveEpisode
                     ) { line ->
                         runOnUiThread {
                             status.text = line
@@ -587,8 +606,8 @@ internal fun MainActivity.showStreamSearchDialog(
                         plugin.resolvesNatively ->
                             resolveTorrentStream(
                                 result.token,
-                                season,
-                                episode
+                                effectiveSeason,
+                                effectiveEpisode
                             ) { line ->
                                 runOnUiThread {
                                     status.text = line
@@ -599,8 +618,8 @@ internal fun MainActivity.showStreamSearchDialog(
                             jsPluginEngine.resolve(
                                 pluginSource,
                                 result.token,
-                                season,
-                                episode
+                                effectiveSeason,
+                                effectiveEpisode
                             )
                     }
                 }
@@ -621,9 +640,9 @@ internal fun MainActivity.showStreamSearchDialog(
                             group = item.group,
                             categoryName = item.categoryName,
                             mediaType = item.mediaType,
-                            episodeNum = episode,
+                            episodeNum = effectiveEpisode,
                             streamSearchItemId = item.id,
-                            streamSearchSeason = season,
+                            streamSearchSeason = effectiveSeason,
                             streamHeaders =
                                 resolved.headers.ifEmpty { null },
                             pluginToken =
@@ -770,8 +789,8 @@ internal fun MainActivity.showStreamSearchDialog(
                         source = pluginSource,
                         query = item.name,
                         year = item.year?.toIntOrNull(),
-                        season = season,
-                        episode = episode,
+                        season = effectiveSeason,
+                        episode = effectiveEpisode,
                         onProgress = {
                             if (results.isEmpty()) {
                                 status.text = it
@@ -829,8 +848,8 @@ internal fun MainActivity.showStreamSearchDialog(
                 val contentId = when {
                     type == "movie" -> imdbId
 
-                    season != null && episode != null ->
-                        "$imdbId:$season:$episode"
+                    effectiveSeason != null && effectiveEpisode != null ->
+                        "$imdbId:$effectiveSeason:$effectiveEpisode"
 
                     else -> return@launch
                 }
