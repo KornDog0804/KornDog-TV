@@ -429,4 +429,12 @@ class PlayerManager(
 
     /** Get the underlying ExoPlayer instance for advanced use. */
     fun getExoPlayer(): ExoPlayer = player
+
+    /** URI Media3 is actually playing after any provider/plugin/Jellyfin resolution. */
+    fun currentMediaUri(): String? =
+        player.currentMediaItem
+            ?.localConfiguration
+            ?.uri
+            ?.toString()
+            ?.takeIf { it.isNotBlank() }
 }

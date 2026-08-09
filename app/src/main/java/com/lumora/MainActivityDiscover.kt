@@ -527,6 +527,30 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
     }
 }
 
+/**
+ * Refreshes a persisted Continue Watching episode from its current provider when possible.
+ * Old snapshots may be missing provider playback fields, while plugin/Jellyfin URLs may
+ * simply have expired. If reconstruction fails, keep the snapshot and let showPlayerFor()
+ * use its normal provider/plugin/Jellyfin fallbacks.
+ */
+internal suspend fun MainActivity.refreshHomeEpisodeSnapshot(channel: Channel): Channel {
+    if (channel.mediaType != MediaType.SERIES || channel.episodeNum == null) return channel
+
+    val series = resolveHomeTileSeries(channel) ?: return channel
+
+    return runCatching {
+        val (_, seasons) = loadSeriesContent(series)
+        val candidates = seasons.flatMap { it.second }
+
+        candidates.firstOrNull { fresh ->
+            fresh.id.isNotBlank() && fresh.id == channel.id
+        } ?: candidates.firstOrNull { fresh ->
+            fresh.episodeNum == channel.episodeNum &&
+                fresh.sourceProviderId == channel.sourceProviderId
+        } ?: channel
+    }.getOrDefault(channel)
+}
+
 internal fun MainActivity.onHomeItemClick(channel: Channel) {
     // User-initiated play - see playItem for why the suppression flag is cleared here.
     skipResumePrompt = false
@@ -567,11 +591,14 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                 if (series != null) {
                     showContentDetail(series)
                 } else {
-                    showPlayerFor(channel)
-                    // A Continue Watching / Next Up tile is a lone episode with no queue
-                    // behind it - nothing would auto-advance when it ends. Back-fill the
-                    // same cross-season episode chain the detail page plays from.
-                    populateHomeTileEpisodeQueue(channel)
+                    scope.launch {
+                        val playable = refreshHomeEpisodeSnapshot(channel)
+                        showPlayerFor(playable)
+                        // A Continue Watching / Next Up tile is a lone episode with no queue
+                        // behind it - nothing would auto-advance when it ends. Back-fill the
+                        // same cross-season episode chain the detail page plays from.
+                        populateHomeTileEpisodeQueue(playable)
+                    }
                 }
             } else {
                 showContentDetail(channel)

@@ -479,6 +479,7 @@ class MainActivity : AppCompatActivity() {
     // Home is a standalone pane rather than one of the Live / Series / Films tabs.
     // The first catalog render routes through this flag in classifyAndShow().
     internal var showingHome = true
+    internal var homeSeeAllShelf: ContentShelf? = null
     internal var showingDownloads = false
     internal var showingDiscover = false
     /** Catch Up is a pane of its own rather than a fourth catalogue tab: it browses the
@@ -705,6 +706,7 @@ class MainActivity : AppCompatActivity() {
         onItemClick = { item -> onHomeItemClick(item) },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
         onHideClick = { shelf -> if (shelf.title == "Continue Watching") clearContinueWatching() else toggleHiddenHomeShelf(shelf.title) },
+        onSeeAllClick = { shelf -> showHomeSeeAll(shelf) },
         showPinButton = false
     )
     // Single-category selection swaps to these - a vertical, scrollable grid instead of
@@ -1057,6 +1059,7 @@ class MainActivity : AppCompatActivity() {
         // and only once already at the top does the next press go Home. Back on Home itself
         // exits. Leaving the app was previously one press from anywhere, which on a remote
         // is very easy to do by accident.
+        else if (showingHome && homeSeeAllShelf != null) selectHome()
         else if (showingHome) return false
         else if (!isAtSectionTop()) goToSectionTop()
         // Simple mode has no Home level above the section - Live TV at its top IS the

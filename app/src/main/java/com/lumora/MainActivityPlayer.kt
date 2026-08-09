@@ -168,7 +168,12 @@ internal fun MainActivity.setupPlayerControls() {
             onCastSessionConnected = { session ->
                 val channel = nowPlayingChannel
                 if (channel != null) {
-                    castChannel(channel, channel.name) { success, message ->
+                    val castUrl = playerManager.currentMediaUri()
+                    castChannel(
+                        channel,
+                        channel.name,
+                        playbackUrl = castUrl
+                    ) { success, message ->
                         runOnUiThread {
                             if (success) {
                                 playerManager.pause()

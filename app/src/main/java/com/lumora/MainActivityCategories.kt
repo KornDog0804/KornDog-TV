@@ -917,6 +917,37 @@ internal fun MainActivity.showSeeAll(shelf: ContentShelf) {
     scope.launch { applyCategoryFilter() }
 }
 
+/** Home See All stays owned by Home instead of routing through Series/Films,
+ * which now short-circuit into their TMDB shelf screens. */
+internal fun MainActivity.showHomeSeeAll(shelf: ContentShelf) {
+    homeSeeAllShelf = shelf
+    showingHome = true
+    showingDownloads = false
+    showingDiscover = false
+    hideCatchup()
+    releaseLivePreview()
+
+    binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
+    binding.homeDashboard.visibility = View.GONE
+    binding.homeContent.visibility = View.GONE
+    binding.homeSearchBar.visibility = View.GONE
+
+    binding.contentRow.visibility = View.VISIBLE
+    binding.liveRow.visibility = View.GONE
+    binding.filmsContent.visibility = View.GONE
+    binding.seriesContent.visibility = View.VISIBLE
+    applySidebarVisibility(tabWantsSidebar = false)
+
+    setGridSpan(binding.seriesContent, seriesGridAdapter, R.id.tabHome)
+    binding.seriesContent.adapter = seriesGridAdapter
+    seriesGridAdapter.replaceAll(shelf.items)
+    binding.seriesContent.scrollToPosition(0)
+
+    updateTabStyles(binding.tabHome)
+    applyStatus()
+}
+
 // Series/Films normally use category-based shelves; picking one
 // specific category from the sidebar swaps that tab's RecyclerView to a vertical,
 // scrollable poster grid instead - a horizontal strip isn't enough room to browse
@@ -1269,6 +1300,7 @@ internal fun MainActivity.updateTabStyles(selected: View) {
 internal fun MainActivity.selectHome() {
     activeSettingsOverlay?.dismiss()
     activeSearchOverlay?.dismiss()
+    homeSeeAllShelf = null
     showingHome = true
     showingDownloads = false
     showingDiscover = false

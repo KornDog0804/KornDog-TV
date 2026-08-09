@@ -7,7 +7,11 @@ import com.lumora.model.MediaType
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadOptions
 import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaStatus
 import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
+import android.os.Handler
+import android.os.Looper
 import com.google.android.gms.cast.framework.CastSession
 import com.google.android.gms.cast.framework.SessionManagerListener
 import com.google.android.gms.common.images.WebImage
@@ -87,6 +91,7 @@ class CastManager(private val context: Context) {
     fun castChannel(
         channel: Channel,
         title: String? = null,
+        playbackUrl: String? = null,
         onResult: (success: Boolean, message: String?) -> Unit
     ) {
         val session = castSession
@@ -101,9 +106,19 @@ class CastManager(private val context: Context) {
             return
         }
 
-        val url = channel.url
+        val url = playbackUrl?.takeIf { it.isNotBlank() } ?: channel.url
         if (url.isBlank()) {
             onResult(false, "This item has no direct stream URL")
+            return
+        }
+
+        val lowerUrl = url.lowercase()
+        if (
+            lowerUrl.startsWith("file:") ||
+            lowerUrl.contains("127.0.0.1") ||
+            lowerUrl.contains("localhost")
+        ) {
+            onResult(false, "This stream only exists on this phone and cannot be fetched by Cast")
             return
         }
 
@@ -133,17 +148,68 @@ class CastManager(private val context: Context) {
                 "Submitting Cast load: $url (type=$contentType, stream=$streamType)"
             )
 
+            var finished = false
+            var loadAccepted = false
+            val handler = Handler(Looper.getMainLooper())
+
+            lateinit var callback: RemoteMediaClient.Callback
+
+            fun finish(success: Boolean, message: String?) {
+                if (finished) return
+                finished = true
+                handler.removeCallbacksAndMessages(null)
+                remoteMediaClient.unregisterCallback(callback)
+                onResult(success, message)
+            }
+
+            callback = object : RemoteMediaClient.Callback() {
+                override fun onStatusUpdated() {
+                    val state = remoteMediaClient.playerState
+
+                    android.util.Log.d(
+                        "CastManager",
+                        "Receiver state=$state idleReason=${remoteMediaClient.idleReason}"
+                    )
+
+                    when (state) {
+                        MediaStatus.PLAYER_STATE_PLAYING -> {
+                            android.util.Log.d(
+                                "CastManager",
+                                "Cast receiver is PLAYING: $url"
+                            )
+                            finish(true, null)
+                        }
+
+                        MediaStatus.PLAYER_STATE_IDLE -> {
+                            // The receiver is normally IDLE before LOAD is accepted.
+                            // Only treat IDLE as a failure once this load actually belongs
+                            // to the receiver.
+                            if (loadAccepted) {
+                                finish(
+                                    false,
+                                    "Receiver went idle (${remoteMediaClient.idleReason})"
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            remoteMediaClient.registerCallback(callback)
+
+            handler.postDelayed({
+                val state = remoteMediaClient.playerState
+                finish(
+                    false,
+                    "Receiver never started playback (state=$state)"
+                )
+            }, 15_000L)
+
             remoteMediaClient.load(mediaInfo, loadOptions)
                 .setResultCallback { result ->
                     val status = result.status
 
-                    if (status.isSuccess) {
-                        android.util.Log.d(
-                            "CastManager",
-                            "Cast receiver accepted load: $url"
-                        )
-                        onResult(true, null)
-                    } else {
+                    if (!status.isSuccess) {
                         val message = status.statusMessage
                             ?: "Cast load failed (${status.statusCode})"
 
@@ -152,7 +218,18 @@ class CastManager(private val context: Context) {
                             "Cast receiver rejected load: code=${status.statusCode}, message=$message, url=$url"
                         )
 
-                        onResult(false, message)
+                        finish(false, message)
+                    } else {
+                        loadAccepted = true
+                        android.util.Log.d(
+                            "CastManager",
+                            "Cast LOAD accepted; waiting for PLAYING: $url"
+                        )
+
+                        // PLAYING can arrive between LOAD completing and this callback.
+                        if (remoteMediaClient.playerState == MediaStatus.PLAYER_STATE_PLAYING) {
+                            finish(true, null)
+                        }
                     }
                 }
         } catch (e: Exception) {

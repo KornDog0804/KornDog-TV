@@ -154,6 +154,8 @@ object PlaybackPositionStore {
                                 categoryId = c.optString("categoryId", null),
                                 isJellyfin = c.optBoolean("isJellyfin", false),
                                 sourceProviderId = c.optString("sourceProviderId", null),
+                                streamUserAgent = c.optString("streamUserAgent", null),
+                                stalkerCmd = c.optString("stalkerCmd", null),
                                 pluginToken = c.optString("pluginToken", null),
                                 pluginId = c.optString("pluginId", null),
                                 streamHeaders = c.optJSONObject("streamHeaders")?.let { h ->
@@ -205,6 +207,8 @@ object PlaybackPositionStore {
                             ch.categoryId?.let { put("categoryId", it) }
                             put("isJellyfin", ch.isJellyfin)
                             ch.sourceProviderId?.let { put("sourceProviderId", it) }
+                            ch.streamUserAgent?.let { put("streamUserAgent", it) }
+                            ch.stalkerCmd?.let { put("stalkerCmd", it) }
                             ch.pluginToken?.let { put("pluginToken", it) }
                             ch.pluginId?.let { put("pluginId", it) }
                             ch.streamHeaders?.takeIf { it.isNotEmpty() }?.let { headers ->
