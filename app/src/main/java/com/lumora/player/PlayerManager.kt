@@ -134,14 +134,12 @@ class PlayerManager(
                         .newCall(requestBuilder.build())
                         .execute()
                         .use { response ->
-                            val firstBytes = response.body
-                                ?.source()
-                                ?.apply { request(32) }
-                                ?.buffer
-                                ?.clone()
-                                ?.readByteArray(32)
-                                ?.joinToString(" ") { "%02x".format(it) }
-                                .orEmpty()
+                            val firstBytes = response
+                                .peekBody(32)
+                                .bytes()
+                                .joinToString(" ") { byte ->
+                                    "%02x".format(byte.toInt() and 0xff)
+                                }
 
                             val diagnostic =
                                 "HTTP ${response.code}\n" +
