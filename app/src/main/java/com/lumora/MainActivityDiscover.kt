@@ -587,18 +587,16 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
             // series items can carry one. If the episode's series can't be resolved,
             // fall back to resuming the episode directly.
             if (channel.episodeNum != null) {
-                val series = resolveHomeTileSeries(channel)
-                if (series != null) {
-                    showContentDetail(series)
-                } else {
-                    scope.launch {
-                        val playable = refreshHomeEpisodeSnapshot(channel)
-                        showPlayerFor(playable)
-                        // A Continue Watching / Next Up tile is a lone episode with no queue
-                        // behind it - nothing would auto-advance when it ends. Back-fill the
-                        // same cross-season episode chain the detail page plays from.
-                        populateHomeTileEpisodeQueue(playable)
-                    }
+                // Continue Watching must play a freshly reconstructed episode rather than the
+                // persisted snapshot. Xtream/Jellyfin/plugin playback URLs and provider fields
+                // can change or expire while the tile itself remains perfectly valid.
+                scope.launch {
+                    val playable = refreshHomeEpisodeSnapshot(channel)
+                    showPlayerFor(playable)
+
+                    // A Continue Watching tile is a lone episode with no queue behind it.
+                    // Rebuild its cross-season chain so normal auto-advance still works.
+                    populateHomeTileEpisodeQueue(playable)
                 }
             } else {
                 showContentDetail(channel)
