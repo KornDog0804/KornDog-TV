@@ -1,8 +1,5 @@
 package com.lumora.player
 
-import android.os.Handler
-import android.os.Looper
-import android.widget.Toast
 import android.content.Context
 import android.net.Uri
 import android.view.SurfaceView
@@ -112,71 +109,58 @@ class PlayerManager(
     ) {
         val dataSourceFactory = buildDataSourceFactory(userAgent, headers)
 
-        // Temporary VOD diagnostics: make the HTTP response visible on-screen so this can
-        // be diagnosed on a TV/phone without ADB. A provider may return HTML/JSON/error text
-        // from a URL that still looks like .mp4/.mkv, which Media3 then reports as an
-        // unsupported container.
+        var detectedMimeType: String? = null
+
         if (!url.startsWith("file:", ignoreCase = true)) {
-            Thread {
-                runCatching {
-                    val requestBuilder = okhttp3.Request.Builder()
-                        .url(url)
-                        .header("Range", "bytes=0-511")
+            runCatching {
+                val requestBuilder = okhttp3.Request.Builder()
+                    .url(url)
+                    .header("Range", "bytes=0-511")
 
-                    if (!userAgent.isNullOrBlank()) {
-                        requestBuilder.header("User-Agent", userAgent)
-                    }
-
-                    headers?.forEach { (name, value) ->
-                        requestBuilder.header(name, value)
-                    }
-
-                    BaseApplication.instance.okHttpClient
-                        .newCall(requestBuilder.build())
-                        .execute()
-                        .use { response ->
-                            val firstBytes = response
-                                .peekBody(32)
-                                .bytes()
-                                .joinToString(" ")
-
-                            val diagnostic =
-                                "HTTP ${response.code}\n" +
-                                "Type: ${response.header("Content-Type") ?: "none"}\n" +
-                                "Length: ${response.header("Content-Length") ?: "unknown"}\n" +
-                                "Range: ${response.header("Content-Range") ?: "none"}\n" +
-                                "Bytes: ${firstBytes.take(95)}"
-
-                            android.util.Log.d("LumoraMediaProbe", "$diagnostic url=$url")
-
-                            Handler(Looper.getMainLooper()).post {
-                                Toast.makeText(
-                                    context,
-                                    diagnostic,
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
-                        }
-                }.onFailure { error: Throwable ->
-                    android.util.Log.e(
-                        "LumoraMediaProbe",
-                        "Probe failed url=$url",
-                        error
-                    )
-
-                    Handler(Looper.getMainLooper()).post {
-                        Toast.makeText(
-                            context,
-                            "Media probe failed: ${error.message ?: "unknown"}",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
+                if (!userAgent.isNullOrBlank()) {
+                    requestBuilder.header("User-Agent", userAgent)
                 }
-            }.start()
+
+                headers?.forEach { (name, value) ->
+                    requestBuilder.header(name, value)
+                }
+
+                BaseApplication.instance.okHttpClient
+                    .newCall(requestBuilder.build())
+                    .execute()
+                    .use { response ->
+                        val contentType = response.header("Content-Type")
+                            ?.substringBefore(';')
+                            ?.trim()
+                            ?.lowercase()
+
+                        detectedMimeType = when (contentType) {
+                            "application/vnd.apple.mpegurl",
+                            "application/x-mpegurl",
+                            "audio/mpegurl",
+                            "audio/x-mpegurl" -> "application/x-mpegURL"
+                            else -> null
+                        }
+
+                        android.util.Log.d(
+                            "LumoraMediaProbe",
+                            "url=$url code=${response.code} type=$contentType detected=$detectedMimeType"
+                        )
+                    }
+            }.onFailure { error ->
+                android.util.Log.w(
+                    "LumoraMediaProbe",
+                    "Probe failed url=$url",
+                    error
+                )
+            }
         }
 
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(Uri.parse(url))
+            .apply {
+                detectedMimeType?.let { setMimeType(it) }
+            }
             .setMediaMetadata(
                 androidx.media3.common.MediaMetadata.Builder()
                     .setTitle(url)
