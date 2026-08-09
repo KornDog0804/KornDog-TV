@@ -279,44 +279,90 @@ internal fun MainActivity.enabledStreamSearchPlugin(item: Channel? = null): Plug
  * the disposable CDN URL changed.
  */
 internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Channel? {
-    val itemId = channel.streamSearchItemId ?: return null
-    val season = channel.streamSearchSeason
-    val episode = channel.episodeNum
+    // New saves carry the durable TMDB/search identity. Older Continue Watching
+    // entries do not, so recover series/episode identity from the display name
+    // rather than ever falling back to yesterday's signed CDN URL.
+    val episodeMatch = Regex("""\s+S(\d{1,2})E(\d{1,2})$""", RegexOption.IGNORE_CASE)
+        .find(channel.name)
 
-    val addons = StremioAddonStore.load(prefs).filter { it.enabled }
-    if (addons.isEmpty()) return null
+    val season =
+        channel.streamSearchSeason
+            ?: episodeMatch?.groupValues?.getOrNull(1)?.toIntOrNull()
 
-    val item = allChannels.firstOrNull { it.id == itemId }
+    val episode =
+        channel.episodeNum
+            ?: episodeMatch?.groupValues?.getOrNull(2)?.toIntOrNull()
 
-    val tmdb = tmdbTypeAndId(itemId)
-        ?: item?.let {
-            tmdbClient.resolveId(
-                it.name,
-                it.year,
-                it.mediaType == MediaType.SERIES
+    val isSeries = season != null && episode != null
+
+    val cleanName =
+        episodeMatch?.let { channel.name.removeRange(it.range).trim() }
+            ?: channel.name
+
+    val savedItemId = channel.streamSearchItemId
+
+    val catalogItem =
+        savedItemId?.let { id ->
+            allChannels.firstOrNull { it.id == id }
+        } ?: allChannels
+            .filter {
+                it.mediaType == if (isSeries) MediaType.SERIES else MediaType.MOVIE
+            }
+            .minByOrNull {
+                kotlin.math.abs(it.name.length - cleanName.length) +
+                    if (it.name.equals(cleanName, ignoreCase = true)) -1000 else 0
+            }
+            ?.takeIf { it.name.equals(cleanName, ignoreCase = true) }
+
+    val tmdb =
+        savedItemId?.let(::tmdbTypeAndId)
+            ?: catalogItem?.let { item ->
+                tmdbTypeAndId(item.id)
+                    ?: tmdbClient.resolveId(
+                        item.name,
+                        item.year,
+                        isSeries
+                    )
+            }
+            ?: tmdbClient.resolveId(
+                cleanName,
+                channel.year,
+                isSeries
             )
-        }
-        ?: return null
+            ?: return null
 
-    val imdbId = tmdbClient.imdbId(tmdb.first, tmdb.second) ?: return null
+    val imdbId =
+        tmdbClient.imdbId(tmdb.first, tmdb.second)
+            ?: return null
 
-    val type =
-        if (channel.mediaType == MediaType.SERIES) "series" else "movie"
+    val type = if (isSeries) "series" else "movie"
 
     val contentId = when {
-        type == "movie" -> imdbId
-        season != null && episode != null -> "$imdbId:$season:$episode"
-        else -> return null
+        type == "movie" ->
+            imdbId
+
+        season != null && episode != null ->
+            "$imdbId:$season:$episode"
+
+        else ->
+            return null
     }
+
+    val addons =
+        StremioAddonStore.load(prefs)
+            .filter { it.enabled }
+
+    if (addons.isEmpty()) return null
 
     val stremioClient = StremioAddonClient()
 
     val streams = coroutineScope {
         addons.map { addon ->
             async {
-                val manifest = stremioClient.fetchManifest(addon.manifestUrl)
-                    .getOrNull()
-                    ?: return@async emptyList()
+                val manifest =
+                    stremioClient.fetchManifest(addon.manifestUrl)
+                        .getOrNull()
+                        ?: return@async emptyList()
 
                 stremioClient.streams(
                     manifest = manifest,
@@ -334,6 +380,7 @@ internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Ch
             when {
                 stream.title.contains("2160p", true) ||
                     stream.title.contains("4k", true) -> 4
+
                 stream.title.contains("1080p", true) -> 3
                 stream.title.contains("720p", true) -> 2
                 else -> 1
@@ -342,10 +389,17 @@ internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Ch
         .firstOrNull()
         ?: return null
 
+    val durableId =
+        savedItemId
+            ?: catalogItem?.id
+            ?: "tmdb:${tmdb.first}:${tmdb.second}"
+
     return channel.copy(
         url = fresh.url!!,
-        streamHeaders = fresh.requestHeaders,
-        streamSearchItemId = itemId,
+        mediaType = if (isSeries) MediaType.SERIES else MediaType.MOVIE,
+        episodeNum = episode,
+        streamHeaders = fresh.requestHeaders.ifEmpty { null },
+        streamSearchItemId = durableId,
         streamSearchSeason = season
     )
 }

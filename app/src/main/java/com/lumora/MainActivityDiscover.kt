@@ -561,8 +561,16 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
 
             if (channel.streamSearchItemId != null) {
                 scope.launch {
-                    val playable = refreshSavedStreamSearch(channel) ?: channel
-                    showPlayerFor(playable)
+                    val playable = refreshSavedStreamSearch(channel)
+                    if (playable != null) {
+                        showPlayerFor(playable)
+                    } else {
+                        Toast.makeText(
+                            this@onHomeItemClick,
+                            "Couldn't refresh this stream. Use Find Stream again.",
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             } else {
                 showPlayerFor(channel)
@@ -603,19 +611,28 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                     // their CDN URLs can expire. IPTV/Jellyfin episodes instead rebuild from
                     // provider metadata as before.
                     val playable =
-                        if (channel.streamSearchItemId != null) {
-                            refreshSavedStreamSearch(channel) ?: channel
+                        if (
+                            channel.streamSearchItemId != null ||
+                            channel.id.startsWith("stream:")
+                        ) {
+                            refreshSavedStreamSearch(channel)
                         } else {
                             refreshHomeEpisodeSnapshot(channel)
                         }
 
-                    showPlayerFor(playable)
+                    if (playable != null) {
+                        showPlayerFor(playable)
 
-                    // IPTV episode snapshots can rebuild an auto-advance queue. Stream-search
-                    // results currently resume as a single episode, which is still better than
-                    // replaying an expired URL.
-                    if (playable.streamSearchItemId == null) {
-                        populateHomeTileEpisodeQueue(playable)
+                        // IPTV episode snapshots can rebuild an auto-advance queue.
+                        if (playable.streamSearchItemId == null) {
+                            populateHomeTileEpisodeQueue(playable)
+                        }
+                    } else {
+                        Toast.makeText(
+                            this@onHomeItemClick,
+                            "Couldn't refresh this episode. Use Find Stream again.",
+                            Toast.LENGTH_LONG
+                        ).show()
                     }
                 }
             } else {

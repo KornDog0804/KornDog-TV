@@ -165,13 +165,60 @@ internal fun MainActivity.setupPlayerControls() {
     } else {
         castManager = com.lumora.player.CastManager(this).apply {
             init()
-            onCastSessionConnected = { session ->
+            onCastSessionConnected = castConnected@{ _ ->
                 val channel = nowPlayingChannel
-                if (channel != null) {
-                    val castUrl = playerManager.currentMediaUri()
+
+                if (channel == null) {
+                    Toast.makeText(
+                        this@setupPlayerControls,
+                        "Play content first, then Cast",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                    return@castConnected
+                }
+
+                scope.launch {
+                    // Find Stream VOD URLs can be signed to the requester's IP and
+                    // expire quickly. A URL already playing locally is therefore
+                    // the worst possible thing to hand blindly to Chromecast.
+                    //
+                    // Re-run the stream lookup immediately before Cast LOAD so the
+                    // receiver gets a freshly-minted URL rather than the persisted
+                    // or hours-old player URI.
+                    val needsFreshStream =
+                        channel.mediaType != MediaType.LIVE &&
+                            (
+                                channel.streamSearchItemId != null ||
+                                channel.id.startsWith("stream:")
+                            )
+
+                    val castItem =
+                        if (needsFreshStream) {
+                            refreshSavedStreamSearch(channel)
+                        } else {
+                            channel
+                        }
+
+                    if (castItem == null) {
+                        Toast.makeText(
+                            this@setupPlayerControls,
+                            "Couldn't refresh this stream for Cast",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@launch
+                    }
+
+                    val castUrl =
+                        if (needsFreshStream) {
+                            castItem.url
+                        } else {
+                            playerManager.currentMediaUri()
+                                ?: castItem.url
+                        }
+
                     castChannel(
-                        channel,
-                        channel.name,
+                        castItem,
+                        castItem.name,
                         playbackUrl = castUrl
                     ) { success, message ->
                         runOnUiThread {
@@ -186,8 +233,6 @@ internal fun MainActivity.setupPlayerControls() {
                             }
                         }
                     }
-                } else {
-                    Toast.makeText(this@setupPlayerControls, "Play content first, then Cast", Toast.LENGTH_SHORT).show()
                 }
             }
         }
