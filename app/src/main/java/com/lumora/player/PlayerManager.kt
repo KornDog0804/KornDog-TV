@@ -6,6 +6,7 @@ import android.widget.Toast
 import android.content.Context
 import android.net.Uri
 import android.view.SurfaceView
+import com.lumora.BaseApplication
 import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
