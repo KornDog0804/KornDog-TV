@@ -75,6 +75,7 @@ internal class CastRelayServer(
         userAgent: String?
     ): String {
         val port = ensureStarted()
+        Log.d(TAG, "register() upstream=$upstreamUrl port=$port localIp=${localIpv4Address()}")
 
         val token = UUID.randomUUID().toString()
         contexts[token] = RelayContext(
@@ -92,6 +93,7 @@ internal class CastRelayServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
+        Log.d(TAG, "serve() method=${session.method} uri=${session.uri} range=${session.headers["range"]}")
         if (session.method != Method.GET && session.method != Method.HEAD) {
             return newFixedLengthResponse(
                 Response.Status.METHOD_NOT_ALLOWED,
@@ -169,6 +171,7 @@ internal class CastRelayServer(
             requestBuilder.head()
         }
 
+        Log.d(TAG, "Fetching upstream url=$upstreamUrl headers=${relayContext.headers} ua=${relayContext.userAgent}")
         val upstream = try {
             client.newCall(requestBuilder.build()).execute()
         } catch (e: Exception) {
@@ -180,6 +183,7 @@ internal class CastRelayServer(
             )
         }
 
+        Log.d(TAG, "Upstream response code=${upstream.code} contentType=${upstream.header("Content-Type")} contentLength=${upstream.header("Content-Length")} contentRange=${upstream.header("Content-Range")}")
         val body = upstream.body
         val upstreamType = upstream.header("Content-Type")
             ?.substringBefore(';')
@@ -204,6 +208,7 @@ internal class CastRelayServer(
                 token = token
             )
 
+        Log.d(TAG, "HLS rewritten originalLen=${text.length} rewrittenLen=${rewritten.length}")
             val bytes = rewritten.toByteArray(StandardCharsets.UTF_8)
 
             return newFixedLengthResponse(
