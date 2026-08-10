@@ -115,6 +115,8 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-rtsp:1.4.1")
     implementation("androidx.media3:media3-datasource-okhttp:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
+    implementation("androidx.media3:media3-transformer:1.4.1")
+    implementation("androidx.media3:media3-muxer:1.4.1")
 
     // UI
     implementation("androidx.recyclerview:recyclerview:1.3.2")
@@ -140,8 +142,6 @@ dependencies {
     // (empty_moov+frag_keyframe) on the fly so Chromecast's receiver can start
     // decoding without needing the moov atom up front, which upstream sources
     // rarely provide in a streaming-friendly position.
-    implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0-2")
-    implementation("com.arthenica:smart-exception-java:0.2.1")
 
     // JSON
     implementation("com.google.code.gson:gson:2.10.1")
@@ -169,8 +169,6 @@ dependencies {
     // (empty_moov+frag_keyframe) on the fly so Chromecast's receiver can start
     // decoding without needing the moov atom up front, which upstream sources
     // rarely provide in a streaming-friendly position.
-    implementation("com.arthenica:ffmpeg-kit-min-gpl:6.0-2")
-    implementation("com.arthenica:smart-exception-java:0.2.1")
     // libtorrent4j (libtorrent 2.0.x), not FrostWire's jlibtorrent (libtorrent 1.2). 1.2 decides
     // whether it may connect to an address from the routing table it reads over netlink, and
     // Android only shows an app LAN + loopback routes - no default route - so every listen socket
