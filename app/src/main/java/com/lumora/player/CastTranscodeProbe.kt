@@ -95,6 +95,22 @@ class CastTranscodeProbe(
                                 "Probe completed path=${output.absolutePath} " +
                                     "bytes=${output.length()}"
                             )
+
+                            runCatching {
+                                val exportFile =
+                                    File("/sdcard/Download/lumora-cast-test.mp4")
+
+                                output.copyTo(exportFile, overwrite = true)
+
+                                Log.i(
+                                    TAG,
+                                    "Probe exported path=${exportFile.absolutePath} " +
+                                        "bytes=${exportFile.length()}"
+                                )
+                            }.onFailure { error ->
+                                Log.e(TAG, "Probe export failed", error)
+                            }
+
                             onFinished(Result.success(output))
                         }
 
