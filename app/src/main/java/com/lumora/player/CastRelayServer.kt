@@ -222,7 +222,19 @@ internal class CastRelayServer(
             ?.substringBefore(';')
             ?.trim()
             ?.ifBlank { null }
-            .let { if (it == null || it.equals("application/octet-stream", true)) "video/mp4" else it }
+            .let { headerType ->
+                if (headerType != null && !headerType.equals("application/octet-stream", true)) {
+                    headerType
+                } else {
+                    when (upstream.request.url.encodedPath.substringAfterLast('.', "").lowercase()) {
+                        "mkv" -> "video/x-matroska"
+                        "webm" -> "video/webm"
+                        "avi" -> "video/x-msvideo"
+                        "mp4", "m4v" -> "video/mp4"
+                        else -> "video/mp4"
+                    }
+                }
+            }
 
         d(
             "Upstream response " +
