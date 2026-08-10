@@ -415,11 +415,6 @@ internal class CastRelayServer(
         val rangeHeader = session.headers["range"]
 
         if (!source.complete) {
-            d(
-                "GROWING_CAST_ACTIVE file=${file.name} " +
-                    "bytes=${file.length()} range=${session.headers["range"]}"
-            )
-
             val requestedStart =
                 rangeHeader
                     ?.takeIf { it.startsWith("bytes=") }
@@ -429,125 +424,31 @@ internal class CastRelayServer(
                     ?.toLongOrNull()
                     ?: 0L
 
-            // Chromecast may ask for bytes that Transformer has not written yet.
-            // Wait until that offset exists instead of returning 416/EOF.
-            while (
-                !source.complete &&
-                requestedStart >= file.length()
-            ) {
-                try {
-                    Thread.sleep(50L)
-                } catch (_: InterruptedException) {
-                    Thread.currentThread().interrupt()
-                    break
-                }
-            }
-
-            val availableLength = file.length()
-
-            if (requestedStart >= availableLength) {
-                return newFixedLengthResponse(
-                    Response.Status.RANGE_NOT_SATISFIABLE,
-                    MIME_PLAINTEXT,
-                    ""
-                ).apply {
-                    addHeader(
-                        "Content-Range",
-                        "bytes */$availableLength"
-                    )
-                    addHeader("Accept-Ranges", "bytes")
-                    addHeader("Access-Control-Allow-Origin", "*")
-                }
-            }
-
-            val responseEnd = availableLength - 1L
-            val contentLength = responseEnd - requestedStart + 1L
-
             d(
-                "Growing local range method=${session.method} " +
-                    "file=${file.name} range=$rangeHeader " +
-                    "serving=$requestedStart-$responseEnd " +
-                    "complete=${source.complete}"
+                "GROWING_CAST_ACTIVE file=${file.name} " +
+                    "bytes=${file.length()} range=$rangeHeader " +
+                    "start=$requestedStart"
             )
 
-            if (session.method == Method.HEAD) {
-                return newFixedLengthResponse(
-                    Response.Status.PARTIAL_CONTENT,
-                    "video/mp4",
-                    ""
-                ).apply {
-                    addHeader("Content-Length", contentLength.toString())
-                    addHeader(
-                        "Content-Range",
-                        "bytes $requestedStart-$responseEnd/*"
-                    )
-                    addHeader("Accept-Ranges", "bytes")
-                    addHeader("Access-Control-Allow-Origin", "*")
-                    addHeader("Cache-Control", "no-store")
-                }
-            }
-
-            val input = FileInputStream(file)
-
-            var remainingToSkip = requestedStart
-            while (remainingToSkip > 0L) {
-                val skipped = input.skip(remainingToSkip)
-
-                if (skipped <= 0L) {
-                    input.close()
-
-                    return newFixedLengthResponse(
-                        Response.Status.INTERNAL_ERROR,
-                        MIME_PLAINTEXT,
-                        "Could not seek growing Cast file"
-                    )
-                }
-
-                remainingToSkip -= skipped
-            }
-
-            val limited = object : FilterInputStream(input) {
-                private var remaining = contentLength
-
-                override fun read(): Int {
-                    if (remaining <= 0L) return -1
-
-                    val value = super.read()
-                    if (value >= 0) remaining--
-
-                    return value
-                }
-
-                override fun read(
-                    buffer: ByteArray,
-                    offset: Int,
-                    length: Int
-                ): Int {
-                    if (remaining <= 0L) return -1
-
-                    val allowed =
-                        minOf(length.toLong(), remaining).toInt()
-
-                    val count =
-                        super.read(buffer, offset, allowed)
-
-                    if (count > 0) remaining -= count
-
-                    return count
-                }
-            }
-
-            return newFixedLengthResponse(
-                Response.Status.PARTIAL_CONTENT,
-                "video/mp4",
-                limited,
-                contentLength
-            ).apply {
-                addHeader(
-                    "Content-Range",
-                    "bytes $requestedStart-$responseEnd/*"
+            // Do not snapshot the file's current length here.
+            // Keep this HTTP response alive while Transformer appends bytes.
+            val stream =
+                GrowingFileInputStream(
+                    source = source,
+                    startPosition = requestedStart
                 )
-                addHeader("Accept-Ranges", "bytes")
+
+            d(
+                "Growing local continuous stream " +
+                    "file=${file.name} start=$requestedStart " +
+                    "currentBytes=${file.length()}"
+            )
+
+            return newChunkedResponse(
+                Response.Status.OK,
+                "video/mp4",
+                stream
+            ).apply {
                 addHeader("Access-Control-Allow-Origin", "*")
                 addHeader("Cache-Control", "no-store")
             }
