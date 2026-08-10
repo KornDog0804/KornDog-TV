@@ -26,7 +26,6 @@ class CastTranscodeProbe(
 ) {
     companion object {
         private const val TAG = "CastTranscodeProbe"
-        private const val TEST_DURATION_MS = 60_000L
         private val PROBE_LOG = File("/sdcard/Download/castprobe.log")
     }
 
@@ -81,11 +80,6 @@ class CastTranscodeProbe(
         val mediaItem =
             MediaItem.Builder()
                 .setUri(upstreamUrl)
-                .setClippingConfiguration(
-                    MediaItem.ClippingConfiguration.Builder()
-                        .setEndPositionMs(TEST_DURATION_MS)
-                        .build()
-                )
                 .build()
 
         val transformer =
@@ -151,7 +145,7 @@ class CastTranscodeProbe(
         probeLog("START url=$upstreamUrl")
         Log.d(
             TAG,
-            "Starting 60-second H264/AAC fragmented-MP4 probe"
+            "Starting full-length H264/AAC fragmented-MP4 transcode"
         )
 
         // Expose the stable output path before Transformer starts writing.
