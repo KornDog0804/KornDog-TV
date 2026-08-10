@@ -138,9 +138,9 @@ class CastManager(private val context: Context) {
         //
         // VOD goes through the phone relay. This keeps the upstream request on the
         // same network origin as phone playback and lets us preserve Referer/UA/etc.
-        val castUrl =
+        val relayMedia =
             if (channel.mediaType == MediaType.LIVE) {
-                url
+                null
             } else {
                 try {
                     vodRelay.ensureStarted()
@@ -156,6 +156,13 @@ class CastManager(private val context: Context) {
                 }
             }
 
+        val castUrl =
+            if (channel.mediaType == MediaType.LIVE) {
+                url
+            } else {
+                relayMedia!!.url
+            }
+
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
             putString(MediaMetadata.KEY_TITLE, title ?: channel.name)
             channel.logoUrl?.let { addImage(WebImage(Uri.parse(it))) }
@@ -164,9 +171,13 @@ class CastManager(private val context: Context) {
         val streamType = if (channel.mediaType == MediaType.LIVE)
             MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
 
-        // MIME still comes from the real upstream URL. The relay URL deliberately
-        // has no media extension.
-        val contentType = guessContentType(url)
+        val contentType =
+            if (channel.mediaType == MediaType.LIVE) {
+                // Known-good Live TV behavior remains exactly unchanged.
+                guessContentType(url)
+            } else {
+                relayMedia!!.contentType
+            }
 
         val mediaInfo = MediaInfo.Builder(castUrl)
             .setStreamType(streamType)

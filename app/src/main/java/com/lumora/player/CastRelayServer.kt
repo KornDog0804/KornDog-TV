@@ -79,29 +79,94 @@ internal class CastRelayServer(
         return actualPort
     }
 
+    data class RelayMedia(
+        val url: String,
+        val contentType: String
+    )
+
     fun register(
         upstreamUrl: String,
         headers: Map<String, String>?,
         userAgent: String?
-    ): String {
+    ): RelayMedia {
         val port = ensureStarted()
+        val relayHeaders = headers.orEmpty()
+
         d(
             "register() host=${upstreamUrl.toHttpUrlOrNull()?.host} " +
                 "port=$port localIp=${localIpv4Address()}"
         )
 
+        // Probe only enough to follow the provider/CDN redirect and discover
+        // the real container. This is VOD-only; Live never enters this relay.
+        val contentType = runCatching {
+            val request = Request.Builder()
+                .url(upstreamUrl)
+                .header("Range", "bytes=0-0")
+                .apply {
+                    relayHeaders.forEach { (name, value) ->
+                        header(name, value)
+                    }
+                    if (!userAgent.isNullOrBlank()) {
+                        header("User-Agent", userAgent)
+                    }
+                }
+                .build()
+
+            client.newCall(request).execute().use { response ->
+                val ext = response.request.url.encodedPath
+                    .substringAfterLast('.', "")
+                    .lowercase()
+
+                val headerType = response.header("Content-Type")
+                    ?.substringBefore(';')
+                    ?.trim()
+                    ?.ifBlank { null }
+
+                val detected = when (ext) {
+                    "mkv" -> "video/x-matroska"
+                    "webm" -> "video/webm"
+                    "avi" -> "video/x-msvideo"
+                    "mp4", "m4v" -> "video/mp4"
+                    "m3u8", "m3u" -> "application/x-mpegURL"
+                    "mpd" -> "application/dash+xml"
+                    else -> headerType
+                        ?.takeUnless {
+                            it.equals("application/octet-stream", true)
+                        }
+                        ?: "video/mp4"
+                }
+
+                d(
+                    "register() castMime=$detected " +
+                        "finalHost=${response.request.url.host}"
+                )
+
+                detected
+            }
+        }.getOrElse { error ->
+            d(
+                "register() MIME probe failed " +
+                    "${error.javaClass.simpleName}: ${error.message}"
+            )
+            "video/mp4"
+        }
+
         val token = UUID.randomUUID().toString()
         contexts[token] = RelayContext(
-            headers = headers.orEmpty(),
+            headers = relayHeaders,
             userAgent = userAgent
         )
 
-        return relayUrl(
-            host = localIpv4Address()
-                ?: throw IllegalStateException("Phone has no LAN IPv4 address"),
-            port = port,
-            token = token,
-            upstream = upstreamUrl
+        return RelayMedia(
+            url = relayUrl(
+                host = localIpv4Address()
+                    ?: throw IllegalStateException("Phone has no LAN IPv4 address"),
+                port = port,
+                token = token,
+                upstream = upstreamUrl
+            ),
+            contentType = contentType
         )
     }
 
