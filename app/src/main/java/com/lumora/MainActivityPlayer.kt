@@ -177,65 +177,28 @@ internal fun MainActivity.setupPlayerControls() {
                     return@castConnected
                 }
 
-                scope.launch {
-                    // LIVE stays on the existing known-good direct Cast path.
-                    //
-                    // Find Stream VOD is different: its provider URL may be signed
-                    // or short-lived. Now that CastManager relays VOD through this
-                    // phone, refreshing immediately before Cast is correct again:
-                    // the PHONE obtains the fresh URL and the PHONE fetches it.
-                    val castItem =
-                        if (
-                            channel.mediaType != MediaType.LIVE &&
-                            (
-                                channel.streamSearchItemId != null ||
-                                channel.id.startsWith("stream:")
-                            )
-                        ) {
-                            refreshSavedStreamSearch(channel)
+                // Cast exactly what the phone is successfully playing right now.
+                // For VOD, CastManager relays it through this phone instead of
+                // handing the provider URL directly to Chromecast.
+                val castUrl = playerManager.currentMediaUri()
+                    ?: channel.url
+
+                castChannel(
+                    channel,
+                    channel.name,
+                    playbackUrl = castUrl,
+                    requestHeaders = channel.streamHeaders,
+                    userAgent = channel.streamUserAgent
+                ) { success, message ->
+                    runOnUiThread {
+                        if (success) {
+                            playerManager.pause()
                         } else {
-                            channel
-                        }
-
-                    if (castItem == null) {
-                        Toast.makeText(
-                            this@setupPlayerControls,
-                            "Couldn't refresh this stream for Cast",
-                            Toast.LENGTH_LONG
-                        ).show()
-                        return@launch
-                    }
-
-                    val castUrl =
-                        if (channel.mediaType == MediaType.LIVE) {
-                            playerManager.currentMediaUri() ?: channel.url
-                        } else if (
-                            channel.streamSearchItemId != null ||
-                            channel.id.startsWith("stream:")
-                        ) {
-                            // Fresh URL returned by the phone-side resolver.
-                            castItem.url
-                        } else {
-                            playerManager.currentMediaUri() ?: castItem.url
-                        }
-
-                    castChannel(
-                        castItem,
-                        castItem.name,
-                        playbackUrl = castUrl,
-                        requestHeaders = castItem.streamHeaders,
-                        userAgent = castItem.streamUserAgent
-                    ) { success, message ->
-                        runOnUiThread {
-                            if (success) {
-                                playerManager.pause()
-                            } else {
-                                Toast.makeText(
-                                    this@setupPlayerControls,
-                                    "Cast failed: ${message ?: "check TV and try again"}",
-                                    Toast.LENGTH_LONG
-                                ).show()
-                            }
+                            Toast.makeText(
+                                this@setupPlayerControls,
+                                "Cast failed: ${message ?: "check TV and try again"}",
+                                Toast.LENGTH_LONG
+                            ).show()
                         }
                     }
                 }
