@@ -27,6 +27,15 @@ class CastTranscodeProbe(
     companion object {
         private const val TAG = "CastTranscodeProbe"
         private const val TEST_DURATION_MS = 60_000L
+        private val PROBE_LOG = File("/sdcard/Download/castprobe.log")
+    }
+
+    private fun probeLog(message: String) {
+        runCatching {
+            PROBE_LOG.appendText(
+                "${System.currentTimeMillis()}: $message\n"
+            )
+        }
     }
 
     fun run(
@@ -90,6 +99,9 @@ class CastTranscodeProbe(
                             composition: Composition,
                             exportResult: ExportResult
                         ) {
+                            probeLog(
+                                "COMPLETED path=${output.absolutePath} bytes=${output.length()}"
+                            )
                             Log.d(
                                 TAG,
                                 "Probe completed path=${output.absolutePath} " +
@@ -102,12 +114,18 @@ class CastTranscodeProbe(
 
                                 output.copyTo(exportFile, overwrite = true)
 
+                                probeLog(
+                                    "EXPORTED path=${exportFile.absolutePath} bytes=${exportFile.length()}"
+                                )
                                 Log.i(
                                     TAG,
                                     "Probe exported path=${exportFile.absolutePath} " +
                                         "bytes=${exportFile.length()}"
                                 )
                             }.onFailure { error ->
+                                probeLog(
+                                    "EXPORT_FAILED ${error.javaClass.simpleName}: ${error.message}"
+                                )
                                 Log.e(TAG, "Probe export failed", error)
                             }
 
@@ -119,6 +137,9 @@ class CastTranscodeProbe(
                             exportResult: ExportResult,
                             exportException: ExportException
                         ) {
+                            probeLog(
+                                "FAILED ${exportException.javaClass.simpleName}: ${exportException.message}"
+                            )
                             Log.e(TAG, "Probe failed", exportException)
                             onFinished(Result.failure(exportException))
                         }
@@ -126,6 +147,7 @@ class CastTranscodeProbe(
                 )
                 .build()
 
+        probeLog("START url=$upstreamUrl")
         Log.d(
             TAG,
             "Starting 60-second H264/AAC fragmented-MP4 probe"
