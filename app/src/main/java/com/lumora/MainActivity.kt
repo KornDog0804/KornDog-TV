@@ -359,6 +359,7 @@ class MainActivity : AppCompatActivity() {
     internal var currentStreamStartMs = 0L
     internal var currentStreamPlayed = false
     internal var castTranscodeFile: java.io.File? = null
+    internal var castGrowingFile: com.lumora.player.CastRelayServer.GrowingLocalFile? = null
     internal val stallTimestamps = mutableListOf<Long>()
     internal val longStallCheckRunnable = Runnable { attemptBufferFailover() }
     internal var blackFrameStreak = 0

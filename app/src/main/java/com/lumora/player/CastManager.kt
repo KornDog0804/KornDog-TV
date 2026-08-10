@@ -83,6 +83,13 @@ class CastManager(private val context: Context) {
 
     fun isConnected(): Boolean = castSession?.isConnected == true
 
+    internal fun registerGrowingCastFile(
+        file: java.io.File
+    ): CastRelayServer.GrowingLocalFile {
+        vodRelay.ensureStarted()
+        return vodRelay.registerGrowingLocalFile(file)
+    }
+
     /**
      * Determine MIME type from a stream URL extension.
      */
@@ -104,13 +111,14 @@ class CastManager(private val context: Context) {
     /**
      * Cast a channel to the connected device.
      */
-    fun castChannel(
+    internal fun castChannel(
         channel: Channel,
         title: String? = null,
         playbackUrl: String? = null,
         requestHeaders: Map<String, String>? = null,
         userAgent: String? = null,
         localFile: java.io.File? = null,
+        growingLocalFile: CastRelayServer.GrowingLocalFile? = null,
         onResult: (success: Boolean, message: String?) -> Unit
     ) {
         val session = castSession
@@ -152,7 +160,13 @@ class CastManager(private val context: Context) {
                 try {
                     vodRelay.ensureStarted()
 
-                    if (localFile != null) {
+                    if (growingLocalFile != null) {
+                        android.util.Log.d(
+                            "CastManager",
+                            "Using growing transcoded Cast file: ${growingLocalFile.media.url}"
+                        )
+                        growingLocalFile.media
+                    } else if (localFile != null) {
                         android.util.Log.d(
                             "CastManager",
                             "Using transcoded local Cast file: ${localFile.absolutePath} bytes=${localFile.length()}"

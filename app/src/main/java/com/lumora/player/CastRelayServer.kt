@@ -9,6 +9,8 @@ import okhttp3.Request
 import java.io.File
 import java.io.FileInputStream
 import java.io.FilterInputStream
+import java.io.InputStream
+import java.io.RandomAccessFile
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.nio.charset.StandardCharsets
@@ -36,7 +38,13 @@ internal class CastRelayServer(
     )
 
     private val contexts = ConcurrentHashMap<String, RelayContext>()
-    private val localFiles = ConcurrentHashMap<String, File>()
+    private data class LocalFileSource(
+        val file: File,
+        @Volatile var complete: Boolean
+    )
+
+    private val localFiles =
+        ConcurrentHashMap<String, LocalFileSource>()
 
     private val debugLog = java.util.Collections.synchronizedList(mutableListOf<String>())
 
@@ -173,6 +181,52 @@ internal class CastRelayServer(
         )
     }
 
+    data class GrowingLocalFile(
+        val media: RelayMedia,
+        val complete: () -> Unit
+    )
+
+    fun registerGrowingLocalFile(file: File): GrowingLocalFile {
+        // Transformer creates the output file when export starts. Registering
+        // it before that happens lets Cast receive a stable URL immediately;
+        // serveLocalFile() waits for bytes to appear.
+        file.parentFile?.mkdirs()
+
+        val port = ensureStarted()
+        val host = localIpv4Address()
+            ?: throw IllegalStateException("Phone has no LAN IPv4 address")
+
+        val token = UUID.randomUUID().toString()
+
+        val source = LocalFileSource(
+            file = file,
+            complete = false
+        )
+
+        localFiles[token] = source
+
+        val url = "http://$host:$port/local/$token"
+
+        d(
+            "registerGrowingLocalFile() path=${file.name} " +
+                "bytes=${file.length()} url=$url"
+        )
+
+        return GrowingLocalFile(
+            media = RelayMedia(
+                url = url,
+                contentType = "video/mp4"
+            ),
+            complete = {
+                source.complete = true
+                d(
+                    "Growing local file complete " +
+                        "path=${file.name} bytes=${file.length()}"
+                )
+            }
+        )
+    }
+
     fun registerLocalFile(file: File): RelayMedia {
         require(file.isFile && file.length() > 0L) {
             "Local Cast file does not exist or is empty: ${file.absolutePath}"
@@ -183,7 +237,10 @@ internal class CastRelayServer(
             ?: throw IllegalStateException("Phone has no LAN IPv4 address")
         val token = UUID.randomUUID().toString()
 
-        localFiles[token] = file
+        localFiles[token] = LocalFileSource(
+            file = file,
+            complete = true
+        )
 
         val url = "http://$host:$port/local/$token"
 
@@ -219,14 +276,14 @@ internal class CastRelayServer(
 
         val localPieces = session.uri.trim('/').split('/')
         if (localPieces.size == 2 && localPieces[0] == "local") {
-            val file = localFiles[localPieces[1]]
+            val source = localFiles[localPieces[1]]
                 ?: return newFixedLengthResponse(
                     Response.Status.NOT_FOUND,
                     MIME_PLAINTEXT,
                     "Local Cast file expired"
                 )
 
-            return serveLocalFile(session, file)
+            return serveLocalFile(session, source)
         }
 
         if (session.uri.trim('/') == "relay/debug-log") {
@@ -281,12 +338,220 @@ internal class CastRelayServer(
         )
     }
 
+    private class GrowingFileInputStream(
+        private val source: LocalFileSource,
+        startPosition: Long
+    ) : InputStream() {
+
+        private val input = RandomAccessFile(source.file, "r")
+        private var position = startPosition
+        private var closed = false
+
+        init {
+            input.seek(startPosition)
+        }
+
+        override fun read(): Int {
+            val one = ByteArray(1)
+            val count = read(one, 0, 1)
+
+            return if (count < 0) {
+                -1
+            } else {
+                one[0].toInt() and 0xff
+            }
+        }
+
+        override fun read(
+            buffer: ByteArray,
+            offset: Int,
+            length: Int
+        ): Int {
+            if (closed) return -1
+            if (length == 0) return 0
+
+            while (true) {
+                val available = source.file.length() - position
+
+                if (available > 0L) {
+                    val wanted =
+                        minOf(length.toLong(), available).toInt()
+
+                    val count = input.read(buffer, offset, wanted)
+
+                    if (count > 0) {
+                        position += count
+                        return count
+                    }
+                }
+
+                if (source.complete) {
+                    return -1
+                }
+
+                try {
+                    Thread.sleep(50L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    return -1
+                }
+            }
+        }
+
+        override fun close() {
+            if (closed) return
+
+            closed = true
+            input.close()
+        }
+    }
+
     private fun serveLocalFile(
         session: IHTTPSession,
-        file: File
+        source: LocalFileSource
     ): Response {
+        val file = source.file
         val totalLength = file.length()
         val rangeHeader = session.headers["range"]
+
+        if (!source.complete) {
+            d(
+                "GROWING_CAST_ACTIVE file=${file.name} " +
+                    "bytes=${file.length()} range=${session.headers["range"]}"
+            )
+
+            val requestedStart =
+                rangeHeader
+                    ?.takeIf { it.startsWith("bytes=") }
+                    ?.removePrefix("bytes=")
+                    ?.substringBefore('-')
+                    ?.trim()
+                    ?.toLongOrNull()
+                    ?: 0L
+
+            // Chromecast may ask for bytes that Transformer has not written yet.
+            // Wait until that offset exists instead of returning 416/EOF.
+            while (
+                !source.complete &&
+                requestedStart >= file.length()
+            ) {
+                try {
+                    Thread.sleep(50L)
+                } catch (_: InterruptedException) {
+                    Thread.currentThread().interrupt()
+                    break
+                }
+            }
+
+            val availableLength = file.length()
+
+            if (requestedStart >= availableLength) {
+                return newFixedLengthResponse(
+                    Response.Status.RANGE_NOT_SATISFIABLE,
+                    MIME_PLAINTEXT,
+                    ""
+                ).apply {
+                    addHeader(
+                        "Content-Range",
+                        "bytes */$availableLength"
+                    )
+                    addHeader("Accept-Ranges", "bytes")
+                    addHeader("Access-Control-Allow-Origin", "*")
+                }
+            }
+
+            val responseEnd = availableLength - 1L
+            val contentLength = responseEnd - requestedStart + 1L
+
+            d(
+                "Growing local range method=${session.method} " +
+                    "file=${file.name} range=$rangeHeader " +
+                    "serving=$requestedStart-$responseEnd " +
+                    "complete=${source.complete}"
+            )
+
+            if (session.method == Method.HEAD) {
+                return newFixedLengthResponse(
+                    Response.Status.PARTIAL_CONTENT,
+                    "video/mp4",
+                    ""
+                ).apply {
+                    addHeader("Content-Length", contentLength.toString())
+                    addHeader(
+                        "Content-Range",
+                        "bytes $requestedStart-$responseEnd/*"
+                    )
+                    addHeader("Accept-Ranges", "bytes")
+                    addHeader("Access-Control-Allow-Origin", "*")
+                    addHeader("Cache-Control", "no-store")
+                }
+            }
+
+            val input = FileInputStream(file)
+
+            var remainingToSkip = requestedStart
+            while (remainingToSkip > 0L) {
+                val skipped = input.skip(remainingToSkip)
+
+                if (skipped <= 0L) {
+                    input.close()
+
+                    return newFixedLengthResponse(
+                        Response.Status.INTERNAL_ERROR,
+                        MIME_PLAINTEXT,
+                        "Could not seek growing Cast file"
+                    )
+                }
+
+                remainingToSkip -= skipped
+            }
+
+            val limited = object : FilterInputStream(input) {
+                private var remaining = contentLength
+
+                override fun read(): Int {
+                    if (remaining <= 0L) return -1
+
+                    val value = super.read()
+                    if (value >= 0) remaining--
+
+                    return value
+                }
+
+                override fun read(
+                    buffer: ByteArray,
+                    offset: Int,
+                    length: Int
+                ): Int {
+                    if (remaining <= 0L) return -1
+
+                    val allowed =
+                        minOf(length.toLong(), remaining).toInt()
+
+                    val count =
+                        super.read(buffer, offset, allowed)
+
+                    if (count > 0) remaining -= count
+
+                    return count
+                }
+            }
+
+            return newFixedLengthResponse(
+                Response.Status.PARTIAL_CONTENT,
+                "video/mp4",
+                limited,
+                contentLength
+            ).apply {
+                addHeader(
+                    "Content-Range",
+                    "bytes $requestedStart-$responseEnd/*"
+                )
+                addHeader("Accept-Ranges", "bytes")
+                addHeader("Access-Control-Allow-Origin", "*")
+                addHeader("Cache-Control", "no-store")
+            }
+        }
 
         var start = 0L
         var end = totalLength - 1L

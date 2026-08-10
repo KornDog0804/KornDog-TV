@@ -190,7 +190,8 @@ internal fun MainActivity.setupPlayerControls() {
                     playbackUrl = castUrl,
                     requestHeaders = channel.streamHeaders,
                     userAgent = channel.streamUserAgent,
-                    localFile = castTranscodeFile
+                    localFile = castTranscodeFile,
+                    growingLocalFile = castGrowingFile
                 ) { success, message ->
                     runOnUiThread {
                         if (success) {
@@ -518,6 +519,7 @@ internal fun MainActivity.showPlayerFor(
     // A completed Cast transcode belongs only to the item that created it.
     // Never allow the next title to reuse the previous title's MP4.
     castTranscodeFile = null
+    castGrowingFile = null
     // Never run the preview decode and the fullscreen decode at once.
     releaseLivePreview()
     // Cleared unconditionally - callers that want episode tracking (Next/Prev,
@@ -764,15 +766,28 @@ internal fun MainActivity.showPlayerFor(
             ).run(
                 upstreamUrl = startVersion.url,
                 headers = startVersion.streamHeaders ?: emptyMap(),
-                userAgent = startVersion.streamUserAgent
+                userAgent = startVersion.streamUserAgent,
+                onStarted = { file ->
+                    if (isCastManagerReady) {
+                        castGrowingFile =
+                            castManager.registerGrowingCastFile(file)
+
+                        android.util.Log.i(
+                            "CastTranscodeProbe",
+                            "Growing Cast relay registered: ${castGrowingFile?.media?.url}"
+                        )
+                    }
+                }
             ) { result ->
                 result.onSuccess { file ->
+                    castGrowingFile?.complete?.invoke()
                     castTranscodeFile = file
                     android.util.Log.i(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
                     )
                 }.onFailure { error ->
+                    castGrowingFile?.complete?.invoke()
                     android.util.Log.e(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE FAILED",

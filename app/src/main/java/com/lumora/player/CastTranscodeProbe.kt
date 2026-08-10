@@ -42,6 +42,7 @@ class CastTranscodeProbe(
         upstreamUrl: String,
         headers: Map<String, String> = emptyMap(),
         userAgent: String? = null,
+        onStarted: (File) -> Unit = {},
         onFinished: (Result<File>) -> Unit
     ) {
         val output = File(context.cacheDir, "cast-test.mp4")
@@ -152,6 +153,10 @@ class CastTranscodeProbe(
             TAG,
             "Starting 60-second H264/AAC fragmented-MP4 probe"
         )
+
+        // Expose the stable output path before Transformer starts writing.
+        // Cast can register this file immediately and wait for bytes.
+        onStarted(output)
 
         transformer.start(mediaItem, output.absolutePath)
     }
