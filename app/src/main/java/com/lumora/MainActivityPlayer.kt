@@ -760,6 +760,9 @@ internal fun MainActivity.showPlayerFor(
             }
         }
         else -> {
+            var thisTranscodeGrowingFile:
+                com.lumora.player.CastRelayServer.GrowingLocalFile? = null
+
             CastTranscodeProbe(
                 this,
                 BaseApplication.instance.okHttpClient
@@ -769,8 +772,10 @@ internal fun MainActivity.showPlayerFor(
                 userAgent = startVersion.streamUserAgent,
                 onStarted = { file ->
                     if (isCastManagerReady) {
-                        castGrowingFile =
+                        thisTranscodeGrowingFile =
                             castManager.registerGrowingCastFile(file)
+
+                        castGrowingFile = thisTranscodeGrowingFile
 
                         android.util.Log.i(
                             "CastTranscodeProbe",
@@ -780,14 +785,14 @@ internal fun MainActivity.showPlayerFor(
                 }
             ) { result ->
                 result.onSuccess { file ->
-                    castGrowingFile?.complete?.invoke()
+                    thisTranscodeGrowingFile?.complete?.invoke()
                     castTranscodeFile = file
                     android.util.Log.i(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
                     )
                 }.onFailure { error ->
-                    castGrowingFile?.complete?.invoke()
+                    thisTranscodeGrowingFile?.complete?.invoke()
                     android.util.Log.e(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE FAILED",
