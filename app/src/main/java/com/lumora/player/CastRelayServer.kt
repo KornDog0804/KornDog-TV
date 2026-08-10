@@ -223,17 +223,21 @@ internal class CastRelayServer(
             ?.trim()
             ?.ifBlank { null }
             .let { headerType ->
-                if (headerType != null && !headerType.equals("application/octet-stream", true)) {
-                    headerType
-                } else {
-                    when (upstream.request.url.encodedPath.substringAfterLast('.', "").lowercase()) {
-                        "mkv" -> "video/x-matroska"
-                        "webm" -> "video/webm"
-                        "avi" -> "video/x-msvideo"
-                        "mp4", "m4v" -> "video/mp4"
-                        else -> "video/mp4"
-                    }
+                // The upstream/CDN Content-Type header is unreliable - a debrid CDN can
+                // claim video/mp4 for a file whose extension is plainly .mkv. The file
+                // extension in the resolved URL is the more trustworthy signal, so it
+                // wins whenever it maps to a known container; the header is only used
+                // as a fallback when the extension is missing/unrecognized.
+                val extType = when (upstream.request.url.encodedPath.substringAfterLast('.', "").lowercase()) {
+                    "mkv" -> "video/x-matroska"
+                    "webm" -> "video/webm"
+                    "avi" -> "video/x-msvideo"
+                    "mp4", "m4v" -> "video/mp4"
+                    else -> null
                 }
+                extType
+                    ?: headerType?.takeUnless { it.equals("application/octet-stream", true) }
+                    ?: "video/mp4"
             }
 
         d(
