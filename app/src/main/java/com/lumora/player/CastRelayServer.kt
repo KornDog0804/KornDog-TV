@@ -106,8 +106,7 @@ internal class CastRelayServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
-        Log.d(
-            TAG,
+        d(
             "Receiver request method=${session.method} " +
                 "uri=${session.uri.substringBefore('?')} " +
                 "range=${session.headers["range"]} " +
@@ -225,8 +224,7 @@ internal class CastRelayServer(
             ?.ifBlank { null }
             .let { if (it == null || it.equals("application/octet-stream", true)) "video/mp4" else it }
 
-        Log.d(
-            TAG,
+        d(
             "Upstream response " +
                 "code=${upstream.code} " +
                 "type=$upstreamType " +
@@ -345,8 +343,7 @@ internal class CastRelayServer(
 
                 if (!firstByteLogged) {
                     firstByteLogged = true
-                    Log.d(
-                        TAG,
+                    d(
                         "Delivery first-byte after " +
                             "${System.currentTimeMillis() - deliveryStartedAt}ms"
                     )
@@ -357,8 +354,7 @@ internal class CastRelayServer(
                     deliveredBytes >= 1024L * 1024L
                 ) {
                     firstMegabyteLogged = true
-                    Log.d(
-                        TAG,
+                    d(
                         "Delivery first-1MB after " +
                             "${System.currentTimeMillis() - deliveryStartedAt}ms"
                     )
@@ -372,8 +368,7 @@ internal class CastRelayServer(
                     if (value < 0) {
                         if (!sawEof) {
                             sawEof = true
-                            Log.d(
-                                TAG,
+                            d(
                                 "Upstream EOF bytes=$deliveredBytes " +
                                     "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
                             )
@@ -384,6 +379,11 @@ internal class CastRelayServer(
 
                     value
                 } catch (e: Exception) {
+                    d(
+                        "Upstream read failure bytes=$deliveredBytes " +
+                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                            "error=${e.javaClass.simpleName}: ${e.message}"
+                    )
                     Log.e(
                         TAG,
                         "Upstream read failure bytes=$deliveredBytes " +
@@ -405,8 +405,7 @@ internal class CastRelayServer(
                     if (count < 0) {
                         if (!sawEof) {
                             sawEof = true
-                            Log.d(
-                                TAG,
+                            d(
                                 "Upstream EOF bytes=$deliveredBytes " +
                                     "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
                             )
@@ -417,6 +416,11 @@ internal class CastRelayServer(
 
                     count
                 } catch (e: Exception) {
+                    d(
+                        "Upstream read failure bytes=$deliveredBytes " +
+                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                            "error=${e.javaClass.simpleName}: ${e.message}"
+                    )
                     Log.e(
                         TAG,
                         "Upstream read failure bytes=$deliveredBytes " +
@@ -429,8 +433,7 @@ internal class CastRelayServer(
 
             override fun close() {
                 try {
-                    Log.d(
-                        TAG,
+                    d(
                         "Delivery stream closed bytes=$deliveredBytes " +
                             "eof=$sawEof " +
                             "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
