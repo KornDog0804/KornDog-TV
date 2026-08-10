@@ -27,6 +27,7 @@ import com.lumora.plugin.ResolveResult
 import com.lumora.torrent.TorrentEngine
 import com.lumora.torrent.TorrentForegroundService
 import com.lumora.player.PlayerManager
+import com.lumora.player.CastTranscodeProbe
 import com.lumora.player.VideoAspectFrameLayout
 import com.lumora.util.extractLeadingTag
 import com.lumora.util.isAdultCategory
@@ -752,6 +753,28 @@ internal fun MainActivity.showPlayerFor(
             }
         }
         else -> {
+            CastTranscodeProbe(
+                this,
+                BaseApplication.instance.okHttpClient
+            ).run(
+                upstreamUrl = startVersion.url,
+                headers = startVersion.streamHeaders ?: emptyMap(),
+                userAgent = startVersion.streamUserAgent
+            ) { result ->
+                result.onSuccess { file ->
+                    android.util.Log.i(
+                        "CastTranscodeProbe",
+                        "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
+                    )
+                }.onFailure { error ->
+                    android.util.Log.e(
+                        "CastTranscodeProbe",
+                        "REAL STREAM PROBE FAILED",
+                        error
+                    )
+                }
+            }
+
             playerManager.playUrl(
                 startVersion.url,
                 startVersion.streamUserAgent,
