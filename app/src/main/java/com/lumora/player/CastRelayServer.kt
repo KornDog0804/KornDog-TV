@@ -206,6 +206,7 @@ internal class CastRelayServer(
             ?.substringBefore(';')
             ?.trim()
             ?.ifBlank { null }
+            .let { if (it == null || it.equals("application/octet-stream", true)) "video/mp4" else it }
 
         val looksLikeHls =
             upstreamType.equals("application/vnd.apple.mpegurl", true) ||
