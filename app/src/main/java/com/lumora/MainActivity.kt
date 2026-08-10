@@ -964,8 +964,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        if (isPlayerVisible && playerManager.playbackState == Player.STATE_READY) playerManager.play()
-        else if (activeTab == 0) showLivePreviewPane()
+
+        val castOwnsPlayback =
+            isCastManagerReady && castManager.isConnected()
+
+        if (
+            isPlayerVisible &&
+            !castOwnsPlayback &&
+            playerManager.playbackState == Player.STATE_READY
+        ) {
+            playerManager.play()
+        } else if (activeTab == 0) {
+            showLivePreviewPane()
+        }
     }
 
     override fun onPause() {
