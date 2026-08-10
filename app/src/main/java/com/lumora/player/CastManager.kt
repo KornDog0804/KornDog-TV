@@ -25,8 +25,14 @@ import okhttp3.OkHttpClient
 class CastManager(private val context: Context) {
 
     private val relayClient = OkHttpClient.Builder()
+        // Cast VOD is a long-lived streaming request. A normal OkHttp read
+        // timeout can kill an otherwise healthy movie during a CDN pause.
+        .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
         .followRedirects(true)
         .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
         .build()
 
     private val vodRelay by lazy {
