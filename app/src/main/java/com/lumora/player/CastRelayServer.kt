@@ -85,7 +85,10 @@ internal class CastRelayServer(
         userAgent: String?
     ): String {
         val port = ensureStarted()
-        d("register() upstream=$upstreamUrl port=$port localIp=${localIpv4Address()}")
+        d(
+            "register() host=${upstreamUrl.toHttpUrlOrNull()?.host} " +
+                "port=$port localIp=${localIpv4Address()}"
+        )
 
         val token = UUID.randomUUID().toString()
         contexts[token] = RelayContext(
@@ -103,6 +106,16 @@ internal class CastRelayServer(
     }
 
     override fun serve(session: IHTTPSession): Response {
+        Log.d(
+            TAG,
+            "Receiver request method=${session.method} " +
+                "uri=${session.uri.substringBefore('?')} " +
+                "range=${session.headers["range"]} " +
+                "accept=${session.headers["accept"]} " +
+                "ua=${session.headers["user-agent"]} " +
+                "connection=${session.headers["connection"]}"
+        )
+
         d("serve() method=${session.method} uri=${session.uri} range=${session.headers["range"]}")
         if (session.method != Method.GET && session.method != Method.HEAD) {
             return newFixedLengthResponse(
@@ -188,7 +201,11 @@ internal class CastRelayServer(
             requestBuilder.head()
         }
 
-        d("Fetching upstream url=$upstreamUrl headers=${relayContext.headers} ua=${relayContext.userAgent}")
+        d(
+            "Fetching upstream host=${upstreamUrl.toHttpUrlOrNull()?.host} " +
+                "headerCount=${relayContext.headers.size} " +
+                "hasUserAgent=${!relayContext.userAgent.isNullOrBlank()}"
+        )
         val upstream = try {
             client.newCall(requestBuilder.build()).execute()
         } catch (e: Exception) {
@@ -200,13 +217,25 @@ internal class CastRelayServer(
             )
         }
 
-        d("Upstream response code=${upstream.code} contentType=${upstream.header("Content-Type")} contentLength=${upstream.header("Content-Length")} contentRange=${upstream.header("Content-Range")}")
+        // Rich upstream metadata is logged below without exposing signed URLs.
         val body = upstream.body
         val upstreamType = upstream.header("Content-Type")
             ?.substringBefore(';')
             ?.trim()
             ?.ifBlank { null }
             .let { if (it == null || it.equals("application/octet-stream", true)) "video/mp4" else it }
+
+        Log.d(
+            TAG,
+            "Upstream response " +
+                "code=${upstream.code} " +
+                "type=$upstreamType " +
+                "length=${upstream.header("Content-Length")} " +
+                "contentRange=${upstream.header("Content-Range")} " +
+                "acceptRanges=${upstream.header("Accept-Ranges")} " +
+                "finalHost=${upstream.request.url.host} " +
+                "finalPath=${upstream.request.url.encodedPath}"
+        )
 
         val looksLikeHls =
             upstreamType.equals("application/vnd.apple.mpegurl", true) ||
@@ -301,9 +330,112 @@ internal class CastRelayServer(
             )
         }
 
+        val deliveryStartedAt = System.currentTimeMillis()
+        var deliveredBytes = 0L
+        var firstByteLogged = false
+        var firstMegabyteLogged = false
+        var sawEof = false
+
         val stream = object : FilterInputStream(body.byteStream()) {
+
+            private fun recordDelivery(count: Int) {
+                if (count <= 0) return
+
+                deliveredBytes += count
+
+                if (!firstByteLogged) {
+                    firstByteLogged = true
+                    Log.d(
+                        TAG,
+                        "Delivery first-byte after " +
+                            "${System.currentTimeMillis() - deliveryStartedAt}ms"
+                    )
+                }
+
+                if (
+                    !firstMegabyteLogged &&
+                    deliveredBytes >= 1024L * 1024L
+                ) {
+                    firstMegabyteLogged = true
+                    Log.d(
+                        TAG,
+                        "Delivery first-1MB after " +
+                            "${System.currentTimeMillis() - deliveryStartedAt}ms"
+                    )
+                }
+            }
+
+            override fun read(): Int {
+                return try {
+                    val value = super.read()
+
+                    if (value < 0) {
+                        if (!sawEof) {
+                            sawEof = true
+                            Log.d(
+                                TAG,
+                                "Upstream EOF bytes=$deliveredBytes " +
+                                    "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
+                            )
+                        }
+                    } else {
+                        recordDelivery(1)
+                    }
+
+                    value
+                } catch (e: Exception) {
+                    Log.e(
+                        TAG,
+                        "Upstream read failure bytes=$deliveredBytes " +
+                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                            "error=${e.javaClass.simpleName}: ${e.message}"
+                    )
+                    throw e
+                }
+            }
+
+            override fun read(
+                buffer: ByteArray,
+                offset: Int,
+                length: Int
+            ): Int {
+                return try {
+                    val count = super.read(buffer, offset, length)
+
+                    if (count < 0) {
+                        if (!sawEof) {
+                            sawEof = true
+                            Log.d(
+                                TAG,
+                                "Upstream EOF bytes=$deliveredBytes " +
+                                    "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
+                            )
+                        }
+                    } else {
+                        recordDelivery(count)
+                    }
+
+                    count
+                } catch (e: Exception) {
+                    Log.e(
+                        TAG,
+                        "Upstream read failure bytes=$deliveredBytes " +
+                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                            "error=${e.javaClass.simpleName}: ${e.message}"
+                    )
+                    throw e
+                }
+            }
+
             override fun close() {
                 try {
+                    Log.d(
+                        TAG,
+                        "Delivery stream closed bytes=$deliveredBytes " +
+                            "eof=$sawEof " +
+                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
+                    )
+
                     super.close()
                 } finally {
                     upstream.close()
