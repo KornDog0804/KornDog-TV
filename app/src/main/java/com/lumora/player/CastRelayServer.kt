@@ -285,6 +285,7 @@ internal class CastRelayServer(
             }
 
             response.addHeader("Access-Control-Allow-Origin", "*")
+            response.addHeader("Accept-Ranges", "bytes")
             response.addHeader("Cache-Control", "no-store")
 
             upstream.close()
@@ -337,6 +338,7 @@ internal class CastRelayServer(
         }
 
         response.addHeader("Access-Control-Allow-Origin", "*")
+            response.addHeader("Accept-Ranges", "bytes")
         response.addHeader("Cache-Control", "no-store")
 
         return response
