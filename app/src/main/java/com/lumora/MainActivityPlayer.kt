@@ -189,7 +189,8 @@ internal fun MainActivity.setupPlayerControls() {
                     channel.name,
                     playbackUrl = castUrl,
                     requestHeaders = channel.streamHeaders,
-                    userAgent = channel.streamUserAgent
+                    userAgent = channel.streamUserAgent,
+                    localFile = castTranscodeFile
                 ) { success, message ->
                     runOnUiThread {
                         if (success) {
@@ -513,6 +514,10 @@ internal fun MainActivity.showPlayerFor(
 ) {
     // Reset Up Next state on any new playback
     cancelUpNext()
+
+    // A completed Cast transcode belongs only to the item that created it.
+    // Never allow the next title to reuse the previous title's MP4.
+    castTranscodeFile = null
     // Never run the preview decode and the fullscreen decode at once.
     releaseLivePreview()
     // Cleared unconditionally - callers that want episode tracking (Next/Prev,
@@ -762,6 +767,7 @@ internal fun MainActivity.showPlayerFor(
                 userAgent = startVersion.streamUserAgent
             ) { result ->
                 result.onSuccess { file ->
+                    castTranscodeFile = file
                     android.util.Log.i(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"

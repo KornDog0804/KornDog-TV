@@ -6,6 +6,8 @@ import fi.iki.elonen.NanoHTTPD
 import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import java.io.File
+import java.io.FileInputStream
 import java.io.FilterInputStream
 import java.net.Inet4Address
 import java.net.NetworkInterface
@@ -34,6 +36,7 @@ internal class CastRelayServer(
     )
 
     private val contexts = ConcurrentHashMap<String, RelayContext>()
+    private val localFiles = ConcurrentHashMap<String, File>()
 
     private val debugLog = java.util.Collections.synchronizedList(mutableListOf<String>())
 
@@ -170,6 +173,31 @@ internal class CastRelayServer(
         )
     }
 
+    fun registerLocalFile(file: File): RelayMedia {
+        require(file.isFile && file.length() > 0L) {
+            "Local Cast file does not exist or is empty: ${file.absolutePath}"
+        }
+
+        val port = ensureStarted()
+        val host = localIpv4Address()
+            ?: throw IllegalStateException("Phone has no LAN IPv4 address")
+        val token = UUID.randomUUID().toString()
+
+        localFiles[token] = file
+
+        val url = "http://$host:$port/local/$token"
+
+        d(
+            "registerLocalFile() path=${file.name} bytes=${file.length()} " +
+                "url=$url"
+        )
+
+        return RelayMedia(
+            url = url,
+            contentType = "video/mp4"
+        )
+    }
+
     override fun serve(session: IHTTPSession): Response {
         d(
             "Receiver request method=${session.method} " +
@@ -187,6 +215,18 @@ internal class CastRelayServer(
                 MIME_PLAINTEXT,
                 "GET/HEAD only"
             )
+        }
+
+        val localPieces = session.uri.trim('/').split('/')
+        if (localPieces.size == 2 && localPieces[0] == "local") {
+            val file = localFiles[localPieces[1]]
+                ?: return newFixedLengthResponse(
+                    Response.Status.NOT_FOUND,
+                    MIME_PLAINTEXT,
+                    "Local Cast file expired"
+                )
+
+            return serveLocalFile(session, file)
         }
 
         if (session.uri.trim('/') == "relay/debug-log") {
@@ -239,6 +279,149 @@ internal class CastRelayServer(
             upstreamUrl = upstreamUrl,
             relayContext = relayContext
         )
+    }
+
+    private fun serveLocalFile(
+        session: IHTTPSession,
+        file: File
+    ): Response {
+        val totalLength = file.length()
+        val rangeHeader = session.headers["range"]
+
+        var start = 0L
+        var end = totalLength - 1L
+        var partial = false
+
+        if (!rangeHeader.isNullOrBlank() && rangeHeader.startsWith("bytes=")) {
+            val range = rangeHeader.removePrefix("bytes=").substringBefore(',')
+            val parts = range.split('-', limit = 2)
+
+            val requestedStart = parts.getOrNull(0)?.trim()?.toLongOrNull()
+            val requestedEnd = parts.getOrNull(1)?.trim()?.toLongOrNull()
+
+            when {
+                requestedStart != null -> {
+                    start = requestedStart
+                    end = requestedEnd ?: end
+                }
+
+                requestedEnd != null -> {
+                    val suffixLength = requestedEnd.coerceAtMost(totalLength)
+                    start = totalLength - suffixLength
+                    end = totalLength - 1L
+                }
+            }
+
+            if (
+                start < 0L ||
+                start >= totalLength ||
+                end < start
+            ) {
+                return newFixedLengthResponse(
+                    Response.Status.RANGE_NOT_SATISFIABLE,
+                    MIME_PLAINTEXT,
+                    ""
+                ).apply {
+                    addHeader("Content-Range", "bytes */$totalLength")
+                    addHeader("Accept-Ranges", "bytes")
+                    addHeader("Access-Control-Allow-Origin", "*")
+                }
+            }
+
+            end = end.coerceAtMost(totalLength - 1L)
+            partial = true
+        }
+
+        val contentLength = end - start + 1L
+        val status =
+            if (partial) Response.Status.PARTIAL_CONTENT
+            else Response.Status.OK
+
+        d(
+            "Local file request method=${session.method} " +
+                "file=${file.name} range=$rangeHeader " +
+                "serving=$start-$end/$totalLength"
+        )
+
+        if (session.method == Method.HEAD) {
+            return newFixedLengthResponse(
+                status,
+                "video/mp4",
+                ""
+            ).apply {
+                addHeader("Content-Length", contentLength.toString())
+                addHeader("Accept-Ranges", "bytes")
+                if (partial) {
+                    addHeader(
+                        "Content-Range",
+                        "bytes $start-$end/$totalLength"
+                    )
+                }
+                addHeader("Access-Control-Allow-Origin", "*")
+                addHeader("Cache-Control", "no-store")
+            }
+        }
+
+        val input = FileInputStream(file)
+
+        var remainingToSkip = start
+        while (remainingToSkip > 0L) {
+            val skipped = input.skip(remainingToSkip)
+            if (skipped <= 0L) {
+                input.close()
+                return newFixedLengthResponse(
+                    Response.Status.INTERNAL_ERROR,
+                    MIME_PLAINTEXT,
+                    "Could not seek local Cast file"
+                )
+            }
+            remainingToSkip -= skipped
+        }
+
+        val limited = object : FilterInputStream(input) {
+            private var remaining = contentLength
+
+            override fun read(): Int {
+                if (remaining <= 0L) return -1
+                val value = super.read()
+                if (value >= 0) remaining--
+                return value
+            }
+
+            override fun read(
+                buffer: ByteArray,
+                offset: Int,
+                length: Int
+            ): Int {
+                if (remaining <= 0L) return -1
+
+                val allowed =
+                    minOf(length.toLong(), remaining).toInt()
+
+                val count = super.read(buffer, offset, allowed)
+                if (count > 0) remaining -= count
+                return count
+            }
+        }
+
+        return newFixedLengthResponse(
+            status,
+            "video/mp4",
+            limited,
+            contentLength
+        ).apply {
+            addHeader("Accept-Ranges", "bytes")
+
+            if (partial) {
+                addHeader(
+                    "Content-Range",
+                    "bytes $start-$end/$totalLength"
+                )
+            }
+
+            addHeader("Access-Control-Allow-Origin", "*")
+            addHeader("Cache-Control", "no-store")
+        }
     }
 
     private fun proxy(

@@ -358,6 +358,7 @@ class MainActivity : AppCompatActivity() {
     // the two things every automatic failover has to know before it condemns a stream.
     internal var currentStreamStartMs = 0L
     internal var currentStreamPlayed = false
+    internal var castTranscodeFile: java.io.File? = null
     internal val stallTimestamps = mutableListOf<Long>()
     internal val longStallCheckRunnable = Runnable { attemptBufferFailover() }
     internal var blackFrameStreak = 0

@@ -110,6 +110,7 @@ class CastManager(private val context: Context) {
         playbackUrl: String? = null,
         requestHeaders: Map<String, String>? = null,
         userAgent: String? = null,
+        localFile: java.io.File? = null,
         onResult: (success: Boolean, message: String?) -> Unit
     ) {
         val session = castSession
@@ -150,11 +151,20 @@ class CastManager(private val context: Context) {
             } else {
                 try {
                     vodRelay.ensureStarted()
-                    vodRelay.register(
-                        upstreamUrl = url,
-                        headers = requestHeaders ?: channel.streamHeaders,
-                        userAgent = userAgent ?: channel.streamUserAgent
-                    )
+
+                    if (localFile != null) {
+                        android.util.Log.d(
+                            "CastManager",
+                            "Using transcoded local Cast file: ${localFile.absolutePath} bytes=${localFile.length()}"
+                        )
+                        vodRelay.registerLocalFile(localFile)
+                    } else {
+                        vodRelay.register(
+                            upstreamUrl = url,
+                            headers = requestHeaders ?: channel.streamHeaders,
+                            userAgent = userAgent ?: channel.streamUserAgent
+                        )
+                    }
                 } catch (e: Exception) {
                     android.util.Log.e("CastManager", "Couldn't start VOD relay", e)
                     onResult(false, e.message ?: "Couldn't start Cast relay")
