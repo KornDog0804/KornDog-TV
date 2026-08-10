@@ -44,7 +44,10 @@ class CastTranscodeProbe(
         onStarted: (File) -> Unit = {},
         onFinished: (Result<File>) -> Unit
     ) {
-        val output = File(context.cacheDir, "cast-test.mp4")
+        val output = File(
+            context.cacheDir,
+            "cast-${System.currentTimeMillis()}-${java.util.UUID.randomUUID()}.mp4"
+        )
         output.delete()
 
         val dataSourceFactory = OkHttpDataSource.Factory(client)
@@ -132,8 +135,26 @@ class CastTranscodeProbe(
                             exportResult: ExportResult,
                             exportException: ExportException
                         ) {
+                            val causeChain = buildString {
+                                var current: Throwable? = exportException
+                                var depth = 0
+
+                                while (current != null && depth < 8) {
+                                    if (depth > 0) append(" <- ")
+
+                                    append(current.javaClass.simpleName)
+                                    append(": ")
+                                    append(current.message)
+
+                                    current = current.cause
+                                    depth++
+                                }
+                            }
+
                             probeLog(
-                                "FAILED ${exportException.javaClass.simpleName}: ${exportException.message}"
+                                "FAILED path=${output.absolutePath} " +
+                                    "bytes=${output.length()} " +
+                                    causeChain
                             )
                             Log.e(TAG, "Probe failed", exportException)
                             onFinished(Result.failure(exportException))
