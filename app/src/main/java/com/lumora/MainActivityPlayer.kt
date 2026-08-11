@@ -804,6 +804,20 @@ internal fun MainActivity.showPlayerFor(
             var thisTranscodeGrowingFile:
                 com.lumora.player.CastRelayServer.GrowingLocalFile? = null
 
+            android.util.Log.i(
+                "CastAudio",
+                "LOCAL_SELECTED_AUDIO ${playerManager.selectedAudioDescription() ?: "none"}"
+            )
+
+            runCatching {
+                java.io.File("/sdcard/Download/castaudio.log")
+                    .appendText(
+                        "${System.currentTimeMillis()}: " +
+                            "LOCAL_SELECTED_AUDIO " +
+                            "${playerManager.selectedAudioDescription() ?: "none"}\n"
+                    )
+            }
+
             CastTranscodeProbe(
                 this,
                 BaseApplication.instance.okHttpClient
