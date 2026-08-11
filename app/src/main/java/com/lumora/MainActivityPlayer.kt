@@ -828,17 +828,26 @@ internal fun MainActivity.showPlayerFor(
                 result.onSuccess { file ->
                     thisTranscodeGrowingFile?.complete?.invoke()
                     castTranscodeFile = file
+
                     android.util.Log.i(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
                     )
                 }.onFailure { error ->
-                    thisTranscodeGrowingFile?.complete?.invoke()
                     android.util.Log.e(
                         "CastTranscodeProbe",
                         "REAL STREAM PROBE FAILED",
                         error
                     )
+
+                    // A failed Transformer output is not a valid completed MP4.
+                    // Never leave it available for a later Cast attempt.
+                    if (castGrowingFile === thisTranscodeGrowingFile) {
+                        castGrowingFile = null
+                    }
+
+                    castTranscodeFile = null
+                    thisTranscodeGrowingFile = null
                 }
             }
 
