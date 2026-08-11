@@ -3,6 +3,7 @@ package com.lumora.player
 import android.content.Context
 import android.util.Log
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.Clock
@@ -89,6 +90,7 @@ class CastTranscodeProbe(
             Transformer.Builder(context)
                 .setAssetLoaderFactory(assetLoaderFactory)
                 .setMuxerFactory(muxerFactory)
+                .setMaxDelayBetweenMuxerSamplesMs(C.TIME_UNSET)
                 .setAudioMimeType(MimeTypes.AUDIO_AAC)
                 .setVideoMimeType(MimeTypes.VIDEO_H264)
                 .addListener(
