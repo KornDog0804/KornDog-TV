@@ -23,6 +23,17 @@ import com.lumora.R
  */
 class CastForegroundService : Service() {
 
+    private fun serviceLog(message: String) {
+        runCatching {
+            java.io.File("/sdcard/Download/castservice.log")
+                .appendText(
+                    "${System.currentTimeMillis()}: $message\n"
+                )
+        }
+        android.util.Log.d("CastForegroundService", message)
+    }
+
+
     private var wakeLock: PowerManager.WakeLock? = null
     private var wifiLock: WifiManager.WifiLock? = null
 
@@ -30,6 +41,8 @@ class CastForegroundService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+
+        serviceLog("SERVICE_CREATE")
 
         acquireWakeLock()
         acquireWifiLock()
@@ -40,6 +53,10 @@ class CastForegroundService : Service() {
         flags: Int,
         startId: Int
     ): Int {
+        serviceLog(
+            "SERVICE_START_COMMAND flags=$flags startId=$startId"
+        )
+
         createNotificationChannel()
 
         val notification: Notification =
@@ -70,6 +87,7 @@ class CastForegroundService : Service() {
     }
 
     override fun onDestroy() {
+        serviceLog("SERVICE_DESTROY")
         releaseLocks()
         super.onDestroy()
     }
@@ -111,6 +129,8 @@ class CastForegroundService : Service() {
                 setReferenceCounted(false)
                 acquire()
             }
+
+        serviceLog("WAKE_LOCK_ACQUIRED held=${wakeLock?.isHeld}")
     }
 
     @Suppress("DEPRECATION")
@@ -134,6 +154,8 @@ class CastForegroundService : Service() {
                 setReferenceCounted(false)
                 acquire()
             }
+
+        serviceLog("WIFI_LOCK_ACQUIRED held=${wifiLock?.isHeld}")
     }
 
     private fun releaseLocks() {
@@ -152,6 +174,8 @@ class CastForegroundService : Service() {
         }
 
         wifiLock = null
+
+        serviceLog("LOCKS_RELEASED")
     }
 
     companion object {

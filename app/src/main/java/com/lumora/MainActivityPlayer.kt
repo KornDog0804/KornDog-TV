@@ -59,6 +59,17 @@ internal fun MainActivity.reloadCurrentProvider() {
 // ── Player ─────────────────────────────────────
 
 internal fun MainActivity.setupPlayerControls() {
+
+    fun castHandoffLog(message: String) {
+        runCatching {
+            java.io.File("/sdcard/Download/casthandoff.log")
+                .appendText(
+                    "${System.currentTimeMillis()}: $message\n"
+                )
+        }
+        android.util.Log.d("CastHandoff", message)
+    }
+
     // showControls() here restarts the 4s auto-hide: this button consumes the OK press
     // itself, so the Activity-level timer refresh in onKeyDown never sees it, and the
     // bar would otherwise vanish right after the press that paused.
@@ -167,9 +178,7 @@ internal fun MainActivity.setupPlayerControls() {
         castManager = com.lumora.player.CastManager(this).apply {
             init()
             onCastSessionConnected = castConnected@{ _ ->
-                com.lumora.player.CastForegroundService.start(
-                    this@setupPlayerControls
-                )
+                castHandoffLog("HANDOFF_SESSION_CONNECTED")
 
                 val channel = nowPlayingChannel
 
@@ -188,6 +197,12 @@ internal fun MainActivity.setupPlayerControls() {
                 val castUrl = playerManager.currentMediaUri()
                     ?: channel.url
 
+                castHandoffLog(
+                    "HANDOFF_CAST_REQUEST channel=${channel.name} " +
+                        "growing=${castGrowingFile != null} " +
+                        "local=${castTranscodeFile != null}"
+                )
+
                 castChannel(
                     channel,
                     channel.name,
@@ -199,8 +214,21 @@ internal fun MainActivity.setupPlayerControls() {
                 ) { success, message ->
                     runOnUiThread {
                         if (success) {
+                            castHandoffLog("HANDOFF_SUCCESS")
+
+                            com.lumora.player.CastForegroundService.start(
+                                this@setupPlayerControls
+                            )
                             playerManager.pause()
                         } else {
+                            castHandoffLog(
+                                "HANDOFF_FAILURE message=${message ?: "unknown"}"
+                            )
+
+                            com.lumora.player.CastForegroundService.stop(
+                                this@setupPlayerControls
+                            )
+
                             Toast.makeText(
                                 this@setupPlayerControls,
                                 "Cast failed: ${message ?: "check TV and try again"}",
@@ -212,6 +240,8 @@ internal fun MainActivity.setupPlayerControls() {
             }
 
             onCastSessionDisconnected = {
+                castHandoffLog("HANDOFF_SESSION_DISCONNECTED")
+
                 com.lumora.player.CastForegroundService.stop(
                     this@setupPlayerControls
                 )

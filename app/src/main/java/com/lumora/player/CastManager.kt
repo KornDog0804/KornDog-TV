@@ -24,6 +24,17 @@ import okhttp3.OkHttpClient
  */
 class CastManager(private val context: Context) {
 
+    private fun castLog(message: String) {
+        runCatching {
+            val file = java.io.File("/sdcard/Download/castmanager.log")
+            file.appendText(
+                "${System.currentTimeMillis()}: $message\n"
+            )
+        }
+        android.util.Log.d("CastManager", message)
+    }
+
+
     private val relayClient = OkHttpClient.Builder()
         // Cast VOD is a long-lived streaming request. A normal OkHttp read
         // timeout can kill an otherwise healthy movie during a CDN pause.
@@ -55,25 +66,33 @@ class CastManager(private val context: Context) {
             val sessionManager = castContext?.sessionManager
             sessionListener = object : SessionManagerListener<CastSession> {
                 override fun onSessionStarted(session: CastSession, sessionId: String) {
+                    castLog("SESSION_STARTED id=$sessionId")
                     castSession = session
                     onCastSessionConnected?.invoke(session)
                 }
                 override fun onSessionEnded(session: CastSession, error: Int) {
+                    castLog("SESSION_ENDED error=$error")
                     onCastSessionDisconnected?.invoke()
                     castSession = null
                 }
                 override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+                    castLog("SESSION_RESUMED wasSuspended=$wasSuspended")
                     castSession = session
                     onCastSessionConnected?.invoke(session)
                 }
-                override fun onSessionSuspended(session: CastSession, reason: Int) {}
+                override fun onSessionSuspended(session: CastSession, reason: Int) {
+                    castLog("SESSION_SUSPENDED reason=$reason")
+                }
                 override fun onSessionStarting(session: CastSession) {}
                 override fun onSessionStartFailed(session: CastSession, error: Int) {
+                    castLog("SESSION_START_FAILED error=$error")
                     castSession = null
                 }
                 override fun onSessionEnding(session: CastSession) {}
                 override fun onSessionResuming(session: CastSession, sessionId: String) {}
-                override fun onSessionResumeFailed(session: CastSession, error: Int) {}
+                override fun onSessionResumeFailed(session: CastSession, error: Int) {
+                    castLog("SESSION_RESUME_FAILED error=$error")
+                }
             }
             sessionManager?.addSessionManagerListener(sessionListener!!, CastSession::class.java)
         } catch (e: Exception) {
@@ -161,18 +180,17 @@ class CastManager(private val context: Context) {
                     vodRelay.ensureStarted()
 
                     if (growingLocalFile != null) {
-                        android.util.Log.d(
-                            "CastManager",
-                            "Using growing transcoded Cast file: ${growingLocalFile.media.url}"
+                        castLog(
+                            "CAST_SOURCE growing url=${growingLocalFile.media.url}"
                         )
                         growingLocalFile.media
                     } else if (localFile != null) {
-                        android.util.Log.d(
-                            "CastManager",
-                            "Using transcoded local Cast file: ${localFile.absolutePath} bytes=${localFile.length()}"
+                        castLog(
+                            "CAST_SOURCE local file=${localFile.name} bytes=${localFile.length()}"
                         )
                         vodRelay.registerLocalFile(localFile)
                     } else {
+                        castLog("CAST_SOURCE relay upstream")
                         vodRelay.register(
                             upstreamUrl = url,
                             headers = requestHeaders ?: channel.streamHeaders,
