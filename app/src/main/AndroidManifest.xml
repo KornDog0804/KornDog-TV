@@ -1,6 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+
 
     <uses-feature
         android:name="android.hardware.touchscreen"
@@ -8,8 +12,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+<uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
@@ -40,6 +43,7 @@
     <!-- largeHeap: merged catalogues run to six figures of Channel objects across several
          providers, all resident so browsing and search stay instant. A TV stick's default heap
          caps around 170MB, which one large Stalker portal was enough on its own to exhaust. -->
+
     <application
         android:name=".BaseApplication"
         android:allowBackup="true"
@@ -96,6 +100,12 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- Keeps phone-side Cast relay/transcode alive while screen sleeps. -->
+        <service
+            android:name=".player.CastForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- Foreground-notification holder for TorrentEngine streams (see com.lumora.torrent). -->
         <service

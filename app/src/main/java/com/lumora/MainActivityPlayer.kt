@@ -167,6 +167,10 @@ internal fun MainActivity.setupPlayerControls() {
         castManager = com.lumora.player.CastManager(this).apply {
             init()
             onCastSessionConnected = castConnected@{ _ ->
+                com.lumora.player.CastForegroundService.start(
+                    this@setupPlayerControls
+                )
+
                 val channel = nowPlayingChannel
 
                 if (channel == null) {
@@ -206,7 +210,14 @@ internal fun MainActivity.setupPlayerControls() {
                     }
                 }
             }
+
+            onCastSessionDisconnected = {
+                com.lumora.player.CastForegroundService.stop(
+                    this@setupPlayerControls
+                )
+            }
         }
+
         try {
             com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(
                 this, binding.btnCast
