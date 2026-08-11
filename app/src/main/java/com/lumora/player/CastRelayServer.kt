@@ -788,105 +788,273 @@ internal class CastRelayServer(
         }
 
         val deliveryStartedAt = System.currentTimeMillis()
+        val length = body.contentLength()
+
+        val responseStart =
+            upstream.header("Content-Range")
+                ?.substringAfter("bytes ", "")
+                ?.substringBefore('-')
+                ?.trim()
+                ?.toLongOrNull()
+                ?: session.headers["range"]
+                    ?.takeIf { it.startsWith("bytes=") }
+                    ?.removePrefix("bytes=")
+                    ?.substringBefore('-')
+                    ?.trim()
+                    ?.toLongOrNull()
+                ?: 0L
+
+        val requestedEnd =
+            session.headers["range"]
+                ?.takeIf { it.startsWith("bytes=") }
+                ?.removePrefix("bytes=")
+                ?.substringAfter('-', "")
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.toLongOrNull()
+
         var deliveredBytes = 0L
         var firstByteLogged = false
         var firstMegabyteLogged = false
         var sawEof = false
+        var consecutiveResumeAttempts = 0
 
-        val stream = object : FilterInputStream(body.byteStream()) {
+        var activeResponse = upstream
+        var activeStream: InputStream = body.byteStream()
 
-            private fun recordDelivery(count: Int) {
-                if (count <= 0) return
+        fun recordDelivery(count: Int) {
+            if (count <= 0) return
 
-                deliveredBytes += count
+            deliveredBytes += count
+            consecutiveResumeAttempts = 0
 
-                if (!firstByteLogged) {
-                    firstByteLogged = true
-                    d(
-                        "Delivery first-byte after " +
-                            "${System.currentTimeMillis() - deliveryStartedAt}ms"
-                    )
-                }
-
-                if (
-                    !firstMegabyteLogged &&
-                    deliveredBytes >= 1024L * 1024L
-                ) {
-                    firstMegabyteLogged = true
-                    d(
-                        "Delivery first-1MB after " +
-                            "${System.currentTimeMillis() - deliveryStartedAt}ms"
-                    )
-                }
+            if (!firstByteLogged) {
+                firstByteLogged = true
+                d(
+                    "Delivery first-byte after " +
+                        "${System.currentTimeMillis() - deliveryStartedAt}ms"
+                )
             }
 
-            override fun read(): Int {
-                return try {
-                    val value = super.read()
+            if (
+                !firstMegabyteLogged &&
+                deliveredBytes >= 1024L * 1024L
+            ) {
+                firstMegabyteLogged = true
+                d(
+                    "Delivery first-1MB after " +
+                        "${System.currentTimeMillis() - deliveryStartedAt}ms"
+                )
+            }
+        }
 
-                    if (value < 0) {
-                        if (!sawEof) {
-                            sawEof = true
-                            d(
-                                "Upstream EOF bytes=$deliveredBytes " +
-                                    "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
-                            )
-                        }
-                    } else {
-                        recordDelivery(1)
+        fun resumeUpstream(cause: Exception): Boolean {
+            if (length >= 0L && deliveredBytes >= length) {
+                return false
+            }
+
+            if (consecutiveResumeAttempts >= 3) {
+                d(
+                    "Upstream resume abandoned bytes=$deliveredBytes " +
+                        "attempts=$consecutiveResumeAttempts " +
+                        "error=${cause.javaClass.simpleName}: ${cause.message}"
+                )
+                return false
+            }
+
+            consecutiveResumeAttempts++
+
+            val resumeAt = responseStart + deliveredBytes
+            val resumeRange =
+                if (requestedEnd != null) {
+                    "bytes=$resumeAt-$requestedEnd"
+                } else {
+                    "bytes=$resumeAt-"
+                }
+
+            d(
+                "Upstream resume attempt=$consecutiveResumeAttempts " +
+                    "delivered=$deliveredBytes range=$resumeRange " +
+                    "cause=${cause.javaClass.simpleName}: ${cause.message}"
+            )
+
+            val builder = Request.Builder()
+                .url(upstreamUrl)
+                .header("Range", resumeRange)
+
+            relayContext.headers.forEach { (name, value) ->
+                builder.header(name, value)
+            }
+
+            if (!relayContext.userAgent.isNullOrBlank()) {
+                builder.header("User-Agent", relayContext.userAgent)
+            }
+
+            val resumed = try {
+                client.newCall(builder.build()).execute()
+            } catch (e: Exception) {
+                d(
+                    "Upstream resume connect failed " +
+                        "attempt=$consecutiveResumeAttempts " +
+                        "error=${e.javaClass.simpleName}: ${e.message}"
+                )
+                return false
+            }
+
+            val resumedBody = resumed.body
+
+            if (resumed.code != 206 || resumedBody == null) {
+                d(
+                    "Upstream resume rejected " +
+                        "attempt=$consecutiveResumeAttempts " +
+                        "code=${resumed.code} " +
+                        "contentRange=${resumed.header("Content-Range")}"
+                )
+                resumed.close()
+                return false
+            }
+
+            val resumedStart =
+                resumed.header("Content-Range")
+                    ?.substringAfter("bytes ", "")
+                    ?.substringBefore('-')
+                    ?.trim()
+                    ?.toLongOrNull()
+
+            if (resumedStart != null && resumedStart != resumeAt) {
+                d(
+                    "Upstream resume wrong offset " +
+                        "wanted=$resumeAt got=$resumedStart"
+                )
+                resumed.close()
+                return false
+            }
+
+            val oldResponse = activeResponse
+
+            activeResponse = resumed
+            activeStream = resumedBody.byteStream()
+
+            oldResponse.close()
+
+            d(
+                "Upstream resume accepted " +
+                    "attempt=$consecutiveResumeAttempts " +
+                    "range=$resumeRange " +
+                    "contentRange=${resumed.header("Content-Range")} " +
+                    "finalHost=${resumed.request.url.host}"
+            )
+
+            return true
+        }
+
+        val stream = object : InputStream() {
+
+            override fun read(): Int {
+                while (true) {
+                    if (length >= 0L && deliveredBytes >= length) {
+                        sawEof = true
+                        return -1
                     }
 
-                    value
-                } catch (e: Exception) {
-                    d(
-                        "Upstream read failure bytes=$deliveredBytes " +
-                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
-                            "error=${e.javaClass.simpleName}: ${e.message}"
-                    )
-                    Log.e(
-                        TAG,
-                        "Upstream read failure bytes=$deliveredBytes " +
-                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
-                            "error=${e.javaClass.simpleName}: ${e.message}"
-                    )
-                    throw e
+                    try {
+                        val value = activeStream.read()
+
+                        if (value < 0) {
+                            if (!sawEof) {
+                                sawEof = true
+                                d(
+                                    "Upstream EOF bytes=$deliveredBytes " +
+                                        "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
+                                )
+                            }
+                        } else {
+                            recordDelivery(1)
+                        }
+
+                        return value
+                    } catch (e: Exception) {
+                        d(
+                            "Upstream read failure bytes=$deliveredBytes " +
+                                "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                                "error=${e.javaClass.simpleName}: ${e.message}"
+                        )
+
+                        Log.e(
+                            TAG,
+                            "Upstream read failure bytes=$deliveredBytes " +
+                                "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                                "error=${e.javaClass.simpleName}: ${e.message}"
+                        )
+
+                        if (!resumeUpstream(e)) {
+                            throw e
+                        }
+                    }
                 }
             }
 
             override fun read(
                 buffer: ByteArray,
                 offset: Int,
-                length: Int
+                lengthRequested: Int
             ): Int {
-                return try {
-                    val count = super.read(buffer, offset, length)
+                while (true) {
+                    val allowed =
+                        if (length >= 0L) {
+                            val remaining = length - deliveredBytes
+                            if (remaining <= 0L) {
+                                sawEof = true
+                                return -1
+                            }
 
-                    if (count < 0) {
-                        if (!sawEof) {
-                            sawEof = true
-                            d(
-                                "Upstream EOF bytes=$deliveredBytes " +
-                                    "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
-                            )
+                            minOf(
+                                lengthRequested.toLong(),
+                                remaining
+                            ).toInt()
+                        } else {
+                            lengthRequested
                         }
-                    } else {
-                        recordDelivery(count)
-                    }
 
-                    count
-                } catch (e: Exception) {
-                    d(
-                        "Upstream read failure bytes=$deliveredBytes " +
-                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
-                            "error=${e.javaClass.simpleName}: ${e.message}"
-                    )
-                    Log.e(
-                        TAG,
-                        "Upstream read failure bytes=$deliveredBytes " +
-                            "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
-                            "error=${e.javaClass.simpleName}: ${e.message}"
-                    )
-                    throw e
+                    try {
+                        val count =
+                            activeStream.read(
+                                buffer,
+                                offset,
+                                allowed
+                            )
+
+                        if (count < 0) {
+                            if (!sawEof) {
+                                sawEof = true
+                                d(
+                                    "Upstream EOF bytes=$deliveredBytes " +
+                                        "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
+                                )
+                            }
+                        } else {
+                            recordDelivery(count)
+                        }
+
+                        return count
+                    } catch (e: Exception) {
+                        d(
+                            "Upstream read failure bytes=$deliveredBytes " +
+                                "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                                "error=${e.javaClass.simpleName}: ${e.message}"
+                        )
+
+                        Log.e(
+                            TAG,
+                            "Upstream read failure bytes=$deliveredBytes " +
+                                "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms " +
+                                "error=${e.javaClass.simpleName}: ${e.message}"
+                        )
+
+                        if (!resumeUpstream(e)) {
+                            throw e
+                        }
+                    }
                 }
             }
 
@@ -898,14 +1066,12 @@ internal class CastRelayServer(
                             "elapsed=${System.currentTimeMillis() - deliveryStartedAt}ms"
                     )
 
-                    super.close()
+                    activeStream.close()
                 } finally {
-                    upstream.close()
+                    activeResponse.close()
                 }
             }
         }
-
-        val length = body.contentLength()
 
         val response =
             if (length >= 0) {
