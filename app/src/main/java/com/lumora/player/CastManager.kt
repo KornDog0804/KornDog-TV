@@ -244,7 +244,17 @@ class CastManager(private val context: Context) {
             )
 
             var finished = false
-            var loadAccepted = false
+
+            // True only after THIS newly submitted media has actually entered
+            // LOADING or BUFFERING on the receiver.
+            //
+            // A successful remoteMediaClient.load() result only means Google
+            // accepted the command. When switching away from live TV, the
+            // receiver can briefly report IDLE while tearing the live stream
+            // down before the new VOD begins loading. That transitional IDLE
+            // must not be treated as a movie failure.
+            var receiverSawNewLoadActivity = false
+
             val handler = Handler(Looper.getMainLooper())
 
             lateinit var callback: RemoteMediaClient.Callback
@@ -276,9 +286,12 @@ class CastManager(private val context: Context) {
                         }
 
                         MediaStatus.PLAYER_STATE_LOADING -> {
-                            // State 5 is a real Cast state: the receiver is still loading
-                            // the media. This is progress, not a playback failure.
-                            loadAccepted = true
+                            receiverSawNewLoadActivity = true
+
+                            castLog(
+                                "NEW_MEDIA_LOADING url=$url"
+                            )
+
                             android.util.Log.d(
                                 "CastManager",
                                 "Cast receiver is LOADING: $url"
@@ -286,8 +299,12 @@ class CastManager(private val context: Context) {
                         }
 
                         MediaStatus.PLAYER_STATE_BUFFERING -> {
-                            // The receiver has the media and is filling its buffer.
-                            loadAccepted = true
+                            receiverSawNewLoadActivity = true
+
+                            castLog(
+                                "NEW_MEDIA_BUFFERING url=$url"
+                            )
+
                             android.util.Log.d(
                                 "CastManager",
                                 "Cast receiver is BUFFERING: $url"
@@ -295,13 +312,26 @@ class CastManager(private val context: Context) {
                         }
 
                         MediaStatus.PLAYER_STATE_IDLE -> {
-                            // The receiver is normally IDLE before LOAD is accepted.
-                            // Only treat IDLE as a failure once this load actually belongs
-                            // to the receiver.
-                            if (loadAccepted) {
+                            val idleReason = remoteMediaClient.idleReason
+
+                            if (receiverSawNewLoadActivity) {
+                                castLog(
+                                    "NEW_MEDIA_IDLE_AFTER_ACTIVITY reason=$idleReason url=$url"
+                                )
+
                                 finish(
                                     false,
-                                    "Receiver went idle (${remoteMediaClient.idleReason})"
+                                    "Receiver went idle ($idleReason)"
+                                )
+                            } else {
+                                // Expected when replacing an existing Cast item,
+                                // especially a never-ending live TV stream.
+                                //
+                                // The old item can become IDLE after our new LOAD
+                                // command has already been accepted but before the
+                                // new movie reports LOADING/BUFFERING.
+                                castLog(
+                                    "TRANSITIONAL_IDLE_IGNORED reason=$idleReason url=$url"
                                 )
                             }
                         }
@@ -348,10 +378,13 @@ class CastManager(private val context: Context) {
 
                         finish(false, message)
                     } else {
-                        loadAccepted = true
+                        castLog(
+                            "LOAD_COMMAND_ACCEPTED waitingForNewMediaActivity url=$url"
+                        )
+
                         android.util.Log.d(
                             "CastManager",
-                            "Cast LOAD accepted; waiting for PLAYING: $url"
+                            "Cast LOAD accepted; waiting for receiver activity: $url"
                         )
 
                         // PLAYING can arrive between LOAD completing and this callback.
