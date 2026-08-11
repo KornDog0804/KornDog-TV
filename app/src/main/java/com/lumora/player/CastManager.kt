@@ -179,24 +179,12 @@ class CastManager(private val context: Context) {
                 try {
                     vodRelay.ensureStarted()
 
-                    if (growingLocalFile != null) {
-                        castLog(
-                            "CAST_SOURCE growing url=${growingLocalFile.media.url}"
-                        )
-                        growingLocalFile.media
-                    } else if (localFile != null) {
-                        castLog(
-                            "CAST_SOURCE local file=${localFile.name} bytes=${localFile.length()}"
-                        )
-                        vodRelay.registerLocalFile(localFile)
-                    } else {
-                        castLog("CAST_SOURCE relay upstream")
-                        vodRelay.register(
-                            upstreamUrl = url,
-                            headers = requestHeaders ?: channel.streamHeaders,
-                            userAgent = userAgent ?: channel.streamUserAgent
-                        )
-                    }
+                    castLog("CAST_SOURCE relay upstream")
+                    vodRelay.register(
+                        upstreamUrl = url,
+                        headers = requestHeaders ?: channel.streamHeaders,
+                        userAgent = userAgent ?: channel.streamUserAgent
+                    )
                 } catch (e: Exception) {
                     android.util.Log.e("CastManager", "Couldn't start VOD relay", e)
                     onResult(false, e.message ?: "Couldn't start Cast relay")
