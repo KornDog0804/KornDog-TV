@@ -137,7 +137,6 @@ class CastManager(private val context: Context) {
         requestHeaders: Map<String, String>? = null,
         userAgent: String? = null,
         localFile: java.io.File? = null,
-        growingLocalFile: CastRelayServer.GrowingLocalFile? = null,
         onResult: (success: Boolean, message: String?) -> Unit
     ) {
         val session = castSession
@@ -172,8 +171,36 @@ class CastManager(private val context: Context) {
         //
         // VOD goes through the phone relay. This keeps the upstream request on the
         // same network origin as phone playback and lets us preserve Referer/UA/etc.
+        val localMedia =
+            if (
+                channel.mediaType != MediaType.LIVE &&
+                localFile != null &&
+                localFile.isFile &&
+                localFile.length() > 0L
+            ) {
+                try {
+                    vodRelay.ensureStarted()
+                    castLog(
+                        "CAST_SOURCE completed local mp4 bytes=${localFile.length()}"
+                    )
+                    vodRelay.registerLocalFile(localFile)
+                } catch (e: Exception) {
+                    android.util.Log.e(
+                        "CastManager",
+                        "Couldn't register completed local Cast file",
+                        e
+                    )
+                    null
+                }
+            } else {
+                null
+            }
+
         val relayMedia =
-            if (channel.mediaType == MediaType.LIVE || growingLocalFile != null) {
+            if (
+                channel.mediaType == MediaType.LIVE ||
+                localMedia != null
+            ) {
                 null
             } else {
                 try {
@@ -205,9 +232,8 @@ class CastManager(private val context: Context) {
                     url
                 }
 
-                growingLocalFile != null -> {
-                    castLog("CAST_SOURCE growing local mp4")
-                    growingLocalFile.media.url
+                localMedia != null -> {
+                    localMedia.url
                 }
 
                 else -> {
@@ -230,8 +256,8 @@ class CastManager(private val context: Context) {
                     guessContentType(url)
                 }
 
-                growingLocalFile != null -> {
-                    "video/mp4"
+                localMedia != null -> {
+                    localMedia.contentType
                 }
 
                 else -> {

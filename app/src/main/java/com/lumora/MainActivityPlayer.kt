@@ -210,7 +210,6 @@ internal fun MainActivity.setupPlayerControls() {
                     requestHeaders = channel.streamHeaders,
                     userAgent = channel.streamUserAgent,
                     localFile = castTranscodeFile,
-                    growingLocalFile = castGrowingFile
                 ) { success, message ->
                     runOnUiThread {
                         if (success) {
@@ -826,17 +825,10 @@ internal fun MainActivity.showPlayerFor(
                 headers = startVersion.streamHeaders ?: emptyMap(),
                 userAgent = startVersion.streamUserAgent,
                 onStarted = { file ->
-                    if (isCastManagerReady) {
-                        thisTranscodeGrowingFile =
-                            castManager.registerGrowingCastFile(file)
-
-                        castGrowingFile = thisTranscodeGrowingFile
-
-                        android.util.Log.i(
-                            "CastTranscodeProbe",
-                            "Growing Cast relay registered: ${castGrowingFile?.media?.url}"
-                        )
-                    }
+                    android.util.Log.i(
+                        "CastTranscodeProbe",
+                        "Transcode started; waiting for completed MP4 before Cast path: ${file.absolutePath}"
+                    )
                 }
             ) { result ->
                 result.onSuccess { file ->
