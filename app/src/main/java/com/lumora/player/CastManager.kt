@@ -173,7 +173,7 @@ class CastManager(private val context: Context) {
         // VOD goes through the phone relay. This keeps the upstream request on the
         // same network origin as phone playback and lets us preserve Referer/UA/etc.
         val relayMedia =
-            if (channel.mediaType == MediaType.LIVE) {
+            if (channel.mediaType == MediaType.LIVE || growingLocalFile != null) {
                 null
             } else {
                 try {
@@ -186,17 +186,33 @@ class CastManager(private val context: Context) {
                         userAgent = userAgent ?: channel.streamUserAgent
                     )
                 } catch (e: Exception) {
-                    android.util.Log.e("CastManager", "Couldn't start VOD relay", e)
-                    onResult(false, e.message ?: "Couldn't start Cast relay")
+                    android.util.Log.e(
+                        "CastManager",
+                        "Couldn't start VOD relay",
+                        e
+                    )
+                    onResult(
+                        false,
+                        e.message ?: "Couldn't start Cast relay"
+                    )
                     return
                 }
             }
 
         val castUrl =
-            if (channel.mediaType == MediaType.LIVE) {
-                url
-            } else {
-                relayMedia!!.url
+            when {
+                channel.mediaType == MediaType.LIVE -> {
+                    url
+                }
+
+                growingLocalFile != null -> {
+                    castLog("CAST_SOURCE growing local mp4")
+                    growingLocalFile.media.url
+                }
+
+                else -> {
+                    relayMedia!!.url
+                }
             }
 
         val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
@@ -208,11 +224,19 @@ class CastManager(private val context: Context) {
             MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
 
         val contentType =
-            if (channel.mediaType == MediaType.LIVE) {
-                // Known-good Live TV behavior remains exactly unchanged.
-                guessContentType(url)
-            } else {
-                relayMedia!!.contentType
+            when {
+                channel.mediaType == MediaType.LIVE -> {
+                    // Known-good Live TV behavior remains exactly unchanged.
+                    guessContentType(url)
+                }
+
+                growingLocalFile != null -> {
+                    "video/mp4"
+                }
+
+                else -> {
+                    relayMedia!!.contentType
+                }
             }
 
         val mediaInfo = MediaInfo.Builder(castUrl)
