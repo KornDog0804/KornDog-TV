@@ -476,8 +476,6 @@ internal fun MainActivity.selectConcertCorner() {
     }
 
     applyStatus()
-
-    updateMobileBottomNav(binding.mobileNavConcerts)
 }
 
 internal fun MainActivity.loadConcertCorner() {

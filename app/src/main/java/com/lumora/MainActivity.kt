@@ -855,21 +855,6 @@ class MainActivity : AppCompatActivity() {
             // The player side menu mirrors the tab bar, so its Downloads row is phone-only
             // too (the row ships GONE - see activity_main.xml).
             binding.navDownloads.visibility = View.VISIBLE
-
-            // Phone gets the fixed bottom navigation.
-            // TV keeps the original scrolling tab strip.
-            binding.tabBar.visibility = View.GONE
-            binding.mobileBottomNav.visibility = View.VISIBLE
-
-            val mobileNavReserve =
-                resources.getDimensionPixelSize(R.dimen.mobile_bottom_nav_height)
-
-            binding.mainContent.setPadding(
-                binding.mainContent.paddingLeft,
-                binding.mainContent.paddingTop,
-                binding.mainContent.paddingRight,
-                mobileNavReserve
-            )
             val filter = android.content.IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
             ContextCompat.registerReceiver(this, downloadCompleteReceiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
         } else {
@@ -877,9 +862,6 @@ class MainActivity : AppCompatActivity() {
             // exits the tabs into the button cluster (Discover -> Search pill), so only the
             // left end needs fixing: Live's LEFT would target the GONE Downloads tab and eat
             // the press - stop it there instead of wrapping into a hidden tab.
-            binding.mobileBottomNav.visibility = View.GONE
-            binding.tabBar.visibility = View.VISIBLE
-
             binding.tabLive.nextFocusLeftId = View.NO_ID
             // Same in the side menu: Discover's DOWN would land on the GONE Downloads row
             // and stop the walk short of Settings.

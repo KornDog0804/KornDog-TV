@@ -85,8 +85,6 @@ internal fun MainActivity.selectDiscover() {
         loadDiscover(null)
     }
     applyStatus()
-
-    updateMobileBottomNav(binding.mobileNavDiscover)
 }
 
 internal fun MainActivity.loadTmdbVodCatalog() {

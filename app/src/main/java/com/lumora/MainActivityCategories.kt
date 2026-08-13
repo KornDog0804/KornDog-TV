@@ -1252,31 +1252,6 @@ internal fun MainActivity.setupTabs() {
     binding.tabDiscover.setOnClickListener { showingHome = false; selectDiscover() }
     binding.tabConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.tabDownloads.setOnClickListener { showingHome = false; selectDownloads() }
-
-    // Phone bottom navigation.
-    binding.mobileNavHome.setOnClickListener {
-        selectHome()
-    }
-
-    binding.mobileNavLive.setOnClickListener {
-        showingHome = false
-        selectTab(0)
-    }
-
-    binding.mobileNavDiscover.setOnClickListener {
-        showingHome = false
-        selectDiscover()
-    }
-
-    binding.mobileNavConcerts.setOnClickListener {
-        showingHome = false
-        selectConcertCorner()
-    }
-
-    binding.mobileNavMore.setOnClickListener {
-        binding.btnSettings.performClick()
-    }
-
     setupDiscover()
     // D-pad focus moving between tabs leaves a stale sliver of the previous tab's
     // rounded-border background behind on some TV-stick GPUs - the view's own
@@ -1289,79 +1264,6 @@ internal fun MainActivity.setupTabs() {
     // Hide tab bar + search until an enabled provider exists
     updateTopChromeVisibility()
 }
-
-internal fun MainActivity.updateMobileBottomNav(selected: View?) {
-    if (isTv) return
-
-    data class MobileNavItem(
-        val container: View,
-        val label: TextView,
-        val icon: ImageView,
-        val indicator: View
-    )
-
-    val items = listOf(
-        MobileNavItem(
-            binding.mobileNavHome,
-            binding.mobileNavHomeLabel,
-            binding.mobileNavHomeIcon,
-            binding.mobileNavHomeIndicator
-        ),
-        MobileNavItem(
-            binding.mobileNavLive,
-            binding.mobileNavLiveLabel,
-            binding.mobileNavLiveIcon,
-            binding.mobileNavLiveIndicator
-        ),
-        MobileNavItem(
-            binding.mobileNavDiscover,
-            binding.mobileNavDiscoverLabel,
-            binding.mobileNavDiscoverIcon,
-            binding.mobileNavDiscoverIndicator
-        ),
-        MobileNavItem(
-            binding.mobileNavConcerts,
-            binding.mobileNavConcertsLabel,
-            binding.mobileNavConcertsIcon,
-            binding.mobileNavConcertsIndicator
-        ),
-        MobileNavItem(
-            binding.mobileNavMore,
-            binding.mobileNavMoreLabel,
-            binding.mobileNavMoreIcon,
-            binding.mobileNavMoreIndicator
-        )
-    )
-
-    items.forEach { item ->
-        val active = item.container === selected
-
-        item.label.setTextColor(
-            getColor(
-                if (active) R.color.text_primary
-                else R.color.text_secondary
-            )
-        )
-
-        item.icon.setColorFilter(
-            getColor(
-                if (active) R.color.text_primary
-                else R.color.text_tertiary
-            ),
-            android.graphics.PorterDuff.Mode.SRC_IN
-        )
-
-        item.label.typeface = ResourcesCompat.getFont(
-            this,
-            if (active) R.font.inter_semibold
-            else R.font.inter_medium
-        )
-
-        item.indicator.visibility =
-            if (active) View.VISIBLE else View.INVISIBLE
-    }
-}
-
 
 internal fun MainActivity.updateTabStyles(selected: View) {
     for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
@@ -1417,8 +1319,6 @@ internal fun MainActivity.selectHome() {
     updateTabStyles(binding.tabHome)
     homeShelfAdapter.submitList(buildHomeShelves())
     applyStatus()
-
-    updateMobileBottomNav(binding.mobileNavHome)
 }
 
 /** Applies [widthDimen] as an explicit width, treating 0 as "leave it as laid out".
