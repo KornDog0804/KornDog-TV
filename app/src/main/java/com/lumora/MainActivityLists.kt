@@ -274,6 +274,13 @@ internal fun MainActivity.selectTab(index: Int) {
         setStatus("", visible = false)
         applyStatus()
     }
+
+    if (!isTv) {
+        when (activeTab) {
+            0 -> updateMobileBottomNav(binding.mobileNavLive)
+            else -> updateMobileBottomNav(null)
+        }
+    }
 }
 
 // ── Lists ──────────────────────────────────────
