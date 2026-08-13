@@ -95,8 +95,12 @@
          item_shelf_poster.xml, so unlike the grid they never scaled by device class - a TV
          got the same 108dp card as a phone and fitted six of them across the row. Artwork
          is 2:3, so the image height is (width - 16dp of card padding) x 1.5. -->
-    <dimen name="shelf_poster_width">86dp</dimen>
-    <dimen name="shelf_poster_image_height">110dp</dimen>
+    <dimen name="shelf_poster_width">118dp</dimen>
+    <dimen name="shelf_poster_image_height">153dp</dimen>
+    <dimen name="shelf_poster_gap">12dp</dimen>
+    <dimen name="shelf_poster_card_padding">6dp</dimen>
+    <dimen name="shelf_poster_title_gap">7dp</dimen>
+    <dimen name="shelf_poster_title_text">12sp</dimen>
     <!-- General on-screen body copy outside the settings scale (empty states, Up Next). -->
     <dimen name="content_body_text">13sp</dimen>
 

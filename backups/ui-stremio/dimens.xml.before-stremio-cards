@@ -141,12 +141,8 @@
          (960 minus the 200dp sidebar and its margin, minus the list's own padding), and each
          card carries a 14dp end margin: 5 x (130 + 14) = 720dp. Image height keeps the 2:3
          artwork ratio against the 114dp of card left inside the 8dp padding. -->
-    <dimen name="shelf_poster_width">152dp</dimen>
-    <dimen name="shelf_poster_image_height">210dp</dimen>
-    <dimen name="shelf_poster_gap">18dp</dimen>
-    <dimen name="shelf_poster_card_padding">7dp</dimen>
-    <dimen name="shelf_poster_title_gap">9dp</dimen>
-    <dimen name="shelf_poster_title_text">16sp</dimen>
+    <dimen name="shelf_poster_width">104dp</dimen>
+    <dimen name="shelf_poster_image_height">137dp</dimen>
     <dimen name="content_body_text">17sp</dimen>
 
     <!-- Shelf headers sit above the posters and name the row, so they carry more weight than

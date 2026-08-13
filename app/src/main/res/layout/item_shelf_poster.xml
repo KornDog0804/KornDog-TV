@@ -1,49 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="@dimen/shelf_poster_width"
     android:layout_height="wrap_content"
-    android:layout_marginEnd="14dp"
+    android:layout_marginEnd="@dimen/shelf_poster_gap"
     android:background="@drawable/bg_grid_card"
     android:clickable="true"
     android:focusable="true"
-    android:padding="8dp"
+    android:orientation="vertical"
+    android:padding="@dimen/shelf_poster_card_padding"
     android:stateListAnimator="@animator/focus_scale">
 
-    <ImageView
-        android:id="@+id/itemPoster"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/shelf_poster_image_height"
-        android:background="@color/surface"
-        android:scaleType="centerCrop" />
+        android:layout_height="@dimen/shelf_poster_image_height">
 
-    <View
-        android:layout_width="match_parent"
-        android:layout_height="80dp"
-        android:layout_gravity="bottom"
-        android:background="@drawable/grad_poster_scrim" />
+        <ImageView
+            android:id="@+id/itemPoster"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/surface"
+            android:scaleType="centerCrop" />
 
-    <com.lumora.ui.OutlineTextView
+    </FrameLayout>
+
+    <TextView
         android:id="@+id/itemTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_gravity="bottom"
-        android:padding="8dp"
-        android:autoSizeMaxTextSize="@dimen/poster_title_text"
-        android:autoSizeMinTextSize="8sp"
-        android:autoSizeStepGranularity="1sp"
-        android:autoSizeTextType="uniform"
-        android:breakStrategy="simple"
+        android:layout_marginTop="@dimen/shelf_poster_title_gap"
         android:ellipsize="end"
         android:fontFamily="@font/inter_medium"
-        android:lineSpacingExtra="1dp"
-        android:maxLines="4"
-        android:shadowColor="#B3000000"
-        android:shadowDx="0"
-        android:shadowDy="1"
-        android:shadowRadius="4"
+        android:maxLines="2"
+        android:minLines="2"
         android:textColor="@color/text_primary"
-        android:textSize="@dimen/poster_title_text"
-        app:outlineColor="@color/poster_title_outline"
-        app:outlineWidth="@dimen/poster_title_outline_width" />
-</FrameLayout>
+        android:textSize="@dimen/shelf_poster_title_text" />
+
+</LinearLayout>
