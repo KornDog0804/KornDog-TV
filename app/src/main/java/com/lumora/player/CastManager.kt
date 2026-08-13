@@ -4,6 +4,7 @@ import android.content.Context
 import android.widget.Toast
 import com.lumora.model.Channel
 import com.lumora.model.MediaType
+import com.google.android.gms.cast.CastDevice
 import com.google.android.gms.cast.MediaInfo
 import com.google.android.gms.cast.MediaLoadOptions
 import com.google.android.gms.cast.MediaMetadata
@@ -164,6 +165,21 @@ class CastManager(private val context: Context) {
             lowerUrl.contains("localhost")
         ) {
             onResult(false, "This stream only exists on this phone and cannot be fetched by Cast")
+            return
+        }
+
+        // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
+        // decode support. Raw-relaying an unsupported codec plays audio with no video,
+        // silently. Rather than let that happen, wait for the background transcode
+        // (castTranscodeFile/localFile) to be ready before casting to these devices.
+        // Chromecast/Android TV/Google TV receivers are not matched here and keep the
+        // existing fast raw-relay path with no wait.
+        if (
+            channel.mediaType != MediaType.LIVE &&
+            isLimitedCapabilityReceiver(session) &&
+            (localFile == null || !localFile.isFile || localFile.length() <= 0L)
+        ) {
+            onResult(false, "Preparing video for this device — try again in a moment")
             return
         }
 
@@ -440,6 +456,21 @@ class CastManager(private val context: Context) {
     fun stopCasting() {
         val session = castSession ?: return
         session.remoteMediaClient?.stop()
+    }
+
+    // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
+    // decode support. Chromecast/Android TV/Google TV devices are not matched here
+    // and keep the existing fast raw-relay path unaffected.
+    private fun isLimitedCapabilityReceiver(session: CastSession): Boolean {
+        val device: CastDevice = session.castDevice ?: return false
+        val name = (device.friendlyName ?: device.modelName ?: "").lowercase()
+        return LIMITED_CAPABILITY_DEVICE_HINTS.any { hint -> name.contains(hint) }
+    }
+
+    companion object {
+        private val LIMITED_CAPABILITY_DEVICE_HINTS = listOf(
+            "nest hub", "home hub"
+        )
     }
 
     fun release() {
