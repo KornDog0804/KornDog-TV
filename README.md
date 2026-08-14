@@ -1,20 +1,18 @@
-# Lumora
+# KornDog TV
 
-**Lumora** is a fast, lightweight IPTV client for Android, Android TV, and Fire TV. It speaks **Xtream Codes, M3U/M3U8 playlists, Stalker Portal, and Jellyfin** — any number of them running at the same time — and merges Live TV, Movies, and Series from all of them into one clean, D-pad-friendly interface.
+**KornDog TV** is a fast, lightweight IPTV client for Android, Android TV, and Fire TV. It speaks **Xtream Codes, M3U/M3U8 playlists, Stalker Portal, and Jellyfin** — any number of them running at the same time — and merges Live TV, Movies, and Series from all of them into one clean, D-pad-friendly interface.
 
 It's a native XML/Views app with **no Jetpack Compose anywhere**, and that's deliberate: on the budget TV boxes and streaming sticks these apps actually run on, heavier UI frameworks pin the CPU and cost you frames mid-playback. Everything here is built to stay smooth on hardware that has nothing to spare.
 
 Nothing is behind a paywall — the multi-playlist support, EPG guide, recording, and catch-up that comparable players charge for are simply included.
 
-# DOWNLOADER CODE - 6626802
 
-https://discord.gg/cNKYGhQWvq
 
-> **Lumora is a player, not a provider.** It doesn't include, sell, host, or supply any channels, streams, or subscriptions of any kind. You bring your own IPTV service (Xtream Codes / M3U / Stalker Portal) or your own Jellyfin server, and Lumora simply plays it back. See [Disclaimer](#disclaimer).
+> **KornDog TV is a player, not a provider.** It doesn't include, sell, host, or supply any channels, streams, or subscriptions of any kind. You bring your own IPTV service (Xtream Codes / M3U / Stalker Portal) or your own Jellyfin server, and KornDog TV simply plays it back. See [Disclaimer](#disclaimer).
 
 ## Highlights
 
-- **Similar to TiVimate or Sparkle TV, without paying for the features.** Multiple playlists, the EPG guide, DVR recording, catch-up, favourites and multi-provider support are the things those players put behind a premium subscription or one-off unlock. In Lumora they're all just included, free.
+- **Similar to TiVimate or Sparkle TV, without paying for the features.** Multiple playlists, the EPG guide, DVR recording, catch-up, favourites and multi-provider support are the things those players put behind a premium subscription or one-off unlock. In KornDog TV they're all just included, free.
 - **Optional Jellyfin support, properly done.** Point it at your own Jellyfin server and its films and series merge into the same shelves as your IPTV catalogue (same title from both = one card). Resume points, watched marks and favourites sync both ways with the server, and files your stick can't decode are converted by the server on the fly rather than opening to a black screen.
 - **Run every subscription at once.** Any number of Xtream Codes, M3U and Stalker Portal providers active together, merged into one catalogue instead of switching between playlists.
 - **Live TV that tidies itself up.** Duplicate feeds of the same channel collapse into one entry at the best available quality (4K → FHD → HD → SD), with instant fallback to any other copy mid-playback; Sports, News, Music and Cinema surface at the top automatically whatever your provider filed them under.
@@ -62,7 +60,7 @@ https://discord.gg/cNKYGhQWvq
 
 ### Jellyfin (optional)
 
-Lumora is an IPTV player first — Jellyfin is an extra slot you can fill if you happen to run
+KornDog TV is an IPTV player first — Jellyfin is an extra slot you can fill if you happen to run
 a server, and everything below is inert if you don't.
 
 - Its films and series merge into the **same shelves and poster grids** as your IPTV catalogue, with a dedicated "Jellyfin" shelf on Films and Series; a title both your provider and your server carry becomes one card with both sources selectable
@@ -107,19 +105,19 @@ Anything else on Android 7.1 (SDK 25) or newer should work; those are just the d
 - **Playback:** [AndroidX Media3](https://developer.android.com/media/media3) (ExoPlayer)
 - **Persistence:** Room, WorkManager (background sync), SharedPreferences
 - **Networking:** OkHttp
-- **Min SDK:** 25 (Android 7.1) · **Target SDK:** 36
+- **Min SDK:** 25 (Android 7.1) · **Target SDK:** 34
 
 ## Installation
 
-Grab the latest signed APK from the [Releases](https://github.com/disclosurez/lumora/releases) page and sideload it. Lumora checks GitHub Releases on launch and will prompt you when a new version is available.
+Grab the latest signed APK from the [Releases](https://github.com/KornDog0804/KornDog-TV/releases) page and sideload it. KornDog TV checks GitHub Releases on launch and will prompt you when a new version is available.
 
-On first launch, you'll be asked to add a provider — this is your own Xtream Codes / M3U / Stalker Portal IPTV subscription, or your own Jellyfin server. Lumora has no content of its own and cannot supply one for you.
+On first launch, you'll be asked to add a provider — this is your own Xtream Codes / M3U / Stalker Portal IPTV subscription, or your own Jellyfin server. KornDog TV has no content of its own and cannot supply one for you.
 
 ## Building from Source
 
 ```bash
-git clone https://github.com/disclosurez/lumora.git
-cd lumora
+git clone https://github.com/KornDog0804/KornDog-TV.git
+cd KornDog-TV
 ./gradlew :app:assembleDebug
 ```
 
@@ -165,9 +163,16 @@ app/src/main/java/com/lumora/
 
 Issues and pull requests are welcome. Please open an issue describing the change before submitting a large PR.
 
+
+## Upstream Credit
+
+KornDog TV is derived from the open-source **Lumora** project by disclosurez. This fork carries its own branding, release builds, and project direction while retaining credit to the upstream work that made it possible.
+
+Upstream project: `disclosurez/Lumora`
+
 ## Disclaimer
 
-**Lumora provides no content, service, or subscription of its own.** It is a generic IPTV/media client, comparable to a web browser or a media player — it does not host, stream, sell, endorse, or have any affiliation with any channel, movie, series, or IPTV service. All content played through Lumora comes exclusively from a provider (Xtream Codes account, M3U playlist, Stalker Portal, or Jellyfin server) that *you* configure, and which you are solely responsible for legally obtaining access to. The developers of Lumora have no visibility into, and no control over, what any given provider serves.
+**KornDog TV provides no content, service, or subscription of its own.** It is a generic IPTV/media client, comparable to a web browser or a media player — it does not host, stream, sell, endorse, or have any affiliation with any channel, movie, series, or IPTV service. All content played through KornDog TV comes exclusively from a provider (Xtream Codes account, M3U playlist, Stalker Portal, or Jellyfin server) that *you* configure, and which you are solely responsible for legally obtaining access to. The developers of KornDog TV have no visibility into, and no control over, what any given provider serves.
 
 ## License
 

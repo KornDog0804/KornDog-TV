@@ -1,5 +1,17 @@
 # Changelog
 
+## 3.2.local
+
+### KornDog TV fork release
+- Published the first **KornDog TV 3.2.local** release from the `korndog-tv` branch.
+- Rebranded the application package presentation and release documentation for KornDog TV.
+- Added the Home navigation labels required by the redesigned navigation.
+- Replaced the missing Concert Corner icon reference with an existing compatible drawable.
+- Built successfully on Android/Termux using the Termux-native AAPT2 override.
+- Release currently compiles and targets **Android SDK 34**.
+- APK package: `com.korndog.tv`
+- Upstream project credit remains with **Lumora** by disclosurez.
+
 ## 3.2
 
 ### Category sidebar
