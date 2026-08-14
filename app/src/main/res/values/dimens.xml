@@ -239,4 +239,11 @@
     <!-- Catch Up columns: channel list stays put while days/programmes fly out beside it. -->
     <dimen name="catchup_channel_column_width">260dp</dimen>
     <dimen name="catchup_day_column_width">150dp</dimen>
+
+    <!-- Phone bottom navigation -->
+    <dimen name="mobile_bottom_nav_height">72dp</dimen>
+    <dimen name="mobile_bottom_nav_icon">22dp</dimen>
+    <dimen name="mobile_bottom_nav_text">11sp</dimen>
+    <dimen name="mobile_bottom_nav_indicator_width">24dp</dimen>
 </resources>
+

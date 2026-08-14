@@ -1220,7 +1220,7 @@ internal fun MainActivity.setupTabs() {
     binding.bottomNavLive.setOnClickListener { showingHome = false; selectTab(0) }
     binding.bottomNavDiscover.setOnClickListener { showingHome = false; selectDiscover() }
     binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
-    binding.bottomNavMore.setOnClickListener { showingHome = false; selectDownloads() }
+    binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
 
     binding.dashboardLive.setOnClickListener {
         showingHome = false
