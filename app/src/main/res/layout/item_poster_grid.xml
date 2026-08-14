@@ -3,8 +3,8 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_poster_glass"
     android:layout_margin="8dp"
-    android:background="@drawable/bg_grid_card"
     android:clickable="true"
     android:focusable="true"
     android:padding="8dp"
@@ -12,8 +12,8 @@
 
     <ImageView
         android:id="@+id/itemPoster"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/poster_image_height"
+        android:layout_width="160dp"
+        android:layout_height="240dp"
         android:background="@color/surface"
         android:scaleType="centerCrop" />
 

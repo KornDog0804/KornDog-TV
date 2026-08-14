@@ -24,41 +24,29 @@ import java.util.Locale
 // Extracted from MainActivity.kt; see that file's header.
 internal fun MainActivity.setupDiscover() {
     setGridSpan(binding.discoverGrid, discoverGridAdapter, R.id.tabDiscover)
-    // setGridSpan only wires the layout manager/span; the adapter still has to be attached.
     binding.discoverGrid.adapter = discoverGridAdapter
 
-    binding.discoverGrid.addOnScrollListener(
-        object : androidx.recyclerview.widget.RecyclerView.OnScrollListener() {
-            override fun onScrolled(
-                recyclerView: androidx.recyclerview.widget.RecyclerView,
-                dx: Int,
-                dy: Int
-            ) {
-                super.onScrolled(recyclerView, dx, dy)
-
-                if (dy <= 0 ||
-                    discoverCurrentQuery != null ||
-                    discoverLoadingMore ||
-                    !discoverHasMore
-                ) {
-                    return
-                }
-
-                val layout =
-                    recyclerView.layoutManager
-                        as? androidx.recyclerview.widget.GridLayoutManager
-                        ?: return
-
-                val total = discoverGridAdapter.itemCount
-                val lastVisible = layout.findLastVisibleItemPosition()
-
-                // Start fetching before the user actually hits the wall.
-                if (total > 0 && lastVisible >= total - 8) {
-                    loadMoreDiscover()
-                }
-            }
+    // Explicit pagination replaces endless scrolling.
+    binding.discoverPrevPage.setOnClickListener {
+        if (
+            discoverCurrentQuery == null &&
+            !discoverLoadingMore &&
+            discoverPage > 1
+        ) {
+            loadDiscoverPage(discoverPage - 1)
         }
-    )
+    }
+
+    binding.discoverNextPage.setOnClickListener {
+        if (
+            discoverCurrentQuery == null &&
+            !discoverLoadingMore &&
+            discoverHasMore &&
+            discoverPage < 10
+        ) {
+            loadDiscoverPage(discoverPage + 1)
+        }
+    }
 }
 
 /** Discover is its own pane (like Downloads): browse/search TMDB, no category sidebar. */
@@ -227,10 +215,16 @@ internal fun MainActivity.loadDiscover(query: String?) {
 
         discoverGridAdapter.replaceAll(visible)
 
-        // TMDB normally returns 20 items per page. A short page means
-        // we've reached the end of this feed.
-        discoverHasMore =
-            query == null && results.size >= 20
+        // Search results do not use pagination. Normal Discover starts
+        // explicitly on page 1.
+        if (query == null) {
+            discoverPage = 1
+            discoverHasMore = results.size >= 20
+        } else {
+            discoverHasMore = false
+        }
+
+        updateDiscoverPagination()
 
         setDiscoverStatus(
             when {
@@ -250,29 +244,48 @@ internal fun MainActivity.loadDiscover(query: String?) {
     }
 }
 
-/**
- * Fetches the next TMDB Discover page and appends it without moving the
- * user's scroll position.
- */
-internal fun MainActivity.loadMoreDiscover() {
-    if (discoverCurrentQuery != null ||
+internal fun MainActivity.updateDiscoverPagination() {
+    val visible = discoverCurrentQuery == null
+
+    binding.discoverPagination.visibility =
+        if (visible) View.VISIBLE else View.GONE
+
+    if (!visible) return
+
+    binding.discoverPageLabel.text = "Page $discoverPage of 10"
+
+    val canGoBack = discoverPage > 1 && !discoverLoadingMore
+    val canGoForward =
+        discoverHasMore &&
+        discoverPage < 10 &&
+        !discoverLoadingMore
+
+    binding.discoverPrevPage.isEnabled = canGoBack
+    binding.discoverPrevPage.alpha =
+        if (canGoBack) 1f else 0.35f
+
+    binding.discoverNextPage.isEnabled = canGoForward
+    binding.discoverNextPage.alpha =
+        if (canGoForward) 1f else 0.35f
+}
+
+internal fun MainActivity.loadDiscoverPage(page: Int) {
+    if (
         discoverLoadingMore ||
-        !discoverHasMore
+        discoverCurrentQuery != null ||
+        page < 1 ||
+        page > 10
     ) {
         return
     }
 
     discoverLoadingMore = true
-    val nextPage = discoverPage + 1
+    updateDiscoverPagination()
+    setDiscoverStatus("Loading page $page…")
 
     scope.launch {
         try {
-            val results = tmdbClient.discoverPage(nextPage)
-
-            if (results.isEmpty()) {
-                discoverHasMore = false
-                return@launch
-            }
+            val results = tmdbClient.discoverPage(page)
 
             val pluginEnabled = hasAnyStreamSource()
 
@@ -287,14 +300,28 @@ internal fun MainActivity.loadMoreDiscover() {
                     }
                 }
 
-            discoverGridAdapter.append(visible)
-            discoverPage = nextPage
+            discoverGridAdapter.replaceAll(visible)
 
-            if (nextPage >= 10) {
-                discoverHasMore = false
-            }
+            discoverPage = page
+            discoverHasMore =
+                results.size >= 20 && page < 10
+
+            binding.discoverGrid.scrollToPosition(0)
+
+            setDiscoverStatus(
+                when {
+                    visible.isNotEmpty() -> null
+
+                    results.isEmpty() ->
+                        "No more titles on page $page."
+
+                    else ->
+                        "Enable a stream plugin to browse titles outside your library."
+                }
+            )
         } finally {
             discoverLoadingMore = false
+            updateDiscoverPagination()
         }
     }
 }

@@ -2,8 +2,8 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="@dimen/shelf_poster_width"
     android:layout_height="wrap_content"
+    android:background="@drawable/bg_poster_glass"
     android:layout_marginEnd="@dimen/shelf_poster_gap"
-    android:background="@drawable/bg_grid_card"
     android:clickable="true"
     android:focusable="true"
     android:orientation="vertical"
@@ -16,8 +16,8 @@
 
         <ImageView
             android:id="@+id/itemPoster"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_width="160dp"
+            android:layout_height="240dp"
             android:background="@color/surface"
             android:scaleType="centerCrop" />
 
