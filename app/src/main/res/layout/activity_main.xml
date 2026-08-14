@@ -1045,8 +1045,8 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:clipChildren="false"
-            android:clipToPadding="false"
+            android:clipChildren="true"
+            android:clipToPadding="true"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
             android:visibility="gone">
@@ -1066,6 +1066,8 @@
                 android:id="@+id/discoverPagination"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:background="@drawable/bg_app_gradient"
+                android:elevation="8dp"
                 android:gravity="center"
                 android:orientation="horizontal"
                 android:paddingTop="6dp"
@@ -1115,8 +1117,9 @@
                 android:layout_width="match_parent"
                 android:layout_height="0dp"
                 android:layout_weight="1"
-                android:clipChildren="false"
-                android:clipToPadding="false" />
+                android:paddingTop="10dp"
+                android:clipChildren="true"
+                android:clipToPadding="true" />
         </LinearLayout>
 
         <!-- Settings: content added/removed at runtime by showProviderSettings(). Lives here

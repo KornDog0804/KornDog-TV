@@ -175,6 +175,10 @@ internal fun MainActivity.setupPlayerControls() {
     if (isTv) {
         binding.btnCast.visibility = View.GONE
     } else {
+        // Phone is a Cast sender. Keep the Cast button available exactly as
+        // it was before the mobile-navigation work.
+        binding.btnCast.visibility = View.VISIBLE
+
         castManager = com.lumora.player.CastManager(this).apply {
             init()
             onCastSessionConnected = castConnected@{ _ ->
@@ -590,6 +594,13 @@ internal fun MainActivity.showPlayerFor(
     resumePromptShown = resumeFromMs != null
     progressTickCount = 0
     binding.mainContent.visibility = View.GONE
+
+    // bottomNavBar is root-level mobile chrome, so hiding mainContent alone
+    // does not cover it. Fullscreen playback owns the whole screen.
+    if (!isTv) {
+        binding.bottomNavBar.visibility = View.GONE
+    }
+
     binding.playerLayout.visibility = View.VISIBLE
     binding.playerLayout.keepScreenOn = true
     // Every new video starts unzoomed - a pinch-zoom from a previous session must not
@@ -1347,6 +1358,12 @@ internal fun MainActivity.hidePlayer() {
     isPlayerVisible = false
     nowPlayingChannel = null
     binding.playerLayout.visibility = View.GONE
+
+    // Return the persistent mobile navigation only after fullscreen playback
+    // has actually closed.
+    if (!isTv) {
+        binding.bottomNavBar.visibility = View.VISIBLE
+    }
     binding.mainContent.visibility = View.VISIBLE
     binding.playerLayout.keepScreenOn = false
     mainHandler.removeCallbacks(hideControlsRunnable)
