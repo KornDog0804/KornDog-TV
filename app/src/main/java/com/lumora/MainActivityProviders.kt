@@ -53,7 +53,10 @@ internal fun MainActivity.hasProviderEnabled(): Boolean =
  *  refresh stay visible so the user can always get back to configuring one. */
 internal fun MainActivity.updateTopChromeVisibility() {
     val enabled = hasProviderEnabled() || enabledStreamSearchPlugin() != null
-    binding.tabBar.visibility = if (enabled) View.VISIBLE else View.GONE
+    binding.tabBar.visibility =
+        if (isTv && enabled) View.VISIBLE else View.GONE
+    binding.bottomNavBar.visibility =
+        if (!isTv && enabled) View.VISIBLE else View.GONE
     binding.btnSearch.visibility = if (enabled) View.VISIBLE else View.GONE
     if (!enabled) binding.homeSearchBar.visibility = View.GONE
     applySimpleModeUi()
@@ -119,7 +122,7 @@ internal fun MainActivity.applySimpleModeUi() {
         // offers an archive. With no archive channels the bar has a single tab in it and
         // is worth no space, so it goes away exactly as it used to.
         val catchupAvailable = catchupChannels().isNotEmpty()
-        binding.tabBar.visibility = if (chromeUp && catchupAvailable) View.VISIBLE else View.GONE
+        binding.tabBar.visibility = if (isTv && chromeUp && catchupAvailable) View.VISIBLE else View.GONE
         for (tab in listOf(binding.tabHome, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabDownloads)) {
             tab.visibility = View.GONE
         }
@@ -149,7 +152,7 @@ internal fun MainActivity.applySimpleModeUi() {
         binding.tabCatchup.nextFocusLeftId = R.id.tabHome
         binding.tabCatchup.nextFocusRightId = R.id.tabDiscover
         updateCatchupTabVisibility()
-        binding.tabBar.visibility = if (chromeUp) View.VISIBLE else View.GONE
+        binding.tabBar.visibility = if (isTv && chromeUp) View.VISIBLE else View.GONE
         // Search's LEFT joins the merged chrome row at its last tab. Downloads is
         // phone-only and GONE on TV, so Discover is the row's rightmost always-visible
         // tab on both devices.
