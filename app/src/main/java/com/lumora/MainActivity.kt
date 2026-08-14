@@ -477,10 +477,9 @@ class MainActivity : AppCompatActivity() {
      *  geometrically nearest, which can be a different season entirely. */
     internal var selectedSeasonChip: View? = null
     internal var activeTab = 0
-    // Home is the landing screen on every fresh app launch. activeTab remains 0 because
-    // Home is a standalone pane rather than one of the Live / Series / Films tabs.
-    // The first catalog render routes through this flag in classifyAndShow().
-    internal var showingHome = true
+    // Mobile now launches directly into Live TV.
+    // Home remains legacy UI for the moment, but is no longer the startup destination.
+    internal var showingHome = false
     internal var homeSeeAllShelf: ContentShelf? = null
     internal var showingDownloads = false
     internal var showingDiscover = false
@@ -675,17 +674,29 @@ class MainActivity : AppCompatActivity() {
         fetchPrograms = { channelId -> resolveEpgPrograms(channelId) }
     )
     internal val seriesShelfAdapter = ShelfAdapter(
-        // onHomeItemClick, not playItem: the Continue Watching shelf row holds EPISODES,
-        // and playItem's SERIES branch would open the episode itself as a dead detail page.
-        // onHomeItemClick resolves an episode to its series (with direct-play fallback).
-        onItemClick = { item -> onHomeItemClick(item) },
+        // TMDB shelf entries are catalog metadata, not playable provider Channels.
+        // Route them through Discover's resolver. Provider-backed entries keep the
+        // existing Home/detail behavior.
+        onItemClick = { item ->
+            if (tmdbVodCatalog.any { it.id == item.id }) {
+                onDiscoverItemClick(item)
+            } else {
+                onHomeItemClick(item)
+            }
+        },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
         onPinClick = { shelf -> togglePinShelfCategory(1, shelf) },
         onHideClick = { shelf -> if (shelf.title == "Continue Watching") clearContinueWatching() else toggleHiddenShelfCategory(1, shelf) },
         onSeeAllClick = { shelf -> showSeeAll(shelf) }
     )
     internal val filmsShelfAdapter = ShelfAdapter(
-        onItemClick = { item -> playItem(item) },
+        onItemClick = { item ->
+            if (tmdbVodCatalog.any { it.id == item.id }) {
+                onDiscoverItemClick(item)
+            } else {
+                playItem(item)
+            }
+        },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
         onPinClick = { shelf -> togglePinShelfCategory(2, shelf) },
         onHideClick = { shelf -> if (shelf.title == "Continue Watching") clearContinueWatching() else toggleHiddenShelfCategory(2, shelf) },
@@ -716,10 +727,22 @@ class MainActivity : AppCompatActivity() {
     // single row.
     internal val seriesGridAdapter = com.lumora.adapter.PosterGridAdapter(
         onItemLongClick = { item -> toggleFavoriteVodItem(item) }
-    ) { item -> onHomeItemClick(item) }
+    ) { item ->
+        if (tmdbVodCatalog.any { it.id == item.id }) {
+            onDiscoverItemClick(item)
+        } else {
+            onHomeItemClick(item)
+        }
+    }
     internal val filmsGridAdapter = com.lumora.adapter.PosterGridAdapter(
         onItemLongClick = { item -> toggleFavoriteVodItem(item) }
-    ) { item -> playItem(item) }
+    ) { item ->
+        if (tmdbVodCatalog.any { it.id == item.id }) {
+            onDiscoverItemClick(item)
+        } else {
+            playItem(item)
+        }
+    }
     internal val tmdbClient = com.lumora.data.remote.tmdb.TmdbClient()
     internal var tmdbVodCatalog: List<com.lumora.model.Channel> = emptyList()
 
@@ -1065,20 +1088,10 @@ class MainActivity : AppCompatActivity() {
         else if (isPlayerVisible && isPlayerSideMenuOpen()) { closeSideMenu() }
         else if (isPlayerVisible) { hidePlayer(); restoreSearchIfPending() }
         else if (isContentDetailVisible) { hideContentDetail(); restoreSearchIfPending() }
-        // Back walks back up the way the user came in rather than dropping straight out of
-        // the app. Inside a section (Live/Series/Films/Discover/Downloads) the first press
-        // goes to the top of that section - a Films/Series category grid up to that tab's
-        // shelves, otherwise the first category with both lists scrolled back to the top -
-        // and only once already at the top does the next press go Home. Back on Home itself
-        // exits. Leaving the app was previously one press from anywhere, which on a remote
-        // is very easy to do by accident.
-        else if (showingHome && homeSeeAllShelf != null) selectHome()
-        else if (showingHome) return false
+        // Home is no longer part of normal navigation. Back first returns the current
+        // section to its top level; once already there, Back leaves the app.
         else if (!isAtSectionTop()) goToSectionTop()
-        // Simple mode has no Home level above the section - Live TV at its top IS the
-        // top, so Back leaves the app from there instead of bouncing into a hidden Home.
-        else if (isSimpleMode()) return false
-        else goHomeFromBack()
+        else return false
         return true
     }
 
