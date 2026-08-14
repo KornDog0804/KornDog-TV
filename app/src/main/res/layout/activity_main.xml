@@ -1498,6 +1498,7 @@
             android:id="@+id/bottomNavBar"
             android:layout_width="match_parent"
             android:layout_height="64dp"
+            android:layout_gravity="bottom"
             android:background="@drawable/bg_app_gradient"
             android:elevation="8dp"
             android:gravity="center_vertical"
