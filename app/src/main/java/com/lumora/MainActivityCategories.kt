@@ -1216,8 +1216,20 @@ internal fun MainActivity.applyStatus() {
 internal fun MainActivity.setupTabs() {
     binding.tabHome.setOnClickListener { selectHome() }
 
-    binding.bottomNavHome.setOnClickListener { selectHome() }
-    binding.bottomNavLive.setOnClickListener { showingHome = false; selectTab(0) }
+    binding.bottomNavLive.setOnClickListener {
+        showingHome = false
+        selectTab(0)
+    }
+
+    binding.bottomNavMovies.setOnClickListener {
+        showingHome = false
+        selectTab(2)
+    }
+
+    binding.bottomNavSeries.setOnClickListener {
+        showingHome = false
+        selectTab(1)
+    }
     binding.bottomNavDiscover.setOnClickListener { showingHome = false; selectDiscover() }
     binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
