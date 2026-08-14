@@ -288,4 +288,10 @@
 
     <!-- activity_main.xml / dialog_discover_search.xml - Discover (TMDB) search -->
     <string name="discover_search_hint">Search movies &amp; series…</string>
+
+    <string name="home">Home</string>
+    <string name="live_tv">Live TV</string>
+    <string name="discover">Discover</string>
+    <string name="concert_corner">Concert Corner</string>
+    <string name="more">More</string>
 </resources>

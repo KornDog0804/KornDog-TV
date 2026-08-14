@@ -15,12 +15,12 @@ val keystoreProperties = Properties().apply {
 
 android {
     namespace = "com.lumora"
-    compileSdk = 36
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "com.korndog.tv"
         minSdk = 25
-        targetSdk = 36
+        targetSdk = 34
         val ciBuildNumber =
             System.getenv("GITHUB_RUN_NUMBER")
                 ?.toIntOrNull()

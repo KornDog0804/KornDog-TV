@@ -1488,6 +1488,138 @@
         </LinearLayout>
     </LinearLayout>
 
+        <!-- ============================================================
+             BOTTOM NAVIGATION (mobile). Last child of mainContent, so it
+             sits below the tab/content area but is still fully covered by
+             contentDetailLayout and playerLayout (later siblings of
+             mainContent, drawn on top). Buttons call the exact same
+             functions the top tabs already use - see setupBottomNav(). -->
+        <LinearLayout
+            android:id="@+id/bottomNavBar"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:background="@drawable/bg_app_gradient"
+            android:elevation="8dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/bottomNavHome"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_home"
+                    android:tint="@color/text_primary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/home"
+                    android:textColor="@color/text_primary"
+                    android:textSize="@dimen/text_tiny" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/bottomNavLive"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_live_tv"
+                    android:tint="@color/text_secondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/live_tv"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_tiny" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/bottomNavDiscover"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_discover"
+                    android:tint="@color/text_secondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/discover"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_tiny" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/bottomNavConcerts"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_series"
+                    android:tint="@color/text_secondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/concert_corner"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_tiny" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/bottomNavMore"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center"
+                android:orientation="vertical">
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_settings"
+                    android:tint="@color/text_secondary" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="@string/more"
+                    android:textColor="@color/text_secondary"
+                    android:textSize="@dimen/text_tiny" />
+            </LinearLayout>
+
+        </LinearLayout>
+
     <!-- ============================================================
          CONTENT DETAIL (fullscreen "you're now on this film's page",
          not a popup - opened from Series/Films/Home)
