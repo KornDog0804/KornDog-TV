@@ -6,7 +6,7 @@ import com.google.android.gms.cast.framework.CastOptions
 import com.google.android.gms.cast.framework.SessionProvider
 import com.google.android.gms.cast.framework.media.CastMediaOptions
 import com.google.android.gms.cast.framework.media.NotificationOptions
-import com.google.android.gms.cast.MediaIntentReceiver
+import com.google.android.gms.cast.framework.media.MediaIntentReceiver
 
 /**
  * Cast options provider required by the Google Cast framework.
