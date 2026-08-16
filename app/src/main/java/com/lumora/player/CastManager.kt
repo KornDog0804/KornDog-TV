@@ -319,6 +319,8 @@ class CastManager(private val context: Context) {
 
             lateinit var callback: RemoteMediaClient.Callback
 
+            lateinit var thisCastCancel: () -> Unit
+
             fun finish(success: Boolean, message: String?) {
                 if (finished) return
                 finished = true
@@ -327,8 +329,6 @@ class CastManager(private val context: Context) {
                 if (activeCastCancel === thisCastCancel) activeCastCancel = null
                 onResult(success, message)
             }
-
-            lateinit var thisCastCancel: () -> Unit
 
             callback = object : RemoteMediaClient.Callback() {
                 override fun onStatusUpdated() {
