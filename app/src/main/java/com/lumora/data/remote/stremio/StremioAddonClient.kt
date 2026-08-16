@@ -102,7 +102,12 @@ class StremioAddonClient {
                 return@runCatching emptyList()
             }
 
-            if (type !in manifest.types) {
+            // Some addons (AIOStreams among them) omit the manifest-level "types" array
+            // and declare supported types per-resource instead - both are valid per the
+            // Stremio addon spec. Treating an empty/missing top-level list as "supports
+            // nothing" silently dropped every query to those addons. Only reject when the
+            // manifest actually declared a type list and this type isn't in it.
+            if (manifest.types.isNotEmpty() && type !in manifest.types) {
                 return@runCatching emptyList()
             }
 
