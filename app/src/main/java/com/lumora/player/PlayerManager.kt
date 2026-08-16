@@ -525,4 +525,14 @@ class PlayerManager(
             ?.uri
             ?.toString()
             ?.takeIf { it.isNotBlank() }
+
+    /**
+     * Headers/UA actually used for the last playUrl() request (post plugin-resolution).
+     * Cast must relay with these, not a channel's stale pre-resolution values, or the
+     * upstream CDN rejects the relay's fetch the same way it would reject a replayed
+     * expired signed URL.
+     */
+    fun currentStreamHeaders(): Map<String, String>? = lastPlayRequest?.headers
+
+    fun currentStreamUserAgent(): String? = lastPlayRequest?.userAgent
 }

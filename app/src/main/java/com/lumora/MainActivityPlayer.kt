@@ -211,8 +211,11 @@ internal fun MainActivity.setupPlayerControls() {
                     channel,
                     channel.name,
                     playbackUrl = castUrl,
-                    requestHeaders = channel.streamHeaders,
-                    userAgent = channel.streamUserAgent,
+                    // Cast must relay with the headers/UA actually used for this playback
+                    // session, not the channel's stale pre-resolution values - a plugin's
+                    // signed CDN URL is worthless without the headers issued alongside it.
+                    requestHeaders = playerManager.currentStreamHeaders() ?: channel.streamHeaders,
+                    userAgent = playerManager.currentStreamUserAgent() ?: channel.streamUserAgent,
                     localFile = castTranscodeFile,
                 ) { success, message ->
                     runOnUiThread {
