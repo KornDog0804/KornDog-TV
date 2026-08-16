@@ -28,6 +28,22 @@ class BaseApplication : Application() {
         // measured from here, so the number matches what someone counting out loud sees.
         processStartedAt = System.currentTimeMillis()
 
+        // Catch anything that would otherwise silently kill the process (a "the app just
+        // refreshed" report with no on-screen error). This can't catch a hard OOM kill from
+        // the system itself - those bypass Java entirely - but it catches genuine crashes,
+        // which is the more common cause and the one we can actually fix.
+        val previousHandler = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            runCatching {
+                java.io.File(getExternalFilesDir(null), "crash.log").appendText(
+                    java.util.Date().toString() + " FATAL on " + thread.name + ": " +
+                        throwable.javaClass.simpleName + ": " + throwable.message + "\n" +
+                        android.util.Log.getStackTraceString(throwable) + "\n\n"
+                )
+            }
+            previousHandler?.uncaughtException(thread, throwable)
+        }
+
         // Initialize Google Cast framework (required before any Cast calls)
         try {
             com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
