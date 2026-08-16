@@ -505,7 +505,7 @@ internal fun MainActivity.showStreamSearchDialog(
             child.visibility = if (currentQualityFilter == "All" || currentQualityFilter == tier) android.view.View.VISIBLE else android.view.View.GONE
         }
     }
-    listOf("All", "4K", "1080p", "720p").forEach { label ->
+    listOf("All", "1080p", "720p").forEach { label ->
         val btn = TextView(this@showStreamSearchDialog).apply {
             text = label
             textSize = 13f
@@ -896,10 +896,12 @@ internal fun MainActivity.showStreamSearchDialog(
                     .awaitAll()
                     .flatten()
                     .distinctBy { it.url ?: it.magnet ?: it.title }
+                    .filterNot { stream ->
+                        stream.title.contains("2160p", true) ||
+                            stream.title.contains("4k", true)
+                    }
                     .groupBy { stream ->
                         when {
-                            stream.title.contains("2160p", true) ||
-                                stream.title.contains("4k", true) -> "4K"
                             stream.title.contains("1080p", true) -> "1080p"
                             stream.title.contains("720p", true) -> "720p"
                             else -> "Other"
