@@ -31,8 +31,10 @@ class BaseApplication : Application() {
         // Initialize Google Cast framework (required before any Cast calls)
         try {
             com.google.android.gms.cast.framework.CastContext.getSharedInstance(this)
-        } catch (_: Exception) {
-            // Google Play Services not available on this device
+        } catch (e: Exception) {
+            try {
+                java.io.File(getExternalFilesDir(null), "cast_init.log").appendText("CastContext init failed: " + e.javaClass.simpleName + ": " + e.message + "\n" + android.util.Log.getStackTraceString(e) + "\n\n")
+            } catch (ignored: Exception) {}
         }
 
         // Loads the native QuickJS .so; every QuickJSContext.create() call throws until this

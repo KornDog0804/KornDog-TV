@@ -255,7 +255,10 @@ internal fun MainActivity.setupPlayerControls() {
             com.google.android.gms.cast.framework.CastButtonFactory.setUpMediaRouteButton(
                 this, binding.btnCast
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            try {
+                java.io.File(getExternalFilesDir(null), "cast_init.log").appendText("setUpMediaRouteButton failed: " + e.javaClass.simpleName + ": " + e.message + "\n" + android.util.Log.getStackTraceString(e) + "\n\n")
+            } catch (ignored: Exception) {}
             binding.btnCast.visibility = View.GONE
         }
     }
