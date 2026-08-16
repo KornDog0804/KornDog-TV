@@ -1,6 +1,5 @@
 package com.lumora.adapter
 
-import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.view.Gravity
 import android.view.LayoutInflater
@@ -10,7 +9,6 @@ import android.widget.HorizontalScrollView
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -62,10 +60,6 @@ class LiveGuideAdapter(
     }
 
     private val scope = CoroutineScope(Dispatchers.Main)
-    private val avatarColors = intArrayOf(
-        R.color.channel_1, R.color.channel_2, R.color.channel_3,
-        R.color.channel_4, R.color.channel_5, R.color.channel_6
-    )
 
     // Shared horizontal scroll offset across every bound row + the time header, so
     // scrolling one (by D-pad focus or drag) keeps every other row in sync.
@@ -240,11 +234,10 @@ class LiveGuideAdapter(
 
             val initial = channel.name.firstOrNull()?.uppercase() ?: "?"
             initialText.text = initial
-            // Keyed on the name, not the adapter position: position-keyed colors made the
-            // same channel's avatar change color every time a filter shifted the list.
-            val colorIndex = (channel.name.hashCode() and 0x7fffffff) % avatarColors.size
-            val color = ContextCompat.getColor(itemView.context, avatarColors[colorIndex])
-            initialText.background = GradientDrawable().apply { shape = GradientDrawable.OVAL; setColor(color) }
+            // Missing-logo fallback deliberately stays brand-neutral now.
+            // The parent logo tile supplies the dark/electric-blue treatment, so
+            // the initial reads like part of the guide instead of a random Material badge.
+            initialText.background = null
 
             logoImage.setImageDrawable(null)
             val logoUrl = channel.logoUrl
@@ -430,6 +423,7 @@ class LiveGuideAdapter(
             return TextView(context).apply {
                 maxLines = 1
                 ellipsize = TextUtils.TruncateAt.END
+                includeFontPadding = false
                 setTextColor(ContextCompat.getColor(context, R.color.text_primary))
                 // From resources rather than a literal so the TV override in
                 // values-television/dimens.xml applies here too - these blocks are built in
@@ -440,11 +434,16 @@ class LiveGuideAdapter(
                     context.resources.getDimension(R.dimen.guide_program_text)
                 )
                 gravity = Gravity.CENTER_VERTICAL
-                setPadding((8 * density).toInt(), 0, (8 * density).toInt(), 0)
+                setPadding(
+                    (10 * density).toInt(),
+                    0,
+                    (10 * density).toInt(),
+                    0
+                )
                 isFocusable = true
                 isClickable = true
                 layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT).apply {
-                    marginEnd = (2 * density).toInt()
+                    marginEnd = (3 * density).toInt()
                 }
             }
         }
