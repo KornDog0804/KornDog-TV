@@ -58,6 +58,12 @@ class CastManager(private val context: Context) {
     var onCastSessionConnected: ((CastSession) -> Unit)? = null
     var onCastSessionDisconnected: (() -> Unit)? = null
 
+    // The one in-flight castChannel() call's own finish(), if any. stopCasting()
+    // must invoke this so that call's callback gets unregistered and its 45s
+    // watchdog cancelled - otherwise disconnecting mid-load leaks a live
+    // RemoteMediaClient.Callback that the next cast attempt stacks on top of.
+    private var activeCastCancel: (() -> Unit)? = null
+
     /**
      * Initialize the Cast framework.
      */
@@ -318,8 +324,11 @@ class CastManager(private val context: Context) {
                 finished = true
                 handler.removeCallbacksAndMessages(null)
                 remoteMediaClient.unregisterCallback(callback)
+                if (activeCastCancel === thisCastCancel) activeCastCancel = null
                 onResult(success, message)
             }
+
+            lateinit var thisCastCancel: () -> Unit
 
             callback = object : RemoteMediaClient.Callback() {
                 override fun onStatusUpdated() {
@@ -393,6 +402,9 @@ class CastManager(private val context: Context) {
                 }
             }
 
+            thisCastCancel = { finish(false, "Cast stopped") }
+            activeCastCancel = thisCastCancel
+
             remoteMediaClient.registerCallback(callback)
 
             handler.postDelayed({
@@ -454,8 +466,26 @@ class CastManager(private val context: Context) {
     }
 
     fun stopCasting() {
-        val session = castSession ?: return
-        session.remoteMediaClient?.stop()
+        // Cancel any in-flight castChannel() load first so its callback and
+        // watchdog don't leak past this disconnect.
+        activeCastCancel?.invoke()
+        activeCastCancel = null
+
+        try {
+            castSession?.remoteMediaClient?.stop()
+        } catch (_: Exception) {}
+
+        // A stopped media session is not the same as an ended Cast session -
+        // without this, castSession stays non-null and the app believes it's
+        // still connected, so the next cast attempt reuses stale session state.
+        try {
+            castContext?.sessionManager?.endCurrentSession(true)
+        } catch (_: Exception) {}
+        castSession = null
+
+        if (vodRelay.isAlive) {
+            vodRelay.stop()
+        }
     }
 
     // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
