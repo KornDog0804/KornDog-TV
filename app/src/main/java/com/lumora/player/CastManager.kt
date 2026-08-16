@@ -48,7 +48,7 @@ class CastManager(private val context: Context) {
         .build()
 
     private val vodRelay by lazy {
-        CastRelayServer(relayClient)
+        CastRelayServer(relayClient, context.cacheDir)
     }
 
     private var castContext: CastContext? = null

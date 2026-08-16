@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap
  */
 internal class CastRelayServer(
     private val client: OkHttpClient,
+    private val cacheDir: File,
     port: Int = DEFAULT_PORT
 ) : NanoHTTPD(port) {
 
@@ -163,6 +164,11 @@ internal class CastRelayServer(
             "video/mp4"
         }
 
+        if (contentType == "video/x-matroska") {
+            d("register() routing MKV through remux path")
+            return registerRemuxedMkv(upstreamUrl, relayHeaders, userAgent)
+        }
+
         val token = UUID.randomUUID().toString()
         contexts[token] = RelayContext(
             headers = relayHeaders,
@@ -180,6 +186,81 @@ internal class CastRelayServer(
             contentType = contentType
         )
     }
+
+    // MKV (and similar Cast-incompatible containers) get remuxed on the fly:
+    // elementary streams are copied straight through into a fresh MP4
+    // container, no re-encode. Written into a GrowingLocalFile so Cast reads
+    // it progressively instead of waiting for the whole remux to finish.
+    private fun registerRemuxedMkv(
+        upstreamUrl: String,
+        headers: Map<String, String>,
+        userAgent: String?
+    ): RelayMedia {
+        val outputFile = File(remuxDir(), UUID.randomUUID().toString() + ".mp4")
+        val growing = registerGrowingLocalFile(outputFile)
+
+        Thread({
+            var extractor: android.media.MediaExtractor? = null
+            var muxer: android.media.MediaMuxer? = null
+            try {
+                extractor = android.media.MediaExtractor().apply {
+                    val requestHeaders = headers.toMutableMap()
+                    if (!userAgent.isNullOrBlank()) requestHeaders["User-Agent"] = userAgent
+                    setDataSource(upstreamUrl, requestHeaders)
+                }
+
+                muxer = android.media.MediaMuxer(
+                    outputFile.absolutePath,
+                    android.media.MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4
+                )
+
+                val indexMap = HashMap<Int, Int>()
+                for (i in 0 until extractor.trackCount) {
+                    val format = extractor.getTrackFormat(i)
+                    val mime = format.getString(android.media.MediaFormat.KEY_MIME) ?: ""
+                    if (mime.startsWith("video/") || mime.startsWith("audio/")) {
+                        indexMap[i] = muxer.addTrack(format)
+                        extractor.selectTrack(i)
+                    }
+                }
+
+                muxer.start()
+
+                val buffer = java.nio.ByteBuffer.allocate(1 shl 20)
+                val bufferInfo = android.media.MediaCodec.BufferInfo()
+
+                while (true) {
+                    buffer.clear()
+                    val size = extractor.readSampleData(buffer, 0)
+                    if (size < 0) break
+
+                    val muxerTrack = indexMap[extractor.sampleTrackIndex]
+                    if (muxerTrack == null) {
+                        extractor.advance()
+                        continue
+                    }
+
+                    bufferInfo.set(0, size, extractor.sampleTime, extractor.sampleFlags)
+                    muxer.writeSampleData(muxerTrack, buffer, bufferInfo)
+                    extractor.advance()
+                }
+
+                d("registerRemuxedMkv() complete path=" + outputFile.name + " bytes=" + outputFile.length())
+            } catch (e: Exception) {
+                Log.e("CastRelayServer", "registerRemuxedMkv() failed for " + upstreamUrl, e)
+            } finally {
+                runCatching { muxer?.stop() }
+                runCatching { muxer?.release() }
+                runCatching { extractor?.release() }
+                growing.complete()
+            }
+        }, "CastRemux").start()
+
+        return growing.media
+    }
+
+    private fun remuxDir(): File =
+        File(cacheDir, "cast_remux").apply { mkdirs() }
 
     data class GrowingLocalFile(
         val media: RelayMedia,
