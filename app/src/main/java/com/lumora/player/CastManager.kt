@@ -175,14 +175,13 @@ class CastManager(private val context: Context) {
         }
 
         // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
-        // decode support. Raw-relaying an unsupported codec plays audio with no video,
-        // silently. Rather than let that happen, wait for the background transcode
-        // (castTranscodeFile/localFile) to be ready before casting to these devices.
-        // Chromecast/Android TV/Google TV receivers are not matched here and keep the
-        // existing fast raw-relay path with no wait.
+        // decode support, and raw-relaying an unsupported audio track (e.g. EAC3/AC3) is
+        // silently accepted by standard Chromecast/Google TV receivers too - video plays,
+        // audio does not. The background transcode (castTranscodeFile) already re-encodes
+        // to Cast-safe AAC/H264 for every VOD title, so ALL non-live Cast attempts wait for
+        // it rather than falling through to the raw relay's original audio track.
         if (
             channel.mediaType != MediaType.LIVE &&
-            isLimitedCapabilityReceiver(session) &&
             (localFile == null || !localFile.isFile || localFile.length() <= 0L)
         ) {
             onResult(false, "Preparing video for this device — try again in a moment")
