@@ -8,6 +8,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
+import android.util.Log
 
 data class StremioAddonManifest(
     val id: String,
@@ -260,12 +261,38 @@ class StremioAddonClient {
             .header("User-Agent", "KornDog-TV/1.0")
             .build()
 
+        Log.d("StremioDebug", "GET $url")
+
         return try {
             http.newCall(request).execute().use { response ->
-                if (!response.isSuccessful) null
-                else response.body?.string()
+                Log.d(
+                    "StremioDebug",
+                    "HTTP ${response.code} host=${response.request.url.host} url=${response.request.url}"
+                )
+
+                if (!response.isSuccessful) {
+                    Log.e(
+                        "StremioDebug",
+                        "FAILED HTTP ${response.code} ${response.message} url=${response.request.url}"
+                    )
+                    null
+                } else {
+                    val body = response.body?.string()
+
+                    Log.d(
+                        "StremioDebug",
+                        "SUCCESS bytes=${body?.length ?: 0} url=${response.request.url}"
+                    )
+
+                    body
+                }
             }
-        } catch (_: Exception) {
+        } catch (error: Exception) {
+            Log.e(
+                "StremioDebug",
+                "EXCEPTION ${error.javaClass.simpleName}: ${error.message} url=$url",
+                error
+            )
             null
         }
     }
