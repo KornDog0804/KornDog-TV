@@ -10,6 +10,9 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -74,3 +77,18 @@ jobs:
           name: KornDog-TV-v3.2.${{ github.run_number }}
           path: ${{ env.OUTPUT_APK }}
           if-no-files-found: error
+
+      - name: Copy to stable filename for release
+        run: cp "${{ env.OUTPUT_APK }}" KornDog-TV-latest.apk
+
+      - name: Publish/refresh "latest" release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: latest-korndog-tv
+          name: KornDog TV (latest, run ${{ github.run_number }})
+          body: |
+            Automatically rebuilt from the latest push to korndog-tv (commit ${{ github.sha }}).
+            This release is overwritten on every push - use the stable download link below on
+            the TV via Downloader, no GitHub login needed.
+          prerelease: true
+          files: KornDog-TV-latest.apk
