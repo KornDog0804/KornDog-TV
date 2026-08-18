@@ -667,6 +667,15 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                 if (plugin != null) {
                     showStreamSearchDialog(plugin, item, season = null, episode = chosen.episodeNum)
                 }
+            } else if (chosen.url.isBlank()) {
+                // TMDB-sourced Series/Movie episodes carry no direct url - resolve
+                // through Find Stream (Stremio addons) same as anime, but with season known.
+                val seasonPair = detailSeasons.firstOrNull { (_, eps) -> eps.any { it.id == chosen.id } }
+                val seasonNum = seasonPair?.first?.let { Regex("""\d+""").find(it)?.value }?.toIntOrNull()
+                val plugin = enabledStreamSearchPlugin(item)
+                if (plugin != null) {
+                    showStreamSearchDialog(plugin, item, season = seasonNum, episode = chosen.episodeNum)
+                }
             } else {
                 currentIndex = if (isSeries) -1 else filmList.indexOf(item)
                 val queue = if (isSeries) itemAdapter.currentList else emptyList()
