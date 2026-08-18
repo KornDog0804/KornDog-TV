@@ -407,9 +407,37 @@ internal suspend fun MainActivity.loadSeriesContent(
             }
         }
         else -> {
-            val client = XtreamClient(BaseApplication.instance.okHttpClient)
-            val info = withContext(Dispatchers.IO) { client.getSeriesFull(xtreamProviderFor(item) ?: provider, item.id) }
-            info.details to info.seasons
+            // Series/Movies resolve through TMDB for metadata (Xtream is Live TV only now) -
+            // same title/year match already proven reliable by the Find Stream plugin dialog.
+            val tmdb = tmdbClient.resolveId(item.name, item.year, true)
+            if (tmdb == null) {
+                itemDetails to emptyList()
+            } else {
+                val (_, tmdbId) = tmdb
+                val seasons = tmdbClient.tvSeasons(tmdbId)
+                itemDetails to seasons.map { season ->
+                    val episodes = runCatching {
+                        tmdbClient.tvEpisodes(tmdbId, season.number)
+                    }.getOrDefault(emptyList())
+                    season.name to episodes.map { ep ->
+                        Channel(
+                            id = "${item.id}:s${season.number}:e${ep.number}",
+                            name = ep.name?.let { "S${season.number}E${ep.number} · $it" }
+                                ?: "S${season.number}E${ep.number}",
+                            url = "",
+                            posterUrl = item.posterUrl,
+                            backdropUrl = item.backdropUrl,
+                            mediaType = MediaType.SERIES,
+                            episodeNum = ep.number,
+                            categoryName = item.categoryName,
+                            group = item.group,
+                            description = ep.overview,
+                            streamSearchItemId = item.id,
+                            streamSearchSeason = season.number
+                        )
+                    }
+                }
+            }
         }
     }
 }
@@ -777,6 +805,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
                     showStreamSearchDialog(plugin, item, season = null, episode = target.episodeNum)
+                }
+            } else if (target.url.isBlank()) {
+                // TMDB-sourced Series/Movie episodes carry no direct url - resolve
+                // through Find Stream (Stremio addons) same as anime, but with season known.
+                val plugin = enabledStreamSearchPlugin(item)
+                if (plugin != null) {
+                    showStreamSearchDialog(plugin, item, season = seasonNum?.toIntOrNull(), episode = target.episodeNum)
                 }
             } else {
                 currentIndex = -1
