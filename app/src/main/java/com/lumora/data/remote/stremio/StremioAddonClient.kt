@@ -140,7 +140,8 @@ class StremioAddonClient {
             val array = json.optJSONArray("streams")
                 ?: return@runCatching emptyList()
 
-            buildList {
+            var skippedNoUrl = 0
+            val result = buildList {
                 for (i in 0 until array.length()) {
                     val item = array.optJSONObject(i) ?: continue
 
@@ -178,7 +179,7 @@ class StremioAddonClient {
                         else -> null
                     }
 
-                    if (directUrl == null && magnet == null) continue
+                    if (directUrl == null && magnet == null) { skippedNoUrl++; continue }
 
                     val hints = mutableMapOf<String, String>()
                     val requestHeaders = mutableMapOf<String, String>()
@@ -227,6 +228,8 @@ class StremioAddonClient {
                     )
                 }
             }
+            stremioLog("PARSE ${manifest.name}: total=${array.length()} kept=${result.size} skippedNoUrl=$skippedNoUrl")
+            result
         }
     }
 
