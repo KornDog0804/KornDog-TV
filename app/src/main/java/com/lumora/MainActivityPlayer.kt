@@ -817,6 +817,13 @@ internal fun MainActivity.showPlayerFor(
             }
         }
         else -> {
+            runCatching {
+                java.io.File("/sdcard/Download/playerstart.log")
+                    .appendText(
+                        "${System.currentTimeMillis()}: ENTER else branch url=${startVersion.url.take(120)} " +
+                        "headers=${startVersion.streamHeaders} ua=${startVersion.streamUserAgent}\n"
+                    )
+            }
             var thisTranscodeGrowingFile:
                 com.lumora.player.CastRelayServer.GrowingLocalFile? = null
 
