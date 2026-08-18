@@ -30,6 +30,17 @@ data class StremioStream(
 
 class StremioAddonClient {
 
+    private fun stremioLog(message: String) {
+        runCatching {
+            java.io.File("/sdcard/Download/stremio.log")
+                .appendText(
+                    "${System.currentTimeMillis()}: $message\n"
+                )
+        }
+
+        Log.d("StremioDebug", message)
+    }
+
     private val http = OkHttpClient.Builder()
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
@@ -261,26 +272,23 @@ class StremioAddonClient {
             .header("User-Agent", "KornDog-TV/1.0")
             .build()
 
-        Log.d("StremioDebug", "GET $url")
+        stremioLog("GET $url")
 
         return try {
             http.newCall(request).execute().use { response ->
-                Log.d(
-                    "StremioDebug",
+                stremioLog(
                     "HTTP ${response.code} host=${response.request.url.host} url=${response.request.url}"
                 )
 
                 if (!response.isSuccessful) {
-                    Log.e(
-                        "StremioDebug",
+                    stremioLog(
                         "FAILED HTTP ${response.code} ${response.message} url=${response.request.url}"
                     )
                     null
                 } else {
                     val body = response.body?.string()
 
-                    Log.d(
-                        "StremioDebug",
+                    stremioLog(
                         "SUCCESS bytes=${body?.length ?: 0} url=${response.request.url}"
                     )
 
@@ -288,11 +296,10 @@ class StremioAddonClient {
                 }
             }
         } catch (error: Exception) {
-            Log.e(
-                "StremioDebug",
-                "EXCEPTION ${error.javaClass.simpleName}: ${error.message} url=$url",
-                error
+            stremioLog(
+                "EXCEPTION ${error.javaClass.simpleName}: ${error.message} url=$url"
             )
+            Log.e("StremioDebug", "Request exception", error)
             null
         }
     }
