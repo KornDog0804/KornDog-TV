@@ -32,8 +32,8 @@
             android:orientation="horizontal"
             android:paddingStart="@dimen/toolbar_padding_horizontal"
             android:paddingEnd="@dimen/toolbar_padding_horizontal"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp">
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp">
 
             <!-- Left group: brand + tab scroller. weight=1 absorbs the free middle of the
                  row, so the button cluster stays pinned right even when the scroller is
@@ -97,7 +97,7 @@
                     android:layout_weight="1"
                     android:clipChildren="true"
                     android:clipToPadding="false"
-                    android:paddingVertical="4dp"
+                    android:paddingVertical="2dp"
                     android:fillViewport="true"
                     android:scrollbars="none">
 
@@ -110,15 +110,15 @@
             android:clipToPadding="false"
             android:gravity="start"
             android:orientation="horizontal"
-            android:paddingHorizontal="10dp"
-            android:paddingBottom="6dp">
+            android:paddingHorizontal="6dp"
+            android:paddingBottom="2dp">
 
             <LinearLayout
                 android:id="@+id/tabLive"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="@dimen/tab_live_start_gap"
-                android:layout_marginEnd="3dp"
+                android:layout_marginEnd="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -143,13 +143,14 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_live_tv"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabLiveLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:ellipsize="end"
                         android:fontFamily="@font/inter_medium"
                         android:maxLines="1"
@@ -160,9 +161,9 @@
 
                 <View
                     android:id="@+id/tabLiveIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -171,7 +172,7 @@
                 android:id="@+id/tabSeries"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -196,13 +197,14 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_series"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabSeriesLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:ellipsize="end"
                         android:fontFamily="@font/inter_medium"
                         android:maxLines="1"
@@ -213,9 +215,9 @@
 
                 <View
                     android:id="@+id/tabSeriesIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -224,7 +226,7 @@
                 android:id="@+id/tabFilms"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -249,13 +251,14 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_films"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabFilmsLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:ellipsize="end"
                         android:fontFamily="@font/inter_medium"
                         android:maxLines="1"
@@ -266,9 +269,9 @@
 
                 <View
                     android:id="@+id/tabFilmsIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -277,7 +280,7 @@
                 android:id="@+id/tabHome"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -302,13 +305,14 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_home"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabHomeLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:ellipsize="end"
                         android:fontFamily="@font/inter_medium"
                         android:maxLines="1"
@@ -319,9 +323,9 @@
 
                 <View
                     android:id="@+id/tabHomeIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -334,7 +338,7 @@
                 android:id="@+id/tabCatchup"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -360,13 +364,14 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_catchup"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabCatchupLabel"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:ellipsize="end"
                         android:fontFamily="@font/inter_medium"
                         android:maxLines="1"
@@ -377,9 +382,9 @@
 
                 <View
                     android:id="@+id/tabCatchupIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -388,7 +393,7 @@
                 android:id="@+id/tabDiscover"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -413,7 +418,8 @@
                         android:layout_width="20dp"
                         android:layout_height="20dp"
                         android:src="@drawable/ic_discover"
-                        android:tint="@color/text_secondary" />
+                        android:tint="@color/text_secondary"
+                        android:visibility="gone" />
 
                     <TextView
                         android:id="@+id/tabDiscoverLabel"
@@ -430,9 +436,9 @@
 
                 <View
                     android:id="@+id/tabDiscoverIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -448,7 +454,7 @@
                 android:id="@+id/tabConcerts"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -489,9 +495,9 @@
 
                 <View
                     android:id="@+id/tabConcertsIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -501,7 +507,7 @@
                 android:id="@+id/btnSearch"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginHorizontal="3dp"
+                android:layout_marginHorizontal="1dp"
                 android:background="@drawable/bg_tab_item"
                 android:clickable="true"
                 android:focusable="true"
@@ -540,9 +546,9 @@
                 </LinearLayout>
 
                 <View
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -594,9 +600,9 @@
 
                 <View
                     android:id="@+id/tabDownloadsIndicator"
-                    android:layout_width="24dp"
-                    android:layout_height="4dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_width="18dp"
+                    android:layout_height="2dp"
+                    android:layout_marginTop="3dp"
                     android:background="@drawable/tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
@@ -815,11 +821,8 @@
         <LinearLayout
             android:id="@+id/homeDashboard"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
+            android:layout_height="0dp"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
-            android:paddingTop="6dp"
-            android:paddingBottom="12dp"
             android:visibility="gone">
 
             <TextView
@@ -1035,7 +1038,10 @@
             android:layout_weight="1"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:paddingHorizontal="16dp"
+            android:paddingStart="20dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="20dp"
             android:visibility="gone" />
 
         <!-- Discover: TMDB browse/search for titles outside the provider catalog, played via a
