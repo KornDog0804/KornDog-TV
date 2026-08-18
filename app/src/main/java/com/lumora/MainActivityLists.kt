@@ -819,6 +819,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                 // TMDB-sourced Series/Movie episodes carry no direct url - resolve
                 // through Find Stream (Stremio addons) same as anime, but with season known.
                 val plugin = enabledStreamSearchPlugin(item)
+                runCatching {
+                    java.io.File("/sdcard/Download/playbutton.log")
+                        .appendText(
+                            "${System.currentTimeMillis()}: PLAY-BUTTON blank-url branch. " +
+                            "plugin=${plugin?.id} seasonNum=$seasonNum episode=${target.episodeNum} itemId=${item.id}\n"
+                        )
+                }
                 if (plugin != null) {
                     showStreamSearchDialog(plugin, item, season = seasonNum?.toIntOrNull(), episode = target.episodeNum)
                 }
