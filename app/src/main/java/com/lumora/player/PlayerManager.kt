@@ -12,6 +12,9 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.AudioSink
+import androidx.media3.exoplayer.audio.DefaultAudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultDataSource
@@ -25,7 +28,24 @@ import java.util.concurrent.CopyOnWriteArrayList
 class PlayerManager(
     private val context: Context
 ) {
-    private val player: ExoPlayer = ExoPlayer.Builder(context)
+    private val volumeAmplifier = VolumeAmplifierAudioProcessor()
+
+    private val renderersFactory =
+        object : DefaultRenderersFactory(context) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink {
+                return DefaultAudioSink.Builder(context)
+                    .setEnableFloatOutput(false)
+                    .setEnableAudioTrackPlaybackParams(enableAudioTrackPlaybackParams)
+                    .setAudioProcessors(arrayOf(volumeAmplifier))
+                    .build()
+            }
+        }
+
+    private val player: ExoPlayer = ExoPlayer.Builder(context, renderersFactory)
         .setAudioAttributes(
             AudioAttributes.Builder()
                 .setUsage(C.USAGE_MEDIA)
@@ -488,6 +508,25 @@ class PlayerManager(
     }
 
     fun setVolume(volume: Float) = player.setVolume(volume)
+
+    fun setVolumeAmplificationDb(db: Float) {
+        val safeDb = db.coerceIn(0f, 30f)
+
+        volumeAmplifier.setAmplificationDb(safeDb)
+
+        context.getSharedPreferences("iptv_prefs", Context.MODE_PRIVATE)
+            .edit()
+            .putFloat("volume_amplification_db", safeDb)
+            .apply()
+    }
+
+    fun getVolumeAmplificationDb(): Float =
+        context.getSharedPreferences("iptv_prefs", Context.MODE_PRIVATE)
+            .getFloat("volume_amplification_db", 0f)
+
+    fun applySavedVolumeAmplification() {
+        volumeAmplifier.setAmplificationDb(getVolumeAmplificationDb())
+    }
 
     /** Get the underlying ExoPlayer instance for advanced use. */
     fun getExoPlayer(): ExoPlayer = player

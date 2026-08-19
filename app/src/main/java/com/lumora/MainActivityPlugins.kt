@@ -825,18 +825,59 @@ internal fun MainActivity.showStreamSearchDialog(
                     return@launch
                 }
 
-                val tmdb = tmdbTypeAndId(item.id)
-                    ?: tmdbClient.resolveId(
-                        item.name,
-                        item.year,
-                        item.mediaType == MediaType.SERIES
-                    )
-                    ?: return@launch
+                runCatching {
+                    java.io.File("/sdcard/Download/streamidentity.log")
+                        .appendText(
+                            "${System.currentTimeMillis()}: START " +
+                                "name=${item.name} id=${item.id} year=${item.year} " +
+                                "type=${item.mediaType} season=$effectiveSeason " +
+                                "episode=$effectiveEpisode addons=${addons.size}\n"
+                        )
+                }
+
+                val directTmdb = tmdbTypeAndId(item.id)
+                val resolvedTmdb = directTmdb ?: tmdbClient.resolveId(
+                    item.name,
+                    item.year,
+                    item.mediaType == MediaType.SERIES
+                )
+
+                runCatching {
+                    java.io.File("/sdcard/Download/streamidentity.log")
+                        .appendText(
+                            "${System.currentTimeMillis()}: TMDB " +
+                                "direct=$directTmdb resolved=$resolvedTmdb\n"
+                        )
+                }
+
+                val tmdb = resolvedTmdb ?: run {
+                    runCatching {
+                        java.io.File("/sdcard/Download/streamidentity.log")
+                            .appendText("${System.currentTimeMillis()}: ABORT no TMDB match\n")
+                    }
+                    return@launch
+                }
 
                 val imdbId = tmdbClient.imdbId(
                     tmdb.first,
                     tmdb.second
-                ) ?: return@launch
+                )
+
+                runCatching {
+                    java.io.File("/sdcard/Download/streamidentity.log")
+                        .appendText(
+                            "${System.currentTimeMillis()}: IMDB id=$imdbId " +
+                                "tmdbType=${tmdb.first} tmdbId=${tmdb.second}\n"
+                        )
+                }
+
+                if (imdbId == null) {
+                    runCatching {
+                        java.io.File("/sdcard/Download/streamidentity.log")
+                            .appendText("${System.currentTimeMillis()}: ABORT no IMDB id\n")
+                    }
+                    return@launch
+                }
 
                 val type =
                     if (item.mediaType == MediaType.SERIES) {
