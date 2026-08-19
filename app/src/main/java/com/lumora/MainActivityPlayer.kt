@@ -114,6 +114,78 @@ internal fun MainActivity.setupPlayerControls() {
     binding.sideMenuCategoryList.adapter = sideMenuCategoryAdapter
     binding.btnAudioTrack.setOnClickListener { showTrackPicker(isAudio = true) }
     binding.btnSubtitleTrack.setOnClickListener { showTrackPicker(isAudio = false) }
+
+    // Kodi-style volume amplification. This is separate from Android's
+    // normal volume control and boosts decoded PCM inside Media3.
+    fun refreshAmplifierLabel() {
+        val db = playerManager.getVolumeAmplificationDb()
+
+        binding.btnVolumeAmp.text =
+            if (db <= 0f) {
+                "AMP"
+            } else {
+                "AMP +${db.toInt()}"
+            }
+    }
+
+    refreshAmplifierLabel()
+
+    binding.btnVolumeAmp.setOnClickListener {
+        val values = floatArrayOf(
+            0f,
+            3f,
+            6f,
+            10f,
+            15f,
+            20f,
+            30f
+        )
+
+        val labels = arrayOf(
+            "Off (0 dB)",
+            "+3 dB",
+            "+6 dB",
+            "+10 dB",
+            "+15 dB",
+            "+20 dB",
+            "+30 dB"
+        )
+
+        val current =
+            playerManager.getVolumeAmplificationDb()
+
+        val checked =
+            values.indices.minByOrNull { index ->
+                kotlin.math.abs(values[index] - current)
+            } ?: 0
+
+        AlertDialog.Builder(this)
+            .setTitle("Volume Amplification")
+            .setSingleChoiceItems(
+                labels,
+                checked
+            ) { dialog, which ->
+
+                val db = values[which]
+
+                playerManager.setVolumeAmplificationDb(db)
+                refreshAmplifierLabel()
+
+                Toast.makeText(
+                    this,
+                    if (db <= 0f) {
+                        "Volume amplification off"
+                    } else {
+                        "Volume amplification +${db.toInt()} dB"
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+
+                dialog.dismiss()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
     binding.btnChapters.setOnClickListener { showChapterPicker() }
     binding.btnLiveVersions.setOnClickListener { showVersionPicker() }
     binding.btnRewind.setOnClickListener { playerManager.seekBy(-15_000); showControls() }

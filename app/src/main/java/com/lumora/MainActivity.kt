@@ -828,6 +828,7 @@ class MainActivity : AppCompatActivity() {
         // because that check ran against the still-empty pre-discovery cache.
         val pluginDiscoveryOnStart = scope.launch { pluginScriptManager.discoverScripts() }
         playerManager = PlayerManager(this)
+        playerManager.applySavedVolumeAmplification()
         playerDiagnostics = PlayerDiagnostics(playerManager.getExoPlayer())
         playerManager.getExoPlayer().addAnalyticsListener(playerDiagnostics.getAnalyticsListener())
         database = LumoraDatabase.getInstance(this)
