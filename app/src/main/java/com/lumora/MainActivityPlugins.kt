@@ -895,19 +895,9 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
                     .awaitAll()
                     .flatten()
+                    // Diagnostic mode: expose every unique result returned by every
+                    // enabled Stremio addon. Do not discard 4K or cap quality tiers.
                     .distinctBy { it.url ?: it.magnet ?: it.title }
-                    .filterNot { stream ->
-                        stream.title.contains("2160p", true) ||
-                            stream.title.contains("4k", true)
-                    }
-                    .groupBy { stream ->
-                        when {
-                            stream.title.contains("1080p", true) -> "1080p"
-                            stream.title.contains("720p", true) -> "720p"
-                            else -> "Other"
-                        }
-                    }
-                    .flatMap { (_, streamsInTier) -> streamsInTier.take(15) }
                     .forEach { stream ->
                         val token =
                             stream.url ?: stream.magnet
