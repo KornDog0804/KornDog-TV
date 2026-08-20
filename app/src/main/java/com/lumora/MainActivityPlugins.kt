@@ -91,6 +91,20 @@ internal fun MainActivity.wireTrailerButton(item: Channel) {
             if (key == null) return@launch
             button.visibility = View.VISIBLE
             button.setOnClickListener { showTrailerPlayer(key) }
+
+            // Find Stream wins when present. If this title has no stream-search
+            // action, Trailer becomes the first usable detail action instead
+            // of leaving focus stranded on the X button.
+            button.post {
+                if (
+                    isContentDetailVisible &&
+                    binding.detailBackButton.isFocused &&
+                    binding.detailFindStreamButton.visibility != View.VISIBLE &&
+                    button.isShown
+                ) {
+                    button.requestFocus()
+                }
+            }
         } catch (e: Exception) {
             android.util.Log.e("TrailerPlayer", "wireTrailerButton('${item.name}') threw", e)
         }
@@ -197,6 +211,21 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
     if (!eligible) {
         button.setOnClickListener(null)
         return
+    }
+
+    // The detail page initially parks focus on Back while its actions are
+    // being wired. PLAY used to steal that focus afterward; now that the
+    // broken PLAY action is intentionally gone, Find Stream is the primary
+    // action. Only take focus while Back still owns it so an async refresh
+    // can never yank the remote away from something the user selected.
+    button.post {
+        if (
+            isContentDetailVisible &&
+            binding.detailBackButton.isFocused &&
+            button.isShown
+        ) {
+            button.requestFocus()
+        }
     }
 
     button.setOnClickListener {
@@ -505,7 +534,7 @@ internal fun MainActivity.showStreamSearchDialog(
             child.visibility = if (currentQualityFilter == "All" || currentQualityFilter == tier) android.view.View.VISIBLE else android.view.View.GONE
         }
     }
-    listOf("All", "1080p", "720p").forEach { label ->
+    listOf("All", "4K", "1080p", "720p").forEach { label ->
         val btn = TextView(this@showStreamSearchDialog).apply {
             text = label
             textSize = 13f
@@ -750,10 +779,66 @@ internal fun MainActivity.showStreamSearchDialog(
                 RegexOption.IGNORE_CASE
             ).find(displayTitle)?.value
 
+        // Surface audio/language hints directly in Find Stream.
+        // Stremio add-ons commonly encode these in the stream title rather
+        // than a dedicated field, so keep this display-only and conservative.
+        val language = when {
+            Regex(
+                "\\b(english|eng|en)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "English"
+
+            Regex(
+                "\\b(japanese|jpn|ja)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Japanese"
+
+            Regex(
+                "\\b(spanish|spa|es)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Spanish"
+
+            Regex(
+                "\\b(french|fre|fra|fr)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "French"
+
+            Regex(
+                "\\b(german|ger|deu|de)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "German"
+
+            Regex(
+                "\\b(italian|ita|it)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Italian"
+
+            Regex(
+                "\\b(korean|kor|ko)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Korean"
+
+            Regex(
+                "\\b(chinese|chi|zho|zh)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Chinese"
+
+            Regex(
+                "\\b(multi(?:[- ]?audio)?|dual[- ]?audio|multi[- ]?lang)\\b",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(displayTitle) -> "Multi"
+
+            entry.result.audio.equals("dub", true) -> "Dub"
+            entry.result.audio.equals("sub", true) -> "Sub"
+
+            else -> null
+        }
+
         row.findViewById<TextView>(
             R.id.streamMeta
         ).text = listOfNotNull(
             derivedQuality,
+            language,
             codec,
             hdr,
             audio,

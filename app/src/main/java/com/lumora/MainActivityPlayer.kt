@@ -74,6 +74,15 @@ internal fun MainActivity.setupPlayerControls() {
     // itself, so the Activity-level timer refresh in onKeyDown never sees it, and the
     // bar would otherwise vanish right after the press that paused.
     binding.btnPlayPause.setOnClickListener { playerManager.togglePlayPause(); updatePlayPauseIcon(); showControls() }
+
+    // Explicit STOP uses the same full teardown path as leaving playback.
+    // Do not duplicate cleanup here: hidePlayer() already stops Media3,
+    // torrent sessions, casting, callbacks and resets the playback session.
+    binding.btnStop.setOnClickListener {
+        hidePlayer()
+        restoreSearchIfPending()
+    }
+
     binding.btnPrevChannel.setOnClickListener { navigateChannel(-1) }
     binding.btnNextChannel.setOnClickListener { navigateChannel(1) }
     binding.btnBack.setOnClickListener { hidePlayer(); restoreSearchIfPending() }

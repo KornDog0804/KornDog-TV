@@ -513,6 +513,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
     castLabel.visibility = View.GONE
     releaseDateText.visibility = View.GONE
     playButton.visibility = View.GONE
+    playButton.isEnabled = false
+    playButton.isFocusable = false
+    playButton.setOnClickListener(null)
+
+    // The legacy detail PLAY action is intentionally retired. It can jump back
+    // to browse instead of resolving the selected episode/source. Episode rows
+    // and Find Stream remain the explicit, reliable playback entry points.
     // Only the series path (wirePlayButton) ever writes this, tagging it with the
     // episode it would resume - "Resume S1E1". These views are reused across opens, so
     // without a reset that tag stayed on the button when a *film* was opened next.
@@ -801,7 +808,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
         // play this was a guessing game before committing to it.
         val tag = if (seasonNum != null && target.episodeNum != null) "S${seasonNum}E${target.episodeNum}" else null
         playButtonLabel.text = listOfNotNull(if (selection.isResume) "Resume" else "Play", tag).joinToString(" ")
-        playButton.visibility = View.VISIBLE
+        playButton.visibility = View.GONE
         // Landing focus on Play once the screen opens; refocus=false on watch-toggle
         // refreshes (label/target changed) must NOT steal focus - the user is on a check.
         if (refocus) playButton.requestFocus()
@@ -954,7 +961,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                     ?.let { PlaybackPositionStore.get(this@showContentDetail, it) }
                     ?.takeIf { !it.isNearComplete && it.positionMs > 0 }
                 playButtonLabel.text = if (filmProgress != null) "Resume" else "Play"
-                playButton.visibility = View.VISIBLE
+                playButton.visibility = View.GONE
                 playButton.requestFocus()
                 playButton.setOnClickListener {
                     // User-initiated play - see playItem for why the suppression flag is cleared here.

@@ -23,7 +23,10 @@ data class TorrentResult(
     val source: String?,
     /** Audio category hint ("sub"/"dub"), when the plugin can tell the two apart. Display and
      *  playback-preference only; the host never derives behavior beyond that from it. */
-    val audio: String? = null
+    val audio: String? = null,
+    /** Best-effort spoken/audio language label supplied or inferred by the source.
+     *  Display/filter metadata only. It never changes playback selection by itself. */
+    val language: String? = null
 )
 
 /** Terminal outcome of the search phase. */
