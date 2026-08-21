@@ -922,43 +922,45 @@ internal fun MainActivity.showPlayerFor(
                     )
             }
 
-            CastTranscodeProbe(
-                this,
-                BaseApplication.instance.okHttpClient
-            ).run(
-                upstreamUrl = startVersion.url,
-                headers = startVersion.streamHeaders ?: emptyMap(),
-                userAgent = startVersion.streamUserAgent,
-                onStarted = { file ->
-                    android.util.Log.i(
-                        "CastTranscodeProbe",
-                        "Transcode started; waiting for completed MP4 before Cast path: ${file.absolutePath}"
-                    )
-                }
-            ) { result ->
-                result.onSuccess { file ->
-                    thisTranscodeGrowingFile?.complete?.invoke()
-                    castTranscodeFile = file
-
-                    android.util.Log.i(
-                        "CastTranscodeProbe",
-                        "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
-                    )
-                }.onFailure { error ->
-                    android.util.Log.e(
-                        "CastTranscodeProbe",
-                        "REAL STREAM PROBE FAILED",
-                        error
-                    )
-
-                    // A failed Transformer output is not a valid completed MP4.
-                    // Never leave it available for a later Cast attempt.
-                    if (castGrowingFile === thisTranscodeGrowingFile) {
-                        castGrowingFile = null
+            if (startVersion.mediaType != MediaType.LIVE) {
+                CastTranscodeProbe(
+                    this,
+                    BaseApplication.instance.okHttpClient
+                ).run(
+                    upstreamUrl = startVersion.url,
+                    headers = startVersion.streamHeaders ?: emptyMap(),
+                    userAgent = startVersion.streamUserAgent,
+                    onStarted = { file ->
+                        android.util.Log.i(
+                            "CastTranscodeProbe",
+                            "Transcode started; waiting for completed MP4 before Cast path: ${file.absolutePath}"
+                        )
                     }
+                ) { result ->
+                    result.onSuccess { file ->
+                        thisTranscodeGrowingFile?.complete?.invoke()
+                        castTranscodeFile = file
 
-                    castTranscodeFile = null
-                    thisTranscodeGrowingFile = null
+                        android.util.Log.i(
+                            "CastTranscodeProbe",
+                            "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
+                        )
+                    }.onFailure { error ->
+                        android.util.Log.e(
+                            "CastTranscodeProbe",
+                            "REAL STREAM PROBE FAILED",
+                            error
+                        )
+
+                        // A failed Transformer output is not a valid completed MP4.
+                        // Never leave it available for a later Cast attempt.
+                        if (castGrowingFile === thisTranscodeGrowingFile) {
+                            castGrowingFile = null
+                        }
+
+                        castTranscodeFile = null
+                        thisTranscodeGrowingFile = null
+                    }
                 }
             }
 

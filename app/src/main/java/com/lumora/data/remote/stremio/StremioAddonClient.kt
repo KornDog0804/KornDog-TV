@@ -28,6 +28,14 @@ data class StremioStream(
     val requestHeaders: Map<String, String> = emptyMap()
 )
 
+
+data class StremioSubtitle(
+    val url: String,
+    val lang: String? = null,
+    val label: String? = null,
+    val source: String? = null
+)
+
 class StremioAddonClient {
 
     private fun stremioLog(message: String) {
@@ -230,6 +238,69 @@ class StremioAddonClient {
             }
             stremioLog("PARSE ${manifest.name}: total=${array.length()} kept=${result.size} skippedNoUrl=$skippedNoUrl")
             result
+        }
+    }
+
+    suspend fun subtitles(
+        manifest: StremioAddonManifest,
+        type: String,
+        contentId: String
+    ): Result<List<StremioSubtitle>> = withContext(Dispatchers.IO) {
+        runCatching {
+            if ("subtitles" !in manifest.resources) {
+                return@runCatching emptyList()
+            }
+
+            if (manifest.types.isNotEmpty() && type !in manifest.types) {
+                return@runCatching emptyList()
+            }
+
+            val encodedId = contentId
+                .split(":")
+                .joinToString(":") { segment ->
+                    URLEncoder.encode(segment, "UTF-8")
+                        .replace("+", "%20")
+                }
+
+            val url =
+                "${manifest.baseUrl}/subtitles/$type/$encodedId.json"
+
+            val body = getText(url)
+                ?: error("Addon subtitle request failed")
+
+            val json = JSONObject(body)
+            val array = json.optJSONArray("subtitles")
+                ?: return@runCatching emptyList()
+
+            buildList {
+                for (i in 0 until array.length()) {
+                    val item = array.optJSONObject(i) ?: continue
+
+                    val subtitleUrl = item.optString("url")
+                        .takeIf {
+                            it.startsWith("http://") ||
+                            it.startsWith("https://")
+                        } ?: continue
+
+                    val lang = item.optString("lang")
+                        .takeIf(String::isNotBlank)
+
+                    val label = item.optString("name")
+                        .takeIf(String::isNotBlank)
+                        ?: item.optString("title")
+                            .takeIf(String::isNotBlank)
+                        ?: lang
+
+                    add(
+                        StremioSubtitle(
+                            url = subtitleUrl,
+                            lang = lang,
+                            label = label,
+                            source = manifest.name
+                        )
+                    )
+                }
+            }
         }
     }
 

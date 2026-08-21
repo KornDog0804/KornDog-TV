@@ -998,8 +998,6 @@ class MainActivity : AppCompatActivity() {
             playerManager.playbackState == Player.STATE_READY
         ) {
             playerManager.play()
-        } else if (activeTab == 0) {
-            showLivePreviewPane()
         }
     }
 

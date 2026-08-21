@@ -879,65 +879,87 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     val shelves = mutableListOf<ContentShelf>()
     val hidden = getHiddenHomeShelves()
 
-    // Jellyfin's own resume list leads Continue Watching: the server knows about playback
-    // from every other client, which a purely local position store never can. Local
-    // entries follow, minus anything the server already covered (same item, one card).
-    val localContinue = PlaybackPositionStore.getAllInProgress(this)
-    val serverContinue = jellyfinResumeItems
-    val serverIds = serverContinue.map { it.id }.toSet()
-    // Up-next series tiles: series whose watched trail ends at a completed episode have
-    // no in-progress entry, so they'd otherwise drop out of Continue Watching entirely.
-    // buildUpNextSeriesTiles returns what's already resolved and kicks the async fetch
-    // for the rest - the row fills in as episodes arrive.
-    val upNext = buildUpNextSeriesTiles().filterNot(::isAdultHomeItem)
-    val continueItems = (serverContinue + localContinue + upNext)
-        .distinctBy { it.id.ifBlank { it.url } }
-        .filterNot(::isAdultHomeItem)
-    if (continueItems.isNotEmpty()) shelves.add(ContentShelf("Continue Watching", continueItems))
-
-    // "Next Up" is the row that makes a series library usable - the next unwatched episode
-    // of everything in flight, straight from the server's own tracking.
-    val nextUpItems = jellyfinNextUpItems.filterNot(::isAdultHomeItem)
-    if (nextUpItems.isNotEmpty()) shelves.add(ContentShelf("Next Up", nextUpItems))
-
-    val recentItems = RecentlyPlayedStore.getRecentIds(this)
-        .mapNotNull { id -> liveChannels.firstOrNull { it.id == id } }
-        .filterNot(::isAdultHomeItem)
-    if (recentItems.isNotEmpty()) shelves.add(ContentShelf("Recently Played", recentItems))
-
-    // Favourited live channels get their own Home row. Long-pressing a channel in the
-    // guide has always favourited it, but the result was only ever visible as the
-    // Favourites category inside Live TV - Home, the screen the app opens on, showed
-    // nothing at all, so the favourites looked like they hadn't saved.
+    // ============================================================
+    // FAVORITES
+    // Home's primary shelf. Merge Live, provider-backed VOD,
+    // and Discover favorites into one horizontally scrolling row.
+    // ============================================================
     val favChannelIds = FavoritesStore.getFavoriteChannelIds(this)
-    val favChannels = liveChannels.filter { it.id in favChannelIds }.filterNot(::isAdultHomeItem)
-    if (favChannels.isNotEmpty()) shelves.add(ContentShelf("Favourite Channels", favChannels))
+    val favoriteLive =
+        liveChannels
+            .filter { it.id in favChannelIds }
+            .filterNot(::isAdultHomeItem)
 
-    // One shelf for both, since favourite VOD is stored in a single set (see
-    // FavoritesStore.KEY_FAVORITE_SERIES) - a favourited film used to be saved and then
-    // never shown anywhere, because only seriesList was searched for the ids.
-    val favIds = FavoritesStore.getFavoriteSeriesIds(this)
-
+    // Films and Series share the VOD favorites store.
+    val favVodIds = FavoritesStore.getFavoriteSeriesIds(this)
     val providerFavorites =
         (seriesList + filmList)
-            .filter { it.id in favIds }
+            .filter { it.id in favVodIds }
+            .filterNot(::isAdultHomeItem)
 
     val discoverFavorites =
         com.lumora.cache.DiscoverFavoritesStore
             .getAll(this)
-
-    val favItems =
-        (discoverFavorites + providerFavorites)
-            .distinctBy { it.id.ifBlank { it.url } }
             .filterNot(::isAdultHomeItem)
 
-    if (favItems.isNotEmpty()) {
+    val favoriteItems =
+        (favoriteLive + discoverFavorites + providerFavorites)
+            .distinctBy { it.id.ifBlank { it.url } }
+
+    if (favoriteItems.isNotEmpty()) {
         shelves.add(
             ContentShelf(
                 "Favorites",
-                favItems
+                favoriteItems
             )
         )
+    }
+
+    // ============================================================
+    // CONTINUE WATCHING
+    // Secondary to Favorites. Jellyfin server state leads local
+    // resume state because it can reflect playback on other clients.
+    // ============================================================
+    val localContinue = PlaybackPositionStore.getAllInProgress(this)
+    val serverContinue = jellyfinResumeItems
+    val serverIds = serverContinue.map { it.id }.toSet()
+
+    // Series whose previous episode was completed can still surface
+    // their next episode here.
+    val upNext = buildUpNextSeriesTiles().filterNot(::isAdultHomeItem)
+
+    val continueItems =
+        (serverContinue +
+            localContinue.filterNot { it.id in serverIds } +
+            upNext)
+            .distinctBy { it.id.ifBlank { it.url } }
+            .filterNot(::isAdultHomeItem)
+
+    if (continueItems.isNotEmpty()) {
+        shelves.add(
+            ContentShelf(
+                "Continue Watching",
+                continueItems
+            )
+        )
+    }
+
+    // Jellyfin server-side next episode suggestions.
+    val nextUpItems = jellyfinNextUpItems.filterNot(::isAdultHomeItem)
+    if (nextUpItems.isNotEmpty()) {
+        shelves.add(ContentShelf("Next Up", nextUpItems))
+    }
+
+    // Recently played LIVE channels.
+    val recentItems =
+        RecentlyPlayedStore.getRecentIds(this)
+            .mapNotNull { id ->
+                liveChannels.firstOrNull { it.id == id }
+            }
+            .filterNot(::isAdultHomeItem)
+
+    if (recentItems.isNotEmpty()) {
+        shelves.add(ContentShelf("Recently Played", recentItems))
     }
 
     return shelves.filter { it.title !in hidden }

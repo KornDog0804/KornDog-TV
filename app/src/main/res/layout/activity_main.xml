@@ -60,15 +60,57 @@
                      left via translationX (toolbar_brand_translate_x) - translation is
                      post-layout, so the scroller and tabs keep their positions; only the
                      icon moves. Decorative - not focusable, so the D-pad never lands on it. -->
-                <ImageView
-                    android:layout_width="@dimen/toolbar_brand_size"
-                    android:layout_height="@dimen/toolbar_brand_size"
-                    android:layout_gravity="top"
-                    android:contentDescription="@string/app_name"
-                    android:src="@drawable/ic_toolbar_brand"
-                    android:tint="@color/text_primary"
-                    android:translationX="@dimen/toolbar_brand_translate_x"
-                    android:translationY="@dimen/toolbar_brand_translate_y" />
+                <LinearLayout
+                    android:id="@+id/korndogBrand"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="22dp"
+                    android:background="@android:color/transparent"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="6dp"
+                    android:paddingVertical="4dp">
+
+                    <FrameLayout
+                        android:layout_width="40dp"
+                        android:layout_height="40dp"
+                        android:background="@drawable/bg_korndog_brand_mark">
+
+                        <ImageView
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
+                            android:layout_gravity="center"
+                            android:contentDescription="@string/app_name"
+                            android:src="@drawable/ic_toolbar_brand"
+                            android:tint="@android:color/white" />
+                    </FrameLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="@font/inter_semibold"
+                            android:text="KornDog"
+                            android:textColor="@color/korndog_purple_bright"
+                            android:textSize="20sp" />
+
+                        <TextView
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="5dp"
+                            android:fontFamily="@font/inter_semibold"
+                            android:text="TV"
+                            android:textColor="@color/korndog_green"
+                            android:textSize="20sp" />
+                    </LinearLayout>
+                </LinearLayout>
 
                 <!-- Tab scroller: Home | Live | Series | Films | Discover (+ Downloads on
                      phones) with D-pad focus (pill segmented control). weight=1 makes it
@@ -105,13 +147,13 @@
             android:id="@+id/tabBarRow"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
+            android:background="@drawable/bg_korndog_nav_strip"
             android:clipChildren="false"
             android:clipToPadding="false"
-            android:gravity="start"
+            android:gravity="start|center_vertical"
             android:orientation="horizontal"
-            android:paddingHorizontal="6dp"
-            android:paddingBottom="2dp">
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="5dp">
 
             <LinearLayout
                 android:id="@+id/tabLive"

@@ -72,4 +72,12 @@
 
     <!-- Hard outline behind poster titles so light text stays legible on bright artwork -->
     <color name="poster_title_outline">#D9000000</color>
+    <color name="korndog_purple">#8B5CF6</color>
+    <color name="korndog_purple_bright">#A78BFA</color>
+    <color name="korndog_purple_dark">#4C1D95</color>
+    <color name="korndog_green">#39D98A</color>
+    <color name="korndog_green_bright">#6EE7A8</color>
+    <color name="korndog_surface">#11141C</color>
+    <color name="korndog_surface_raised">#191D28</color>
+    <color name="korndog_surface_soft">#202534</color>
 </resources>

@@ -26,7 +26,7 @@ android {
                 ?.toIntOrNull()
                 ?: 0
 
-        versionCode = 320000 + ciBuildNumber
+        versionCode = 400000 + ciBuildNumber
         versionName =
             if (ciBuildNumber > 0) {
                 "3.2.$ciBuildNumber"

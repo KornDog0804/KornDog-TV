@@ -16,6 +16,14 @@ data class StremioAddonConfig(
 object StremioAddonStore {
 
     private const val KEY = "stremio_addons_json"
+    private const val KEY_DEFAULT_SUBTITLE_ADDON_SEEDED =
+        "stremio_default_subtitle_addon_seeded"
+
+    private const val OPEN_SUBTITLES_NAME =
+        "OpenSubtitles v3"
+
+    private const val OPEN_SUBTITLES_MANIFEST =
+        "https://opensubtitles-v3.strem.io/manifest.json"
 
 
     /**
@@ -75,9 +83,11 @@ object StremioAddonStore {
 
 
     fun load(prefs: SharedPreferences): List<StremioAddonConfig> {
-        val raw = prefs.getString(KEY, null) ?: return emptyList()
+        val raw = prefs.getString(KEY, null)
 
-        val saved = runCatching {
+        val saved = if (raw == null) {
+            emptyList()
+        } else runCatching {
             val array = JSONArray(raw)
 
             buildList {
@@ -108,6 +118,41 @@ object StremioAddonStore {
             }
         }.getOrDefault(emptyList())
 
+        // Seed OpenSubtitles exactly once. This also upgrades existing installs
+        // without replacing or disturbing their current Stremio addons.
+        val withDefaults =
+            if (!prefs.getBoolean(KEY_DEFAULT_SUBTITLE_ADDON_SEEDED, false)) {
+                val updated =
+                    if (saved.any {
+                            it.manifestUrl.equals(
+                                OPEN_SUBTITLES_MANIFEST,
+                                ignoreCase = true
+                            )
+                        }) {
+                        saved
+                    } else {
+                        saved + StremioAddonConfig(
+                            id = "builtin-opensubtitles-v3",
+                            name = OPEN_SUBTITLES_NAME,
+                            manifestUrl = OPEN_SUBTITLES_MANIFEST,
+                            enabled = true
+                        )
+                    }
+
+                save(prefs, updated)
+
+                prefs.edit()
+                    .putBoolean(
+                        KEY_DEFAULT_SUBTITLE_ADDON_SEEDED,
+                        true
+                    )
+                    .apply()
+
+                updated
+            } else {
+                saved
+            }
+
         // Persist any URL normalization performed while loading.
         // This permanently migrates older Comet configs whose server-side
         // language restriction could incorrectly turn valid results into zero.
@@ -127,15 +172,16 @@ object StremioAddonStore {
         }.getOrDefault(emptyList())
 
         if (
+            raw != null &&
             saved.size == rawUrls.size &&
             saved.indices.any { index ->
                 saved[index].manifestUrl != rawUrls[index]
             }
         ) {
-            save(prefs, saved)
+            save(prefs, withDefaults)
         }
 
-        return saved
+        return withDefaults
     }
 
     fun save(

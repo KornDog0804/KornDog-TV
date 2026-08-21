@@ -440,6 +440,91 @@ internal suspend fun MainActivity.refreshSavedStreamSearch(channel: Channel): Ch
     )
 }
 
+internal suspend fun MainActivity.stremioSubtitlesFor(
+    item: Channel,
+    season: Int? = null,
+    episode: Int? = null
+): List<com.lumora.plugin.PluginSubtitle> {
+    val addons = StremioAddonStore
+        .load(prefs)
+        .filter { it.enabled }
+
+    if (addons.isEmpty()) return emptyList()
+
+    val directTmdb = tmdbTypeAndId(item.id)
+    val resolvedTmdb = directTmdb ?: tmdbClient.resolveId(
+        item.name,
+        item.year,
+        item.mediaType == MediaType.SERIES
+    )
+
+    val tmdb = resolvedTmdb ?: return emptyList()
+
+    val imdbId = tmdbClient.imdbId(
+        tmdb.first,
+        tmdb.second
+    ) ?: return emptyList()
+
+    val type =
+        if (item.mediaType == MediaType.SERIES) "series"
+        else "movie"
+
+    val contentId = when {
+        type == "movie" -> imdbId
+
+        season != null && episode != null ->
+            "$imdbId:$season:$episode"
+
+        else -> return emptyList()
+    }
+
+    val client = StremioAddonClient()
+
+    return coroutineScope {
+        addons.map { addon ->
+            async {
+                val manifest =
+                    client.fetchManifest(addon.manifestUrl)
+                        .getOrNull()
+                        ?: return@async emptyList()
+
+                if ("subtitles" !in manifest.resources) {
+                    return@async emptyList()
+                }
+
+                client.subtitles(
+                    manifest = manifest,
+                    type = type,
+                    contentId = contentId
+                )
+                    .getOrDefault(emptyList())
+                    .map { subtitle ->
+                        com.lumora.plugin.PluginSubtitle(
+                            url = subtitle.url,
+                            label = buildString {
+                                subtitle.label?.let { append(it) }
+
+                                if (!subtitle.source.isNullOrBlank()) {
+                                    if (isNotEmpty()) append(" · ")
+                                    append(subtitle.source)
+                                }
+                            }.ifBlank { subtitle.lang ?: "Subtitle" },
+                            language = subtitle.lang,
+                            isDefault = false
+                        )
+                    }
+            }
+        }
+            .awaitAll()
+            .flatten()
+            .distinctBy { subtitle ->
+                subtitle.url
+                    .substringBefore('?')
+                    .lowercase()
+            }
+    }
+}
+
 internal fun MainActivity.showStreamSearchDialog(
     plugin: PluginScript?,
     item: Channel,
@@ -659,6 +744,21 @@ internal fun MainActivity.showStreamSearchDialog(
                     dialog.dismiss()
                     hideContentDetail()
 
+                    val addonSubtitles = stremioSubtitlesFor(
+                        item = item,
+                        season = effectiveSeason,
+                        episode = effectiveEpisode
+                    )
+
+                    val mergedSubtitles =
+                        (resolved.subtitles + addonSubtitles)
+                            .distinctBy {
+                                it.url
+                                    .substringBefore('?')
+                                    .substringBefore('#')
+                                    .lowercase()
+                            }
+
                     showPlayerFor(
                         Channel(
                             id = stableId(entry),
@@ -688,7 +788,7 @@ internal fun MainActivity.showStreamSearchDialog(
                                 }
                         ),
                         externalSubtitles =
-                            resolved.subtitles.map(
+                            mergedSubtitles.map(
                                 ::externalSubtitleFor
                             ),
                         pluginStreamAlreadyResolved = true,
@@ -1280,11 +1380,14 @@ internal fun MainActivity.wirePluginsPane(dialogView: View, onProviderAdded: () 
                                 return@launch
                             }
 
-                        if ("stream" !in manifest.resources) {
+                        if (
+                            "stream" !in manifest.resources &&
+                            "subtitles" !in manifest.resources
+                        ) {
                             input.isEnabled = true
                             Toast.makeText(
                                 this@wirePluginsPane,
-                                "${manifest.name} does not provide streams",
+                                "${manifest.name} provides neither streams nor subtitles",
                                 Toast.LENGTH_LONG
                             ).show()
                             return@launch
