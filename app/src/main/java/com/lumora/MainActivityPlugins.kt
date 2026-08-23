@@ -681,9 +681,12 @@ internal fun MainActivity.showStreamSearchDialog(
         // direct wrapper/session URLs and can be resolved by Lumora itself.
         if ("aiostreams" in source) score += 1200
 
-        if (entry.resolver == "torrent") {
-            score += 900
-        } else if (entry.resolver == "direct") {
+        // Ready HTTPS debrid/cache URLs are the fastest path into Media3.
+        // Magnets remain fully available, but they require another resolution
+        // hop before playback can begin.
+        if (entry.resolver == "direct") {
+            score += 1600
+        } else if (entry.resolver == "torrent") {
             score += 500
         }
 
@@ -766,6 +769,20 @@ internal fun MainActivity.showStreamSearchDialog(
         resultsHost.removeAllViews()
 
         scope.launch {
+            // Sidecar subtitle discovery runs beside stream resolution instead
+            // of after it. A slow subtitle addon gets a very small budget and
+            // cannot add several seconds to video startup. Embedded/resolver
+            // subtitles remain untouched.
+            val addonSubtitlesDeferred = async {
+                withTimeoutOrNull(350L) {
+                    stremioSubtitlesFor(
+                        item = item,
+                        season = effectiveSeason,
+                        episode = effectiveEpisode
+                    )
+                } ?: emptyList()
+            }
+
             val resolved = when (entry.resolver) {
                 "direct" -> {
                     ResolveResult.Ready(
@@ -820,11 +837,10 @@ internal fun MainActivity.showStreamSearchDialog(
                     dialog.dismiss()
                     hideContentDetail()
 
-                    val addonSubtitles = stremioSubtitlesFor(
-                        item = item,
-                        season = effectiveSeason,
-                        episode = effectiveEpisode
-                    )
+                    // This normally completed while the stream itself was
+                    // resolving. If the addon was slow it already timed out,
+                    // so playback is never stuck waiting on subtitle discovery.
+                    val addonSubtitles = addonSubtitlesDeferred.await()
 
                     val mergedSubtitles =
                         (resolved.subtitles + addonSubtitles)
