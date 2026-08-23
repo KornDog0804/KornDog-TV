@@ -666,7 +666,7 @@ class MainActivity : AppCompatActivity() {
     internal val liveAdapter = LiveGuideAdapter(
         onChannelClick = { channel -> onChannelOkPress(channel) },
         onChannelFocused = { channel -> lastFocusedLiveChannel = channel },
-        onChannelLongPress = { channel -> toggleFavoriteChannel(channel) },
+        onChannelLongPress = { channel -> showChannelContextMenu(channel) },
         onChannelFavClick = { channel -> toggleFavoriteChannel(channel) },
         isChannelFavourite = { id -> FavoritesStore.getFavoriteChannelIds(this).contains(id) },
         onProgramLongPress = { channel, program -> toggleProgramReminder(channel, program) },
@@ -769,10 +769,11 @@ class MainActivity : AppCompatActivity() {
         onCategoryClick = { category -> onCategorySelected(category) },
         onCategoryStarClick = { category -> togglePinCategory(category) },
         onCategoryLongClick = { category ->
-            // Live TV's sidebar has other long-press-worthy stuff going on (brand/bucket
-            // rows) - keep it a plain pin toggle there. Films/Series get a small menu so
-            // hide is reachable too.
-            if (activeTab == 0) togglePinCategory(category) else showCategoryContextMenu(category)
+            // Category-level pin/hide menu is available on every tab now - Live TV's
+            // dynamic buckets/brand rows fall back to hiding by their own synthetic id,
+            // same as everywhere else; raw provider categories (countries/languages)
+            // hide via matchIds exactly like Films/Series already did.
+            showCategoryContextMenu(category)
         }
     )
     internal val downloadAdapter = DownloadAdapter(

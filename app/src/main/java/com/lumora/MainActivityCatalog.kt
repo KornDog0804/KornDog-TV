@@ -329,10 +329,12 @@ internal fun MainActivity.deriveLiveHalf(list: List<Channel>) {
         return
     }
 
+    val hiddenLiveChannelIds = com.lumora.cache.HiddenChannelsStore.getHiddenChannelIds(this)
     val rawLive = list.filter { ch ->
         ch.mediaType == MediaType.LIVE &&
-            !ch.name.contains("##") &&
-            !(hideAdult && isAdultCategory(ch.categoryName, ch.group))
+        !ch.name.contains("##") &&
+        !(hideAdult && isAdultCategory(ch.categoryName, ch.group)) &&
+        ch.id !in hiddenLiveChannelIds
     }
     if (useClassic || !groupChannels) {
         // Classic: no quality version merging — show every channel as-is from the provider.
