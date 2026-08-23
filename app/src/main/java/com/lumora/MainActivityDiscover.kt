@@ -440,8 +440,7 @@ internal fun MainActivity.startDiscoverStreamSearch(item: Channel) {
         // Let the ranked source engine choose the best candidate automatically.
         showStreamSearchDialog(
             plugin,
-            item,
-            autoPlayBest = true
+            item
         )
     }
 }
@@ -546,8 +545,7 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
                                 plugin,
                                 item,
                                 season = season.number,
-                                episode = episodeNumber,
-                                autoPlayBest = true
+                                episode = episodeNumber
                             )
                         }
                         .setNegativeButton("Back") { _, _ ->

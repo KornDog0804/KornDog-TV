@@ -1220,79 +1220,82 @@ internal fun MainActivity.showStreamSearchDialog(
                     else -> return@launch
                 }
 
-                addons.map { addon ->
-                    async {
-                        val manifestResult =
-                            stremioClient.fetchManifest(
-                                addon.manifestUrl
-                            )
+                val seenStreamKeys = mutableSetOf<String>()
 
-                        val manifest = manifestResult.getOrNull()
+                coroutineScope {
+                    addons.forEach { addon ->
+                        launch {
+                            val manifestResult =
+                                stremioClient.fetchManifest(
+                                    addon.manifestUrl
+                                )
 
-                        if (manifest == null) {
-                            runOnUiThread {
+                            val manifest = manifestResult.getOrNull()
+
+                            if (manifest == null) {
                                 status.text = "${addon.name}: manifest failed"
+                                return@launch
                             }
-                            return@async emptyList()
-                        }
 
-                        val streamsResult =
-                            stremioClient.streams(
-                                manifest = manifest,
-                                type = type,
-                                contentId = contentId
-                            )
+                            val streamsResult =
+                                stremioClient.streams(
+                                    manifest = manifest,
+                                    type = type,
+                                    contentId = contentId
+                                )
 
-                        val addonStreams =
-                            streamsResult.getOrElse {
-                                runOnUiThread {
-                                    status.text = "${manifest.name}: stream request failed"
+                            val addonStreams =
+                                streamsResult.getOrElse {
+                                    status.text =
+                                        "${manifest.name}: stream request failed"
+                                    emptyList()
                                 }
-                                emptyList()
-                            }
 
-                        runOnUiThread {
                             status.text =
                                 "${manifest.name}: ${addonStreams.size} result(s)"
-                        }
 
-                        addonStreams
+                            addonStreams.forEach { stream ->
+                                val key =
+                                    stream.url
+                                        ?: stream.magnet
+                                        ?: stream.title
+
+                                if (!seenStreamKeys.add(key)) {
+                                    return@forEach
+                                }
+
+                                val token =
+                                    stream.url
+                                        ?: stream.magnet
+                                        ?: return@forEach
+
+                                addResult(
+                                    StreamEntry(
+                                        result = TorrentResult(
+                                            title = stream.title,
+                                            token = token,
+                                            seeders = null,
+                                            size = null,
+                                            quality = Regex(
+                                                "(2160p|4k|1080p|720p|480p)",
+                                                RegexOption.IGNORE_CASE
+                                            ).find(stream.title)?.value,
+                                            source = stream.source,
+                                            audio = null
+                                        ),
+                                        resolver =
+                                            if (stream.url != null) {
+                                                "direct"
+                                            } else {
+                                                "torrent"
+                                            },
+                                        headers = stream.requestHeaders
+                                    )
+                                )
+                            }
+                        }
                     }
                 }
-                    .awaitAll()
-                    .flatten()
-                    // Diagnostic mode: expose every unique result returned by every
-                    // enabled Stremio addon. Do not discard 4K or cap quality tiers.
-                    .distinctBy { it.url ?: it.magnet ?: it.title }
-                    .forEach { stream ->
-                        val token =
-                            stream.url ?: stream.magnet
-                                ?: return@forEach
-
-                        addResult(
-                            StreamEntry(
-                                result = TorrentResult(
-                                    title = stream.title,
-                                    token = token,
-                                    seeders = null,
-                                    size = null,
-                                    quality = Regex(
-                                        "(2160p|4k|1080p|720p|480p)",
-                                        RegexOption.IGNORE_CASE
-                                    ).find(stream.title)?.value,
-                                    source = stream.source,
-                                    audio = null
-                                ),
-                                resolver =
-                                    if (stream.url != null) {
-                                        "direct"
-                                    } else {
-                                        "torrent"
-                                    },
-                                headers = stream.requestHeaders
-                            )
-                        )
-                    }
             }
         }
 
