@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KornDog-TV design system: FocusableCard rest-state background. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="@color/kdtv_bg_surface" />
+    <corners android:radius="@dimen/kdtv_card_corner_radius" />
+</shape>

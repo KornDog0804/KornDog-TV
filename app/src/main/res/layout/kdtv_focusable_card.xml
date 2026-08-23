@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KornDog-TV design system: FocusableCard.
+     One shared unit for poster tiles, live channel tiles, category chips,
+     and settings rows going forward (Phase 1 - see plan doc §2.1). Not
+     wired into any existing screen yet; adapters adopt this one at a time
+     in later phases per the "no mass adapter rewrite" rule.
+
+     aspectRatio is set programmatically by FocusableCard.kt depending on
+     variant (2:3 for posters, 16:9 for live tiles) rather than hardcoded
+     here, so one layout serves both card shapes. -->
+<merge xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <FrameLayout
+        android:id="@+id/kdtvCardArt"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintDimensionRatio="2:3"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:id="@+id/kdtvCardImage"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scaleType="centerCrop"
+            android:contentDescription="@null" />
+
+        <TextView
+            android:id="@+id/kdtvCardInitial"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:textColor="@color/kdtv_text_secondary"
+            android:textSize="32sp"
+            android:visibility="gone" />
+
+        <!-- Micro badge slot (NEW / 4K / LIVE) - top-right corner, hidden
+             unless a variant sets text on it. -->
+        <TextView
+            android:id="@+id/kdtvCardBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top|end"
+            android:layout_margin="6dp"
+            android:paddingHorizontal="6dp"
+            android:paddingVertical="2dp"
+            android:background="@drawable/kdtv_card_bg"
+            android:textColor="@color/kdtv_text_primary"
+            android:textSize="@dimen/kdtv_text_micro"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/kdtvCardTitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/kdtv_text_primary"
+        android:textSize="@dimen/kdtv_text_body"
+        app:layout_constraintTop_toBottomOf="@id/kdtvCardArt"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+    <TextView
+        android:id="@+id/kdtvCardSubtitle"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:textColor="@color/kdtv_text_secondary"
+        android:textSize="@dimen/kdtv_text_caption"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/kdtvCardTitle"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent" />
+
+</merge>

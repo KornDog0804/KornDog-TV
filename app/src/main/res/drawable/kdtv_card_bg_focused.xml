@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KornDog-TV design system: FocusableCard focused-state background -
+     raised surface + electric-blue glow ring, consistent everywhere this
+     component is used. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape>
+            <solid android:color="@color/kdtv_focus_glow" />
+            <corners android:radius="@dimen/kdtv_card_corner_radius" />
+        </shape>
+    </item>
+    <item
+        android:top="2dp"
+        android:bottom="2dp"
+        android:left="2dp"
+        android:right="2dp">
+        <shape>
+            <solid android:color="@color/kdtv_bg_surface_raised" />
+            <corners android:radius="@dimen/kdtv_card_corner_radius" />
+            <stroke
+                android:width="2dp"
+                android:color="@color/kdtv_accent_primary" />
+        </shape>
+    </item>
+</layer-list>

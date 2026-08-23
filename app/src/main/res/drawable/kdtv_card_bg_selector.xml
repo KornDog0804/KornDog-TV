@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KornDog-TV design system: state-driven swap between rest/focused card
+     backgrounds. Used instead of relying on the scale animator alone to
+     carry the focus feel, so the card also gets the glow ring called out
+     in the Phase 1 success criteria ("consistent glow across every
+     migrated component"). -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true" android:drawable="@drawable/kdtv_card_bg_focused" />
+    <item android:drawable="@drawable/kdtv_card_bg" />
+</selector>
