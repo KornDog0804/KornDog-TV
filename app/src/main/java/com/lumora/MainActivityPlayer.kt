@@ -936,9 +936,6 @@ internal fun MainActivity.showPlayerFor(
                         "headers=${startVersion.streamHeaders} ua=${startVersion.streamUserAgent}\n"
                     )
             }
-            var thisTranscodeGrowingFile:
-                com.lumora.player.CastRelayServer.GrowingLocalFile? = null
-
             android.util.Log.i(
                 "CastAudio",
                 "LOCAL_SELECTED_AUDIO ${playerManager.selectedAudioDescription() ?: "none"}"
@@ -953,47 +950,9 @@ internal fun MainActivity.showPlayerFor(
                     )
             }
 
-            if (startVersion.mediaType != MediaType.LIVE) {
-                CastTranscodeProbe(
-                    this,
-                    BaseApplication.instance.okHttpClient
-                ).run(
-                    upstreamUrl = startVersion.url,
-                    headers = startVersion.streamHeaders ?: emptyMap(),
-                    userAgent = startVersion.streamUserAgent,
-                    onStarted = { file ->
-                        android.util.Log.i(
-                            "CastTranscodeProbe",
-                            "Transcode started; waiting for completed MP4 before Cast path: ${file.absolutePath}"
-                        )
-                    }
-                ) { result ->
-                    result.onSuccess { file ->
-                        thisTranscodeGrowingFile?.complete?.invoke()
-                        castTranscodeFile = file
-
-                        android.util.Log.i(
-                            "CastTranscodeProbe",
-                            "REAL STREAM PROBE OK bytes=${file.length()} path=${file.absolutePath}"
-                        )
-                    }.onFailure { error ->
-                        android.util.Log.e(
-                            "CastTranscodeProbe",
-                            "REAL STREAM PROBE FAILED",
-                            error
-                        )
-
-                        // A failed Transformer output is not a valid completed MP4.
-                        // Never leave it available for a later Cast attempt.
-                        if (castGrowingFile === thisTranscodeGrowingFile) {
-                            castGrowingFile = null
-                        }
-
-                        castTranscodeFile = null
-                        thisTranscodeGrowingFile = null
-                    }
-                }
-            }
+            // Local playback must own the decoder.
+            // Cast preparation is intentionally NOT started here.
+            // A Cast transcode will be prepared only when the user actually casts.
 
             playerManager.playUrl(
                 startVersion.url,
