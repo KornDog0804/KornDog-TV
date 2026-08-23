@@ -436,7 +436,13 @@ internal fun MainActivity.startDiscoverStreamSearch(item: Channel) {
     if (item.mediaType == MediaType.SERIES) {
         showSeriesEpisodePicker(plugin, item)
     } else {
-        showStreamSearchDialog(plugin, item)
+        // Discover movie playback is intent to PLAY.
+        // Let the ranked source engine choose the best candidate automatically.
+        showStreamSearchDialog(
+            plugin,
+            item,
+            autoPlayBest = true
+        )
     }
 }
 
@@ -539,8 +545,9 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
                             showStreamSearchDialog(
                                 plugin,
                                 item,
-                                season.number,
-                                episodeNumber
+                                season = season.number,
+                                episode = episodeNumber,
+                                autoPlayBest = true
                             )
                         }
                         .setNegativeButton("Back") { _, _ ->
