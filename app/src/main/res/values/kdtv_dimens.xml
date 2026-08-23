@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- KornDog-TV design system tokens (Phase 1 foundation). -->
+
+    <!-- Focus scale: 1.0 -> 1.08, per the locked Phase 1 success criteria. -->
+    <item name="kdtv_focus_scale" format="float" type="dimen">1.08</item>
+    <dimen name="kdtv_focus_elevation">8dp</dimen>
+    <dimen name="kdtv_focus_glow_radius">18dp</dimen>
+
+    <!-- 8dp base spacing unit. -->
+    <dimen name="kdtv_space_unit">8dp</dimen>
+    <dimen name="kdtv_space_xs">4dp</dimen>
+    <dimen name="kdtv_space_sm">8dp</dimen>
+    <dimen name="kdtv_space_md">16dp</dimen>
+    <dimen name="kdtv_space_lg">24dp</dimen>
+    <dimen name="kdtv_space_xl">32dp</dimen>
+
+    <dimen name="kdtv_card_corner_radius">8dp</dimen>
+
+    <!-- Type scale (sp values held as dimens so both layouts and code share
+         one source; convert with getDimension()/COMPLEX_UNIT_PX same as the
+         guide's existing text-size pattern). -->
+    <dimen name="kdtv_text_display">32sp</dimen>
+    <dimen name="kdtv_text_title">20sp</dimen>
+    <dimen name="kdtv_text_body">16sp</dimen>
+    <dimen name="kdtv_text_caption">13sp</dimen>
+    <dimen name="kdtv_text_micro">11sp</dimen>
+</resources>

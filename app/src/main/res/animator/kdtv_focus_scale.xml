@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- KornDog-TV design system: shared focus-state scale animator.
+     120ms scale to 1.08x on focus, matching the plan's Phase 1 success
+     criteria for consistent focus feel across every migrated component.
+     New file - does not replace or touch the existing focus_scale.xml used
+     by category chips today. Migration to this one happens screen-by-screen
+     in later phases, never as a mass swap. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="120"
+                android:valueTo="@dimen/kdtv_focus_scale"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="120"
+                android:valueTo="@dimen/kdtv_focus_scale"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:propertyName="translationZ"
+                android:duration="120"
+                android:valueTo="@dimen/kdtv_focus_elevation"
+                android:valueType="floatType" />
+        </set>
+    </item>
+    <item>
+        <set>
+            <objectAnimator
+                android:propertyName="scaleX"
+                android:duration="120"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:propertyName="scaleY"
+                android:duration="120"
+                android:valueTo="1.0"
+                android:valueType="floatType" />
+            <objectAnimator
+                android:propertyName="translationZ"
+                android:duration="120"
+                android:valueTo="0"
+                android:valueType="floatType" />
+        </set>
+    </item>
+</selector>

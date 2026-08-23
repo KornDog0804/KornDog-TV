@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- KornDog-TV design system tokens (Phase 1 foundation).
+         Prefixed kdtv_ deliberately so these can never collide with any
+         existing color name - purely additive, nothing else references
+         these yet. Migrated screens adopt them one at a time in later
+         phases. -->
+    <color name="kdtv_bg_canvas">#FF08090C</color>
+    <color name="kdtv_bg_surface">#FF12141A</color>
+    <color name="kdtv_bg_surface_raised">#FF1B1E26</color>
+
+    <color name="kdtv_accent_primary">#FF2E8FFF</color>
+    <color name="kdtv_accent_live">#FFFF3B5C</color>
+
+    <color name="kdtv_text_primary">#FFFFFFFF</color>
+    <color name="kdtv_text_secondary">#FF9AA0AC</color>
+    <color name="kdtv_text_tertiary">#FF5A5F6B</color>
+
+    <!-- 40% alpha electric blue for the focus glow, precomputed rather than
+         set programmatically so every migrated component uses the exact
+         same value. -->
+    <color name="kdtv_focus_glow">#662E8FFF</color>
+</resources>
