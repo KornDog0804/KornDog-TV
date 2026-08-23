@@ -40,6 +40,7 @@ class BackupManager(private val context: Context) {
         val watchHistory: List<WatchHistoryBackup> = emptyList(),
         val recordingStorage: RecordingStorageBackup? = null,
         val recordingSchedules: List<RecordingScheduleBackup> = emptyList(),
+        val stremioAddonsJson: String? = null,
         val checksum: String = ""
     )
 
@@ -85,6 +86,7 @@ class BackupManager(private val context: Context) {
         val customGroupsImported: Int = 0,
         val watchHistoryImported: Int = 0,
         val recordingSchedulesImported: Int = 0,
+        val stremioAddonsImported: Int = 0,
         val conflicts: Int = 0
     )
 
@@ -184,6 +186,9 @@ class BackupManager(private val context: Context) {
         val watchHistory = db.watchHistoryDao().getRecent()
         val recordingStorage = db.recordingDao().getStorageConfig()
         val recordings = db.recordingDao().getAll()
+        val stremioAddonsJson =
+            context.getSharedPreferences("iptv_prefs", Context.MODE_PRIVATE)
+                .getString("stremio_addons_json", null)
 
         val dateFormat = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", Locale.US)
         dateFormat.timeZone = TimeZone.getTimeZone("UTC")
@@ -232,7 +237,8 @@ class BackupManager(private val context: Context) {
                     startTimeUtc = it.startTimeUtc, stopTimeUtc = it.stopTimeUtc,
                     recurringRule = it.recurringRule
                 )
-            }
+            },
+            stremioAddonsJson = stremioAddonsJson
         )
     }
 
@@ -315,6 +321,20 @@ class BackupManager(private val context: Context) {
             )
             result = result.copy(recordingSchedulesImported = result.recordingSchedulesImported + 1)
         }
+
+        // Restore configured Stremio addons exactly as exported from the source device.
+        // These manifests may contain provider-specific/Premiumize configuration, so
+        // they belong in the private backup, never hard-coded in the public repo.
+        data.stremioAddonsJson
+            ?.takeIf { it.isNotBlank() }
+            ?.let { json ->
+                context.getSharedPreferences("iptv_prefs", Context.MODE_PRIVATE)
+                    .edit()
+                    .putString("stremio_addons_json", json)
+                    .apply()
+
+                result = result.copy(stremioAddonsImported = 1)
+            }
 
         return result
     }
