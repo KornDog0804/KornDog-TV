@@ -748,27 +748,193 @@ internal fun MainActivity.showProviderSettings() {
         }
     }
     dialogView.findViewById<View>(R.id.settingsImportBackup).setOnClickListener {
-        val intent = android.content.Intent(android.content.Intent.ACTION_OPEN_DOCUMENT).apply {
-            addCategory(android.content.Intent.CATEGORY_OPENABLE)
-            type = "application/json"
-        }
-        try {
-            startActivityForResult(intent, MainActivity.REQUEST_IMPORT_BACKUP)
-            pendingBackupManager = backupManager
-        } catch (e: android.content.ActivityNotFoundException) {
-            val file = localBackupFile()
-            if (!file.exists()) {
-                Toast.makeText(this@showProviderSettings, "No backup file found at ${file.absolutePath}", Toast.LENGTH_LONG).show()
-            } else {
-                scope.launch {
-                    val result = withContext(Dispatchers.IO) { backupManager.importFrom(Uri.fromFile(file)) }
+
+        fun importBackupUri(uri: android.net.Uri) {
+            scope.launch {
+                val firstResult = withContext(Dispatchers.IO) {
+                    backupManager.importFrom(uri)
+                }
+
+                // Existing provider data causes BackupManager to request confirmation
+                // rather than changing anything. On TV, give that confirmation here
+                // instead of silently looking like the import succeeded.
+                if (firstResult.conflicts > 0) {
+                    AlertDialog.Builder(this@showProviderSettings)
+                        .setTitle("Import this backup?")
+                        .setMessage(
+                            "This TV already contains ${firstResult.conflicts} provider(s). " +
+                                "Import the selected backup and merge/restore its saved data?"
+                        )
+                        .setPositiveButton("Import") { _, _ ->
+                            scope.launch {
+                                val result = withContext(Dispatchers.IO) {
+                                    backupManager.importFrom(uri, confirmed = true)
+                                }
+
+                                Toast.makeText(
+                                    this@showProviderSettings,
+                                    "Imported backup · " +
+                                        "${result.providersImported} providers · " +
+                                        "${result.epgSourcesImported} EPG · " +
+                                        "${result.stremioAddonsImported} Stremio setup",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+                } else {
                     Toast.makeText(
                         this@showProviderSettings,
-                        "Imported: ${result.providersImported} providers, ${result.epgSourcesImported} EPG sources, ${result.customGroupsImported} groups",
+                        "Imported backup · " +
+                            "${firstResult.providersImported} providers · " +
+                            "${firstResult.epgSourcesImported} EPG · " +
+                            "${firstResult.stremioAddonsImported} Stremio setup",
                         Toast.LENGTH_LONG
                     ).show()
                 }
             }
+        }
+
+        if (isTv) {
+            // Android TV boxes often have no ACTION_OPEN_DOCUMENT activity.
+            // Query MediaStore's public Downloads collection directly instead.
+            scope.launch {
+                data class TvBackup(
+                    val name: String,
+                    val uri: android.net.Uri,
+                    val modified: Long
+                )
+
+                val backups = withContext(Dispatchers.IO) {
+                    val result = mutableListOf<TvBackup>()
+
+                    val collection =
+                        android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+
+                    val projection = arrayOf(
+                        android.provider.MediaStore.Downloads._ID,
+                        android.provider.MediaStore.Downloads.DISPLAY_NAME,
+                        android.provider.MediaStore.Downloads.DATE_MODIFIED
+                    )
+
+                    runCatching {
+                        contentResolver.query(
+                            collection,
+                            projection,
+                            null,
+                            null,
+                            android.provider.MediaStore.Downloads.DATE_MODIFIED + " DESC"
+                        )?.use { cursor ->
+
+                            val idColumn = cursor.getColumnIndexOrThrow(
+                                android.provider.MediaStore.Downloads._ID
+                            )
+
+                            val nameColumn = cursor.getColumnIndexOrThrow(
+                                android.provider.MediaStore.Downloads.DISPLAY_NAME
+                            )
+
+                            val modifiedColumn = cursor.getColumnIndex(
+                                android.provider.MediaStore.Downloads.DATE_MODIFIED
+                            )
+
+                            while (cursor.moveToNext()) {
+                                val name = cursor.getString(nameColumn) ?: continue
+
+                                if (
+                                    !name.startsWith("lumora_backup", ignoreCase = true) ||
+                                    !name.endsWith(".json", ignoreCase = true)
+                                ) {
+                                    continue
+                                }
+
+                                val id = cursor.getLong(idColumn)
+
+                                val uri = android.content.ContentUris.withAppendedId(
+                                    collection,
+                                    id
+                                )
+
+                                val modified =
+                                    if (modifiedColumn >= 0) {
+                                        cursor.getLong(modifiedColumn)
+                                    } else {
+                                        0L
+                                    }
+
+                                result += TvBackup(
+                                    name = name,
+                                    uri = uri,
+                                    modified = modified
+                                )
+                            }
+                        }
+                    }
+
+                    result.sortedByDescending { it.modified }
+                }
+
+                if (backups.isNotEmpty()) {
+                    val labels = backups
+                        .mapIndexed { index, backup ->
+                            if (index == 0) {
+                                "${backup.name}  ·  newest"
+                            } else {
+                                backup.name
+                            }
+                        }
+                        .toTypedArray()
+
+                    AlertDialog.Builder(this@showProviderSettings)
+                        .setTitle("Choose KornDog backup")
+                        .setItems(labels) { _, which ->
+                            importBackupUri(backups[which].uri)
+                        }
+                        .setNegativeButton("Cancel", null)
+                        .show()
+
+                    return@launch
+                }
+
+                // Preserve the old app-private fallback too.
+                val localFile = localBackupFile()
+
+                if (localFile.exists()) {
+                    importBackupUri(android.net.Uri.fromFile(localFile))
+                } else {
+                    Toast.makeText(
+                        this@showProviderSettings,
+                        "No lumora_backup JSON files found in Downloads.",
+                        Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+
+            return@setOnClickListener
+        }
+
+        // Phones/tablets retain Android's normal document picker.
+        val intent =
+            android.content.Intent(
+                android.content.Intent.ACTION_OPEN_DOCUMENT
+            ).apply {
+                addCategory(android.content.Intent.CATEGORY_OPENABLE)
+                type = "application/json"
+            }
+
+        try {
+            pendingBackupManager = backupManager
+            startActivityForResult(
+                intent,
+                MainActivity.REQUEST_IMPORT_BACKUP
+            )
+        } catch (e: android.content.ActivityNotFoundException) {
+            Toast.makeText(
+                this@showProviderSettings,
+                "No document picker is installed.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
