@@ -297,7 +297,17 @@ internal fun MainActivity.setupPlayerControls() {
                     // signed CDN URL is worthless without the headers issued alongside it.
                     requestHeaders = playerManager.currentStreamHeaders() ?: channel.streamHeaders,
                     userAgent = playerManager.currentStreamUserAgent() ?: channel.streamUserAgent,
-                    localFile = castTranscodeFile,
+                    localFileProvider = { castTranscodeFile },
+                    onPreparing = {
+                        runOnUiThread {
+                            castHandoffLog("HANDOFF_PREPARING")
+                            Toast.makeText(
+                                this@setupPlayerControls,
+                                "Preparing video for Cast…",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    },
                 ) { success, message ->
                     runOnUiThread {
                         if (success) {

@@ -539,7 +539,6 @@ internal fun MainActivity.showStreamSearchDialog(
     val effectiveSeason = season ?: item.streamSearchSeason
     val effectiveEpisode = episode ?: item.episodeNum
 
-
     data class StreamEntry(
         val result: TorrentResult,
         val resolver: String,
@@ -603,6 +602,14 @@ internal fun MainActivity.showStreamSearchDialog(
     val results = mutableListOf<StreamEntry>()
     val stremioClient = StremioAddonClient()
     var currentQualityFilter = "All"
+
+    // ── Autoplay guard ─────────────────────────────
+    // Guards against playing more than one source at once and lets both the
+    // decision-window timer and the "search fully finished" fallback race
+    // safely - whichever fires first wins, the other is a no-op.
+    var autoPlayCommitted = false
+    var autoPlayDecisionJob: Job? = null
+
     fun qualityTierOf(title: String): String = when {
         title.contains("2160") || title.contains("4K", true) -> "4K"
         title.contains("1080") -> "1080p"
@@ -842,7 +849,6 @@ internal fun MainActivity.showStreamSearchDialog(
                     // resolving. If the addon was slow it already timed out,
                     // so playback is never stuck waiting on subtitle discovery.
                     val addonSubtitles = addonSubtitlesDeferred.await()
-
                     val mergedSubtitles =
                         (resolved.subtitles + addonSubtitles)
                             .distinctBy {
@@ -903,11 +909,29 @@ internal fun MainActivity.showStreamSearchDialog(
                             Toast.LENGTH_LONG
                         ).show()
 
-                        dialog.dismiss()
+                        // Autoplay ran out of usable sources - fall back to letting the
+                        // user browse the chooser manually instead of a bare toast with
+                        // nothing else on screen.
+                        if (autoPlayBest) {
+                            dialog.show()
+                        } else {
+                            dialog.dismiss()
+                        }
                     }
                 }
             }
         }
+    }
+
+    // Committing to autoplay is guarded so the 1-2s decision-window timer and
+    // the "search fully finished" fallback below can never both fire.
+    fun commitAutoPlay(entry: StreamEntry) {
+        if (autoPlayCommitted) return
+        autoPlayCommitted = true
+        autoPlayDecisionJob?.cancel()
+        autoPlayDecisionJob = null
+        status.text = "Best source: ${entry.result.source ?: "stream"} · starting…"
+        playResult(entry)
     }
 
     fun addResult(
@@ -1031,7 +1055,6 @@ internal fun MainActivity.showStreamSearchDialog(
 
             entry.result.audio.equals("dub", true) -> "Dub"
             entry.result.audio.equals("sub", true) -> "Sub"
-
             else -> null
         }
 
@@ -1058,15 +1081,28 @@ internal fun MainActivity.showStreamSearchDialog(
             resultsHost.addView(row, 0)
         } else {
             resultsHost.addView(
-            row,
-            insertIndex.coerceIn(0, resultsHost.childCount)
-        )
+                row,
+                insertIndex.coerceIn(0, resultsHost.childCount)
+            )
         }
 
         status.text = "${results.size} result(s)"
 
         if (resultsHost.childCount == 1) {
             row.post { row.requestFocus() }
+        }
+
+        // Playback intent: arm a short decision window off the FIRST result that
+        // lands, not the last. This gives late/slow addons ~1.5s to beat whatever's
+        // currently ranked #1 without making the user wait for the full 200-400
+        // result sweep across every addon.
+        if (autoPlayBest && !autoPlayCommitted && autoPlayDecisionJob == null) {
+            autoPlayDecisionJob = scope.launch {
+                delay(1500L)
+                if (!autoPlayCommitted) {
+                    results.firstOrNull()?.let { commitAutoPlay(it) }
+                }
+            }
         }
     }
 
@@ -1260,20 +1296,23 @@ internal fun MainActivity.showStreamSearchDialog(
             }
         }
 
-        // Episode-row and Series Play/Resume requests are intent to PLAY,
-        // not intent to browse hundreds of sources. Wait until every enabled
-        // plugin/Stremio addon has finished contributing so streamRank() has
-        // the complete pool, then launch the highest-ranked result.
+        // Episode-row and Series Play/Resume requests are intent to PLAY, not intent
+        // to browse hundreds of sources. If the decision-window timer in addResult()
+        // already committed to a source, do nothing further here - this is only the
+        // fallback for a search that finished before that 1.5s window elapsed, or
+        // found nothing at all.
         //
-        // Manual Find Stream keeps autoPlayBest=false and still shows the
-        // full chooser exactly as before.
-        if (autoPlayBest && results.isNotEmpty()) {
-            val best = results.first()
-
-            status.text =
-                "Best source: ${best.result.source ?: "stream"} · starting…"
-
-            playResult(best)
+        // Manual Find Stream keeps autoPlayBest=false and still shows the full
+        // chooser exactly as before.
+        if (autoPlayBest) {
+            if (!autoPlayCommitted) {
+                if (results.isNotEmpty()) {
+                    commitAutoPlay(results.first())
+                } else {
+                    status.text = "No streams found"
+                    dialog.show()
+                }
+            }
             return@launch
         }
 
@@ -1284,6 +1323,7 @@ internal fun MainActivity.showStreamSearchDialog(
 
     dialog.setOnCancelListener {
         searchJob.cancel()
+        autoPlayDecisionJob?.cancel()
 
         activeTorrentSession?.let { engine ->
             Thread {
@@ -1295,7 +1335,13 @@ internal fun MainActivity.showStreamSearchDialog(
         TorrentForegroundService.stop(this)
     }
 
-    dialog.show()
+    // Manual Find Stream shows the chooser immediately, same as before.
+    // Playback intent (autoPlayBest) keeps it hidden unless/until autoplay
+    // has exhausted its options - see commitAutoPlay's Failed branch and the
+    // no-results fallback above.
+    if (!autoPlayBest) {
+        dialog.show()
+    }
 }
 
 // ── Plugins ────────────────────────────────────
