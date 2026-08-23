@@ -529,7 +529,8 @@ internal fun MainActivity.showStreamSearchDialog(
     plugin: PluginScript?,
     item: Channel,
     season: Int? = null,
-    episode: Int? = null
+    episode: Int? = null,
+    autoPlayBest: Boolean = false
 ) {
 
     // Continue Watching restores an episode Channel directly. Its caller may
@@ -1257,6 +1258,23 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
                     }
             }
+        }
+
+        // Episode-row and Series Play/Resume requests are intent to PLAY,
+        // not intent to browse hundreds of sources. Wait until every enabled
+        // plugin/Stremio addon has finished contributing so streamRank() has
+        // the complete pool, then launch the highest-ranked result.
+        //
+        // Manual Find Stream keeps autoPlayBest=false and still shows the
+        // full chooser exactly as before.
+        if (autoPlayBest && results.isNotEmpty()) {
+            val best = results.first()
+
+            status.text =
+                "Best source: ${best.result.source ?: "stream"} · starting…"
+
+            playResult(best)
+            return@launch
         }
 
         if (results.isEmpty()) {

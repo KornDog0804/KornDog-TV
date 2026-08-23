@@ -672,7 +672,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
-                    showStreamSearchDialog(plugin, item, season = null, episode = chosen.episodeNum)
+                    showStreamSearchDialog(
+                        plugin,
+                        item,
+                        season = null,
+                        episode = chosen.episodeNum,
+                        autoPlayBest = true
+                    )
                 }
             } else if (chosen.url.isBlank()) {
                 // TMDB-sourced Series/Movie episodes carry no direct url - resolve
@@ -681,7 +687,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                 val seasonNum = seasonPair?.first?.let { Regex("""\d+""").find(it)?.value }?.toIntOrNull()
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
-                    showStreamSearchDialog(plugin, item, season = seasonNum, episode = chosen.episodeNum)
+                    showStreamSearchDialog(
+                        plugin,
+                        item,
+                        season = seasonNum,
+                        episode = chosen.episodeNum,
+                        autoPlayBest = true
+                    )
                 }
             } else {
                 currentIndex = if (isSeries) -1 else filmList.indexOf(item)
@@ -820,7 +832,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
-                    showStreamSearchDialog(plugin, item, season = null, episode = target.episodeNum)
+                    showStreamSearchDialog(
+                        plugin,
+                        item,
+                        season = null,
+                        episode = target.episodeNum,
+                        autoPlayBest = true
+                    )
                 }
             } else if (target.url.isBlank()) {
                 // TMDB-sourced Series/Movie episodes carry no direct url - resolve
@@ -834,7 +852,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                         )
                 }
                 if (plugin != null) {
-                    showStreamSearchDialog(plugin, item, season = seasonNum?.toIntOrNull(), episode = target.episodeNum)
+                    showStreamSearchDialog(
+                        plugin,
+                        item,
+                        season = seasonNum?.toIntOrNull(),
+                        episode = target.episodeNum,
+                        autoPlayBest = true
+                    )
                 }
             } else {
                 currentIndex = -1
