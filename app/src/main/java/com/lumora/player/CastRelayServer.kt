@@ -789,7 +789,12 @@ internal class CastRelayServer(
 
             val rewritten = rewritePlaylist(
                 playlist = text,
-                playlistUrl = upstreamUrl,
+                // Resolve relative HLS segments against the URL that actually
+                // returned this playlist after redirects, not the original
+                // provider URL. Some IPTV servers redirect the playlist to a
+                // session-specific host/path; rebuilding segment URLs from the
+                // pre-redirect URL sends Cast back to an unauthorized endpoint.
+                playlistUrl = upstream.request.url.toString(),
                 token = token
             )
 
