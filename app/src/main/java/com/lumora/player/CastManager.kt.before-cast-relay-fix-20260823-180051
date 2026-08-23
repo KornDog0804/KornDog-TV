@@ -1,0 +1,539 @@
+package com.lumora.player
+
+import android.content.Context
+import android.widget.Toast
+import com.lumora.model.Channel
+import com.lumora.model.MediaType
+import com.google.android.gms.cast.CastDevice
+import com.google.android.gms.cast.MediaInfo
+import com.google.android.gms.cast.MediaLoadOptions
+import com.google.android.gms.cast.MediaMetadata
+import com.google.android.gms.cast.MediaStatus
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.media.RemoteMediaClient
+import android.os.Handler
+import android.os.Looper
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
+import com.google.android.gms.common.images.WebImage
+import android.net.Uri
+import okhttp3.OkHttpClient
+
+/**
+ * Manages Google Cast (Chromecast) playback.
+ * Handles session lifecycle and media loading to cast devices.
+ */
+class CastManager(private val context: Context) {
+
+    private fun castLog(message: String) {
+        runCatching {
+            val file = java.io.File("/sdcard/Download/castmanager.log")
+            file.appendText(
+                "${System.currentTimeMillis()}: $message\n"
+            )
+        }
+        android.util.Log.d("CastManager", message)
+    }
+
+
+    private val relayClient = OkHttpClient.Builder()
+        // Cast VOD is a long-lived streaming request. A normal OkHttp read
+        // timeout can kill an otherwise healthy movie during a CDN pause.
+        .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)
+        .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
+        .followRedirects(true)
+        .followSslRedirects(true)
+        .retryOnConnectionFailure(true)
+        .build()
+
+    private val vodRelay by lazy {
+        CastRelayServer(relayClient, context.cacheDir)
+    }
+
+    private var castContext: CastContext? = null
+    private var castSession: CastSession? = null
+    private var sessionListener: SessionManagerListener<CastSession>? = null
+
+    var onCastSessionConnected: ((CastSession) -> Unit)? = null
+    var onCastSessionDisconnected: (() -> Unit)? = null
+
+    // The one in-flight castChannel() call's own finish(), if any. stopCasting()
+    // must invoke this so that call's callback gets unregistered and its 45s
+    // watchdog cancelled - otherwise disconnecting mid-load leaks a live
+    // RemoteMediaClient.Callback that the next cast attempt stacks on top of.
+    private var activeCastCancel: (() -> Unit)? = null
+
+    /**
+     * Initialize the Cast framework.
+     */
+    fun init() {
+        try {
+            castContext = CastContext.getSharedInstance(context)
+            val sessionManager = castContext?.sessionManager
+            sessionListener = object : SessionManagerListener<CastSession> {
+                override fun onSessionStarted(session: CastSession, sessionId: String) {
+                    castLog("SESSION_STARTED id=$sessionId")
+                    castSession = session
+                    onCastSessionConnected?.invoke(session)
+                }
+                override fun onSessionEnded(session: CastSession, error: Int) {
+                    castLog("SESSION_ENDED error=$error")
+                    onCastSessionDisconnected?.invoke()
+                    castSession = null
+                }
+                override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+                    castLog("SESSION_RESUMED wasSuspended=$wasSuspended")
+                    castSession = session
+                    onCastSessionConnected?.invoke(session)
+                }
+                override fun onSessionSuspended(session: CastSession, reason: Int) {
+                    castLog("SESSION_SUSPENDED reason=$reason")
+                }
+                override fun onSessionStarting(session: CastSession) {}
+                override fun onSessionStartFailed(session: CastSession, error: Int) {
+                    castLog("SESSION_START_FAILED error=$error")
+                    castSession = null
+                }
+                override fun onSessionEnding(session: CastSession) {}
+                override fun onSessionResuming(session: CastSession, sessionId: String) {}
+                override fun onSessionResumeFailed(session: CastSession, error: Int) {
+                    castLog("SESSION_RESUME_FAILED error=$error")
+                }
+            }
+            sessionManager?.addSessionManagerListener(sessionListener!!, CastSession::class.java)
+        } catch (e: Exception) {
+            // Google Play Services may not be available
+        }
+    }
+
+    fun isConnected(): Boolean = castSession?.isConnected == true
+
+    internal fun registerGrowingCastFile(
+        file: java.io.File
+    ): CastRelayServer.GrowingLocalFile {
+        vodRelay.ensureStarted()
+        return vodRelay.registerGrowingLocalFile(file)
+    }
+
+    /**
+     * Determine MIME type from a stream URL extension.
+     */
+    private fun guessContentType(url: String): String {
+        val lower = url.lowercase()
+        return when {
+            lower.contains(".m3u8") || lower.contains(".m3u") -> "application/x-mpegURL"
+            lower.contains(".mp4") -> "video/mp4"
+            lower.contains(".ts") -> "video/mp2t"
+            lower.contains(".mp3") -> "audio/mpeg"
+            lower.contains(".webm") -> "video/webm"
+            lower.contains(".mkv") -> "video/x-matroska"
+            // HLS-style query params or dash
+            lower.contains("dash") || lower.contains(".mpd") -> "application/dash+xml"
+            else -> "application/x-mpegURL" // best guess for IPTV
+        }
+    }
+
+    /**
+     * Cast a channel to the connected device.
+     */
+    internal fun castChannel(
+        channel: Channel,
+        title: String? = null,
+        playbackUrl: String? = null,
+        requestHeaders: Map<String, String>? = null,
+        userAgent: String? = null,
+        localFileProvider: (() -> java.io.File?)? = null,
+        onPreparing: (() -> Unit)? = null,
+        onResult: (success: Boolean, message: String?) -> Unit
+    ) {
+        val session = castSession
+        if (session == null || !session.isConnected) {
+            onResult(false, "Cast session is not connected")
+            return
+        }
+
+        val remoteMediaClient = session.remoteMediaClient
+        if (remoteMediaClient == null) {
+            onResult(false, "Cast receiver is not ready")
+            return
+        }
+
+        val url = playbackUrl?.takeIf { it.isNotBlank() } ?: channel.url
+        if (url.isBlank()) {
+            onResult(false, "This item has no direct stream URL")
+            return
+        }
+
+        val lowerUrl = url.lowercase()
+        if (
+            lowerUrl.startsWith("file:") ||
+            lowerUrl.contains("127.0.0.1") ||
+            lowerUrl.contains("localhost")
+        ) {
+            onResult(false, "This stream only exists on this phone and cannot be fetched by Cast")
+            return
+        }
+
+        val pollHandler = Handler(Looper.getMainLooper())
+
+        // Everything below here is the original load path, unchanged. It is now
+        // wrapped in a local function so the VOD-readiness gate further down can
+        // poll and call into it once (and only once) a completed transcode file
+        // is actually available - Live TV always calls this immediately with a
+        // null local file, exactly as it always has.
+        fun proceedWithLocalFile(localFile: java.io.File?) {
+            // Live TV already casts correctly and must stay on the existing direct path.
+            //
+            // VOD goes through the phone relay. This keeps the upstream request on the
+            // same network origin as phone playback and lets us preserve Referer/UA/etc.
+            val localMedia =
+                if (
+                    channel.mediaType != MediaType.LIVE &&
+                    localFile != null &&
+                    localFile.isFile &&
+                    localFile.length() > 0L
+                ) {
+                    try {
+                        vodRelay.ensureStarted()
+                        castLog(
+                            "CAST_SOURCE completed local mp4 bytes=${localFile.length()}"
+                        )
+                        vodRelay.registerLocalFile(localFile)
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "CastManager",
+                            "Couldn't register completed local Cast file",
+                            e
+                        )
+                        null
+                    }
+                } else {
+                    null
+                }
+
+            val relayMedia =
+                if (
+                    channel.mediaType == MediaType.LIVE ||
+                    localMedia != null
+                ) {
+                    null
+                } else {
+                    try {
+                        vodRelay.ensureStarted()
+                        castLog("CAST_SOURCE relay upstream")
+                        vodRelay.register(
+                            upstreamUrl = url,
+                            headers = requestHeaders ?: channel.streamHeaders,
+                            userAgent = userAgent ?: channel.streamUserAgent
+                        )
+                    } catch (e: Exception) {
+                        android.util.Log.e(
+                            "CastManager",
+                            "Couldn't start VOD relay",
+                            e
+                        )
+                        onResult(
+                            false,
+                            e.message ?: "Couldn't start Cast relay"
+                        )
+                        return
+                    }
+                }
+
+            val castUrl =
+                when {
+                    channel.mediaType == MediaType.LIVE -> {
+                        url
+                    }
+
+                    localMedia != null -> {
+                        localMedia.url
+                    }
+
+                    else -> {
+                        relayMedia!!.url
+                    }
+                }
+
+            val metadata = MediaMetadata(MediaMetadata.MEDIA_TYPE_MOVIE).apply {
+                putString(MediaMetadata.KEY_TITLE, title ?: channel.name)
+                channel.logoUrl?.let { addImage(WebImage(Uri.parse(it))) }
+            }
+
+            val streamType = if (channel.mediaType == MediaType.LIVE)
+                MediaInfo.STREAM_TYPE_LIVE else MediaInfo.STREAM_TYPE_BUFFERED
+
+            val contentType =
+                when {
+                    channel.mediaType == MediaType.LIVE -> {
+                        // Known-good Live TV behavior remains exactly unchanged.
+                        guessContentType(url)
+                    }
+
+                    localMedia != null -> {
+                        localMedia.contentType
+                    }
+
+                    else -> {
+                        relayMedia!!.contentType
+                    }
+                }
+
+            val mediaInfo = MediaInfo.Builder(castUrl)
+                .setStreamType(streamType)
+                .setContentType(contentType)
+                .setMetadata(metadata)
+                .build()
+
+            val loadOptions = MediaLoadOptions.Builder()
+                .setAutoplay(true)
+                .build()
+
+            try {
+                android.util.Log.d(
+                    "CastManager",
+                    "Submitting Cast load: $castUrl upstream=$url (type=$contentType, stream=$streamType)"
+                )
+
+                var finished = false
+
+                var receiverSawNewLoadActivity = false
+
+                val handler = Handler(Looper.getMainLooper())
+
+                lateinit var callback: RemoteMediaClient.Callback
+                lateinit var thisCastCancel: () -> Unit
+
+                fun finish(success: Boolean, message: String?) {
+                    if (finished) return
+                    finished = true
+                    handler.removeCallbacksAndMessages(null)
+                    remoteMediaClient.unregisterCallback(callback)
+                    if (activeCastCancel === thisCastCancel) activeCastCancel = null
+                    onResult(success, message)
+                }
+
+                callback = object : RemoteMediaClient.Callback() {
+                    override fun onStatusUpdated() {
+                        val state = remoteMediaClient.playerState
+                        android.util.Log.d(
+                            "CastManager",
+                            "Receiver state=$state idleReason=${remoteMediaClient.idleReason}"
+                        )
+
+                        when (state) {
+                            MediaStatus.PLAYER_STATE_PLAYING -> {
+                                android.util.Log.d(
+                                    "CastManager",
+                                    "Cast receiver is PLAYING: $url"
+                                )
+                                finish(true, null)
+                            }
+
+                            MediaStatus.PLAYER_STATE_LOADING -> {
+                                receiverSawNewLoadActivity = true
+
+                                castLog(
+                                    "NEW_MEDIA_LOADING url=$url"
+                                )
+
+                                android.util.Log.d(
+                                    "CastManager",
+                                    "Cast receiver is LOADING: $url"
+                                )
+                            }
+
+                            MediaStatus.PLAYER_STATE_BUFFERING -> {
+                                receiverSawNewLoadActivity = true
+
+                                castLog(
+                                    "NEW_MEDIA_BUFFERING url=$url"
+                                )
+
+                                android.util.Log.d(
+                                    "CastManager",
+                                    "Cast receiver is BUFFERING: $url"
+                                )
+                            }
+
+                            MediaStatus.PLAYER_STATE_IDLE -> {
+                                val idleReason = remoteMediaClient.idleReason
+
+                                if (receiverSawNewLoadActivity) {
+                                    castLog(
+                                        "NEW_MEDIA_IDLE_AFTER_ACTIVITY reason=$idleReason url=$url"
+                                    )
+
+                                    finish(
+                                        false,
+                                        "Receiver went idle ($idleReason)"
+                                    )
+                                } else {
+                                    castLog(
+                                        "TRANSITIONAL_IDLE_IGNORED reason=$idleReason url=$url"
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+
+                thisCastCancel = { finish(false, "Cast stopped") }
+                activeCastCancel = thisCastCancel
+
+                remoteMediaClient.registerCallback(callback)
+
+                handler.postDelayed({
+                    val state = remoteMediaClient.playerState
+
+                    if (
+                        state == MediaStatus.PLAYER_STATE_LOADING ||
+                        state == MediaStatus.PLAYER_STATE_BUFFERING
+                    ) {
+                        android.util.Log.d(
+                            "CastManager",
+                            "Cast still starting after startup window: state=$state url=$url"
+                        )
+                        return@postDelayed
+                    }
+
+                    finish(
+                        false,
+                        "Receiver never started playback (state=$state)"
+                    )
+                }, 45_000L)
+
+                remoteMediaClient.load(mediaInfo, loadOptions)
+                    .setResultCallback { result ->
+                        val status = result.status
+
+                        if (!status.isSuccess) {
+                            val message = status.statusMessage
+                                ?: "Cast load failed (${status.statusCode})"
+
+                            android.util.Log.e(
+                                "CastManager",
+                                "Cast receiver rejected load: code=${status.statusCode}, message=$message, url=$url"
+                            )
+
+                            finish(false, message)
+                        } else {
+                            castLog(
+                                "LOAD_COMMAND_ACCEPTED waitingForNewMediaActivity url=$url"
+                            )
+
+                            android.util.Log.d(
+                                "CastManager",
+                                "Cast LOAD accepted; waiting for receiver activity: $url"
+                            )
+
+                            if (remoteMediaClient.playerState == MediaStatus.PLAYER_STATE_PLAYING) {
+                                finish(true, null)
+                            }
+                        }
+                    }
+            } catch (e: Exception) {
+                android.util.Log.e("CastManager", "Failed to submit Cast load", e)
+                onResult(false, e.message ?: "Couldn't send media to Cast receiver")
+            }
+        }
+
+        // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
+        // decode support, and raw-relaying an unsupported audio track (e.g. EAC3/AC3) is
+        // silently accepted by standard Chromecast/Google TV receivers too - video plays,
+        // audio does not. The background transcode (castTranscodeFile) already re-encodes
+        // to Cast-safe AAC/H264 for every VOD title, so ALL non-live Cast attempts wait for
+        // it rather than falling through to the raw relay's original audio track.
+        //
+        // The transcode runs in the background and is frequently still in progress the
+        // instant Cast is pressed. Instead of failing immediately, poll for it (bounded
+        // budget) and proceed automatically the moment it's ready - the user should not
+        // have to press Cast again themselves.
+        if (channel.mediaType != MediaType.LIVE) {
+            val initialFile = localFileProvider?.invoke()
+            val alreadyReady = initialFile != null && initialFile.isFile && initialFile.length() > 0L
+
+            if (!alreadyReady) {
+                onPreparing?.invoke()
+
+                var elapsedMs = 0L
+                val pollIntervalMs = 1000L
+                val budgetMs = 60_000L
+
+                lateinit var poll: () -> Unit
+                poll = {
+                    val candidate = localFileProvider?.invoke()
+                    if (candidate != null && candidate.isFile && candidate.length() > 0L) {
+                        proceedWithLocalFile(candidate)
+                    } else {
+                        elapsedMs += pollIntervalMs
+                        if (elapsedMs >= budgetMs) {
+                            onResult(false, "Video preparation timed out — try again")
+                        } else {
+                            pollHandler.postDelayed({ poll() }, pollIntervalMs)
+                        }
+                    }
+                }
+                pollHandler.postDelayed({ poll() }, pollIntervalMs)
+                return
+            }
+
+            proceedWithLocalFile(initialFile)
+            return
+        }
+
+        proceedWithLocalFile(null)
+    }
+
+    fun stopCasting() {
+        // Cancel any in-flight castChannel() load first so its callback and
+        // watchdog don't leak past this disconnect.
+        activeCastCancel?.invoke()
+        activeCastCancel = null
+
+        try {
+            castSession?.remoteMediaClient?.stop()
+        } catch (_: Exception) {}
+
+        // A stopped media session is not the same as an ended Cast session -
+        // without this, castSession stays non-null and the app believes it's
+        // still connected, so the next cast attempt reuses stale session state.
+        try {
+            castContext?.sessionManager?.endCurrentSession(true)
+        } catch (_: Exception) {}
+        castSession = null
+
+        if (vodRelay.isAlive) {
+            vodRelay.stop()
+        }
+    }
+
+    // Smart-display class receivers (Nest Hub, Home Hub) commonly lack HEVC 10-bit
+    // decode support. Chromecast/Android TV/Google TV devices are not matched here
+    // and keep the existing fast raw-relay path unaffected.
+    private fun isLimitedCapabilityReceiver(session: CastSession): Boolean {
+        val device: CastDevice = session.castDevice ?: return false
+        val name = (device.friendlyName ?: device.modelName ?: "").lowercase()
+        return LIMITED_CAPABILITY_DEVICE_HINTS.any { hint -> name.contains(hint) }
+    }
+
+    companion object {
+        private val LIMITED_CAPABILITY_DEVICE_HINTS = listOf(
+            "nest hub", "home hub"
+        )
+    }
+
+    fun release() {
+        try {
+            castContext?.sessionManager?.removeSessionManagerListener(
+                sessionListener!!, CastSession::class.java
+            )
+        } catch (_: Exception) {}
+        castSession = null
+        castContext = null
+        if (vodRelay.isAlive) {
+            vodRelay.stop()
+        }
+    }
+}
