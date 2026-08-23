@@ -212,16 +212,24 @@ class CastManager(private val context: Context) {
                     null
                 }
 
+            // Chromecast cannot attach arbitrary IPTV/provider request headers
+            // when it fetches a remote URL itself. Route both Live TV and VOD
+            // through Lumora's phone relay so the phone performs the upstream
+            // request using the exact headers/User-Agent that already work locally.
+            //
+            // A completed local Cast-safe MP4 still wins when one exists.
             val relayMedia =
-                if (
-                    channel.mediaType == MediaType.LIVE ||
-                    localMedia != null
-                ) {
+                if (localMedia != null) {
                     null
                 } else {
                     try {
                         vodRelay.ensureStarted()
-                        castLog("CAST_SOURCE relay upstream")
+                        castLog(
+                            if (channel.mediaType == MediaType.LIVE)
+                                "CAST_SOURCE live relay upstream"
+                            else
+                                "CAST_SOURCE vod relay upstream"
+                        )
                         vodRelay.register(
                             upstreamUrl = url,
                             headers = requestHeaders ?: channel.streamHeaders,
@@ -230,7 +238,7 @@ class CastManager(private val context: Context) {
                     } catch (e: Exception) {
                         android.util.Log.e(
                             "CastManager",
-                            "Couldn't start VOD relay",
+                            "Couldn't start Cast relay",
                             e
                         )
                         onResult(
@@ -243,10 +251,6 @@ class CastManager(private val context: Context) {
 
             val castUrl =
                 when {
-                    channel.mediaType == MediaType.LIVE -> {
-                        url
-                    }
-
                     localMedia != null -> {
                         localMedia.url
                     }
@@ -450,40 +454,26 @@ class CastManager(private val context: Context) {
         // instant Cast is pressed. Instead of failing immediately, poll for it (bounded
         // budget) and proceed automatically the moment it's ready - the user should not
         // have to press Cast again themselves.
-        if (channel.mediaType != MediaType.LIVE) {
-            val initialFile = localFileProvider?.invoke()
-            val alreadyReady = initialFile != null && initialFile.isFile && initialFile.length() > 0L
-
-            if (!alreadyReady) {
-                onPreparing?.invoke()
-
-                var elapsedMs = 0L
-                val pollIntervalMs = 1000L
-                val budgetMs = 60_000L
-
-                lateinit var poll: () -> Unit
-                poll = {
-                    val candidate = localFileProvider?.invoke()
-                    if (candidate != null && candidate.isFile && candidate.length() > 0L) {
-                        proceedWithLocalFile(candidate)
-                    } else {
-                        elapsedMs += pollIntervalMs
-                        if (elapsedMs >= budgetMs) {
-                            onResult(false, "Video preparation timed out — try again")
-                        } else {
-                            pollHandler.postDelayed({ poll() }, pollIntervalMs)
-                        }
-                    }
+        // Background VOD transcoding was intentionally removed because running
+        // a second decode beside normal phone playback caused black-screen and
+        // responsiveness problems. If a completed Cast file already exists, use it.
+        // Otherwise relay the working playback URL immediately instead of waiting
+        // 60 seconds for a file that is no longer produced.
+        val readyLocalFile =
+            if (channel.mediaType != MediaType.LIVE) {
+                localFileProvider?.invoke()?.takeIf {
+                    it.isFile && it.length() > 0L
                 }
-                pollHandler.postDelayed({ poll() }, pollIntervalMs)
-                return
+            } else {
+                null
             }
 
-            proceedWithLocalFile(initialFile)
-            return
+        if (readyLocalFile != null) {
+            castLog("CAST_SOURCE ready local file bytes=${readyLocalFile.length()}")
+            proceedWithLocalFile(readyLocalFile)
+        } else {
+            proceedWithLocalFile(null)
         }
-
-        proceedWithLocalFile(null)
     }
 
     fun stopCasting() {
