@@ -533,6 +533,27 @@ internal fun MainActivity.setupPlayerControls() {
             resetStallTracking()
             blackFrameStreak = 0
 
+            // Eternal/Xtream-style live servers can expose a .m3u8 URL but occasionally
+            // return raw MPEG-TS bytes at a stream boundary instead of another HLS manifest.
+            // Media3 then complains that the response does not begin with #EXTM3U even though
+            // the underlying transport stream is perfectly playable. Retry that SAME live URL
+            // once as progressive MPEG-TS before marking it dead or changing versions.
+            if (
+                nowPlayingChannel?.mediaType == MediaType.LIVE &&
+                error.errorCode == PlaybackException.ERROR_CODE_PARSING_MANIFEST_MALFORMED &&
+                playerManager.retryCurrentAsProgressiveTs()
+            ) {
+                android.util.Log.w(
+                    "LumoraPlayback",
+                    "Malformed live HLS manifest; retrying same URL as MPEG-TS"
+                )
+
+                beginStreamAttempt()
+                startBlackFrameWatch()
+                binding.bufferingSpinner.visibility = View.VISIBLE
+                return
+            }
+
             // Some VOD providers return HLS behind URLs that look like MP4/MKV or have
             // no useful extension at all. Let Media3 try normally first; only when it
             // specifically says the container could not be parsed do we retry the exact

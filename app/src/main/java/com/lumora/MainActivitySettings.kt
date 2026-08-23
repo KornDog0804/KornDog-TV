@@ -797,99 +797,102 @@ internal fun MainActivity.showProviderSettings() {
         }
 
         if (isTv) {
-            // Android TV boxes often have no ACTION_OPEN_DOCUMENT activity.
-            // Query MediaStore's public Downloads collection directly instead.
+            // Android 11+ blocks ordinary apps from arbitrary non-media files
+            // in public Downloads. KornDog TV is sideloaded and needs to import
+            // backups received by Send Files to TV, so request All Files Access
+            // once and then read Downloads directly.
+            if (
+                android.os.Build.VERSION.SDK_INT >=
+                    android.os.Build.VERSION_CODES.R &&
+                !android.os.Environment.isExternalStorageManager()
+            ) {
+                runCatching {
+                    val intent = android.content.Intent(
+                        android.provider.Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
+                        android.net.Uri.parse("package:$packageName")
+                    )
+                    startActivity(intent)
+                }.recoverCatching {
+                    startActivity(
+                        android.content.Intent(
+                            android.provider.Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION
+                        )
+                    )
+                }
+
+                Toast.makeText(
+                    this@showProviderSettings,
+                    "Allow KornDog TV file access, then return and press Import backup again.",
+                    Toast.LENGTH_LONG
+                ).show()
+
+                return@setOnClickListener
+            }
+
             scope.launch {
                 data class TvBackup(
                     val name: String,
-                    val uri: android.net.Uri,
+                    val file: java.io.File,
                     val modified: Long
                 )
 
                 val backups = withContext(Dispatchers.IO) {
-                    val result = mutableListOf<TvBackup>()
-
-                    val collection =
-                        android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
-
-                    val projection = arrayOf(
-                        android.provider.MediaStore.Downloads._ID,
-                        android.provider.MediaStore.Downloads.DISPLAY_NAME,
-                        android.provider.MediaStore.Downloads.DATE_MODIFIED
+                    val dirs = listOfNotNull(
+                        android.os.Environment
+                            .getExternalStoragePublicDirectory(
+                                android.os.Environment.DIRECTORY_DOWNLOADS
+                            ),
+                        java.io.File("/sdcard/Download"),
+                        java.io.File("/storage/emulated/0/Download")
                     )
+                        .distinctBy { it.absolutePath }
 
-                    runCatching {
-                        contentResolver.query(
-                            collection,
-                            projection,
-                            null,
-                            null,
-                            android.provider.MediaStore.Downloads.DATE_MODIFIED + " DESC"
-                        )?.use { cursor ->
-
-                            val idColumn = cursor.getColumnIndexOrThrow(
-                                android.provider.MediaStore.Downloads._ID
-                            )
-
-                            val nameColumn = cursor.getColumnIndexOrThrow(
-                                android.provider.MediaStore.Downloads.DISPLAY_NAME
-                            )
-
-                            val modifiedColumn = cursor.getColumnIndex(
-                                android.provider.MediaStore.Downloads.DATE_MODIFIED
-                            )
-
-                            while (cursor.moveToNext()) {
-                                val name = cursor.getString(nameColumn) ?: continue
-
-                                if (
-                                    !name.startsWith("lumora_backup", ignoreCase = true) ||
-                                    !name.endsWith(".json", ignoreCase = true)
-                                ) {
-                                    continue
-                                }
-
-                                val id = cursor.getLong(idColumn)
-
-                                val uri = android.content.ContentUris.withAppendedId(
-                                    collection,
-                                    id
-                                )
-
-                                val modified =
-                                    if (modifiedColumn >= 0) {
-                                        cursor.getLong(modifiedColumn)
-                                    } else {
-                                        0L
+                    dirs
+                        .flatMap { dir ->
+                            runCatching {
+                                dir.listFiles()
+                                    ?.filter { file ->
+                                        file.isFile &&
+                                            file.name.startsWith(
+                                                "lumora_backup",
+                                                ignoreCase = true
+                                            ) &&
+                                            file.name.endsWith(
+                                                ".json",
+                                                ignoreCase = true
+                                            )
                                     }
-
-                                result += TvBackup(
-                                    name = name,
-                                    uri = uri,
-                                    modified = modified
-                                )
-                            }
+                                    .orEmpty()
+                            }.getOrDefault(emptyList())
                         }
-                    }
-
-                    result.sortedByDescending { it.modified }
+                        .distinctBy { it.absolutePath }
+                        .sortedByDescending { it.lastModified() }
+                        .map {
+                            TvBackup(
+                                name = it.name,
+                                file = it,
+                                modified = it.lastModified()
+                            )
+                        }
                 }
 
                 if (backups.isNotEmpty()) {
-                    val labels = backups
-                        .mapIndexed { index, backup ->
-                            if (index == 0) {
-                                "${backup.name}  ·  newest"
-                            } else {
-                                backup.name
-                            }
+                    val labels = backups.mapIndexed { index, backup ->
+                        if (index == 0) {
+                            "${backup.name}  ·  newest"
+                        } else {
+                            backup.name
                         }
-                        .toTypedArray()
+                    }.toTypedArray()
 
                     AlertDialog.Builder(this@showProviderSettings)
                         .setTitle("Choose KornDog backup")
                         .setItems(labels) { _, which ->
-                            importBackupUri(backups[which].uri)
+                            importBackupUri(
+                                android.net.Uri.fromFile(
+                                    backups[which].file
+                                )
+                            )
                         }
                         .setNegativeButton("Cancel", null)
                         .show()
@@ -897,11 +900,12 @@ internal fun MainActivity.showProviderSettings() {
                     return@launch
                 }
 
-                // Preserve the old app-private fallback too.
                 val localFile = localBackupFile()
 
                 if (localFile.exists()) {
-                    importBackupUri(android.net.Uri.fromFile(localFile))
+                    importBackupUri(
+                        android.net.Uri.fromFile(localFile)
+                    )
                 } else {
                     Toast.makeText(
                         this@showProviderSettings,

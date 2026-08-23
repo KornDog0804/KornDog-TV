@@ -656,6 +656,82 @@ internal fun MainActivity.showStreamSearchDialog(
 
     val attemptedStreamTokens = mutableSetOf<String>()
 
+    /*
+     * Rank Find Stream results by practical playback usefulness rather than
+     * whichever addon happened to answer first.
+     *
+     * Nothing is discarded here. This only changes ordering, and therefore
+     * also improves the order used by automatic source failover.
+     */
+    fun streamRank(entry: StreamEntry): Int {
+        val title = entry.result.title.lowercase()
+        val source = entry.result.source.orEmpty().lowercase()
+
+        var score = 0
+
+        // Debrid/cache hints. Real-Debrid is currently the most reliable
+        // path on this install, followed by TorBox and Premiumize.
+        when {
+            "[rd" in title || "real-debrid" in title -> score += 10000
+            "[tb" in title || "torbox" in title -> score += 9000
+            "[pm" in title || "premiumize" in title -> score += 8000
+        }
+
+        // AIO is useful as an aggregator, but a magnet result avoids stale
+        // direct wrapper/session URLs and can be resolved by Lumora itself.
+        if ("aiostreams" in source) score += 1200
+
+        if (entry.resolver == "torrent") {
+            score += 900
+        } else if (entry.resolver == "direct") {
+            score += 500
+        }
+
+        // Prefer normal English/multi-audio releases.
+        if (
+            Regex(
+                """\b(english|eng|multi(?:[- ]?audio)?|dual[- ]?audio)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(title)
+        ) {
+            score += 700
+        }
+
+        // Push clearly foreign-only releases down.
+        if (
+            Regex(
+                """\b(french|fre|fra|german|ger|deu|russian|rus|italian|ita|spanish|spa|latino|hindi|hin)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(title) &&
+            !Regex(
+                """\b(english|eng|multi|dual[- ]?audio)\b""",
+                RegexOption.IGNORE_CASE
+            ).containsMatchIn(title)
+        ) {
+            score -= 2500
+        }
+
+        // Resolution preference. 1080p first for fast/reliable TV playback,
+        // then 4K, then 720p.
+        when {
+            "1080p" in title -> score += 600
+            "2160p" in title || Regex("""\b4k\b""").containsMatchIn(title) ->
+                score += 500
+            "720p" in title -> score += 350
+            "480p" in title -> score += 100
+        }
+
+        // Useful source preferences without excluding anything.
+        when {
+            "elfcache" in title -> score += 350
+            "torrentio" in source -> score += 250
+            "mediafusion" in source -> score += 150
+            "comet" in source -> score += 50
+        }
+
+        return score
+    }
+
     fun playResult(entry: StreamEntry) {
         val result = entry.result
         attemptedStreamTokens += result.token
@@ -828,11 +904,19 @@ internal fun MainActivity.showStreamSearchDialog(
             return
         }
 
-        if (atFront) {
-            results.add(0, entry)
-        } else {
-            results.add(entry)
-        }
+        val insertIndex =
+            if (atFront) {
+                0
+            } else {
+                val rank = streamRank(entry)
+
+                results.indexOfFirst {
+                    streamRank(it) < rank
+                }.takeIf { it >= 0 }
+                    ?: results.size
+            }
+
+        results.add(insertIndex, entry)
 
         val row = layoutInflater.inflate(
             R.layout.item_stream_result,
@@ -956,7 +1040,10 @@ internal fun MainActivity.showStreamSearchDialog(
         if (atFront) {
             resultsHost.addView(row, 0)
         } else {
-            resultsHost.addView(row)
+            resultsHost.addView(
+            row,
+            insertIndex.coerceIn(0, resultsHost.childCount)
+        )
         }
 
         status.text = "${results.size} result(s)"

@@ -128,6 +128,7 @@ class PlayerManager(
 
     private var lastPlayRequest: PlayRequest? = null
     private var lastPlayWasForcedHls = false
+    private var lastPlayWasForcedProgressiveTs = false
 
     /**
      * Prepare and start playing a stream URL.
@@ -144,7 +145,8 @@ class PlayerManager(
         headers: Map<String, String>? = null,
         audio: String? = null,
         preferAudioLanguage: Boolean = false,
-        forceHls: Boolean = false
+        forceHls: Boolean = false,
+        forceProgressiveTs: Boolean = false
     ) {
         lastPlayRequest = PlayRequest(
             url = url,
@@ -156,6 +158,7 @@ class PlayerManager(
             preferAudioLanguage = preferAudioLanguage
         )
         lastPlayWasForcedHls = forceHls
+        lastPlayWasForcedProgressiveTs = forceProgressiveTs
 
         val dataSourceFactory = buildDataSourceFactory(userAgent, headers)
 
@@ -165,7 +168,16 @@ class PlayerManager(
         val mediaItemBuilder = MediaItem.Builder()
             .setUri(Uri.parse(url))
             .apply {
-                if (forceHls) setMimeType(MimeTypes.APPLICATION_M3U8)
+                when {
+                    forceHls -> setMimeType(MimeTypes.APPLICATION_M3U8)
+
+                    // Some IPTV/Xtream servers advertise a .m3u8 URL but,
+                    // after a stream boundary/reconnect, return raw MPEG-TS
+                    // rather than an HLS playlist. Media3 otherwise tries
+                    // to parse the TS bytes as #EXTM3U and throws
+                    // ERROR_CODE_PARSING_MANIFEST_MALFORMED.
+                    forceProgressiveTs -> setMimeType(MimeTypes.VIDEO_MP2T)
+                }
             }
             .setMediaMetadata(
                 androidx.media3.common.MediaMetadata.Builder()
@@ -302,6 +314,32 @@ class PlayerManager(
             preferAudioLanguage = request.preferAudioLanguage,
             forceHls = true
         )
+        return true
+    }
+
+
+    /**
+     * IPTV recovery for servers that expose a .m3u8 URL but occasionally
+     * return raw MPEG-TS bytes instead of an HLS playlist.
+     *
+     * Live streams restart at the current live edge rather than seeking to
+     * the old player's elapsed position.
+     */
+    fun retryCurrentAsProgressiveTs(): Boolean {
+        val request = lastPlayRequest ?: return false
+        if (lastPlayWasForcedProgressiveTs) return false
+
+        playUrl(
+            url = request.url,
+            userAgent = request.userAgent,
+            subtitles = request.subtitles,
+            startPositionMs = 0L,
+            headers = request.headers,
+            audio = request.audio,
+            preferAudioLanguage = false,
+            forceProgressiveTs = true
+        )
+
         return true
     }
 
