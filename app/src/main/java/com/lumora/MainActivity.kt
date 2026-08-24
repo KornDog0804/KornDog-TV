@@ -224,12 +224,20 @@ internal const val CLASSIC_LAYOUT_TOGGLE_ID = "__classic_layout_toggle__"
 /** Sidebar utility row that collapses the category rail; persisted so the rail stays
  *  collapsed across launches. */
 internal const val COLLAPSE_CATEGORIES_TOGGLE_ID = "__collapse_categories__"
+/** Live TV sidebar action that opens global Search already scoped to LIVE.
+ *  Search operates on the loaded liveChannels catalog, so even very large
+ *  Eternal/Xtream lineups do not require another provider fetch. */
+internal const val LIVE_SEARCH_CATEGORY_ID = "__live_search__"
 internal const val PREF_CATEGORY_SIDEBAR_COLLAPSED = "category_sidebar_collapsed"
 /** Rows that act on the rail itself rather than filtering it. They must never be hideable:
  *  hiding one is unrecoverable, since the only way to unhide a row is the context menu on
  *  that same row. The hidden-id filter in buildCategoryRows skips these too, so anyone who
  *  already hid one gets it back. */
-internal val UTILITY_ROW_IDS = setOf(CLASSIC_LAYOUT_TOGGLE_ID, COLLAPSE_CATEGORIES_TOGGLE_ID)
+internal val UTILITY_ROW_IDS = setOf(
+    CLASSIC_LAYOUT_TOGGLE_ID,
+    COLLAPSE_CATEGORIES_TOGGLE_ID,
+    LIVE_SEARCH_CATEGORY_ID
+)
 /** Films/Series sidebar row that filters the tab down to Jellyfin-sourced items only.
  *  Only built when the tab actually contains Jellyfin content. */
 internal const val JELLYFIN_CATEGORY_ID = "__jellyfin__"

@@ -872,6 +872,16 @@ internal fun MainActivity.buildCategoryRows(
         }
         if (tab != 0) result.add(allRow)
         if (tab == 0) {
+            // Search belongs inside Live TV itself, not buried in the global
+            // toolbar. It opens the existing search overlay scoped to LIVE.
+            result.add(
+                CategoryFilter(
+                    id = LIVE_SEARCH_CATEGORY_ID,
+                    name = "Search channels",
+                    count = -1
+                )
+            )
+
             val favoriteCount = list.count { it.id in favoriteChannelIds }
             if (favoriteCount > 0) {
                 result.add(CategoryFilter(id = FAVOURITES_CATEGORY_ID, name = "Favourites", count = favoriteCount))
@@ -1143,6 +1153,11 @@ internal suspend fun MainActivity.applyCategoryFilter(focusFirstLiveChannel: Boo
 }
 
 internal fun MainActivity.onCategorySelected(category: CategoryFilter) {
+    if (category.id == LIVE_SEARCH_CATEGORY_ID) {
+        showLiveSearchDialog()
+        return
+    }
+
     if (category.id == COLLAPSE_CATEGORIES_TOGGLE_ID) {
         collapseCategorySidebar()
         return
