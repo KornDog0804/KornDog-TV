@@ -443,3 +443,14 @@ internal fun MainActivity.addSearchRecent(q: String) {
 internal fun MainActivity.clearSearchRecents() {
     getSharedPreferences("search_recents", Context.MODE_PRIVATE).edit().remove("list").apply()
 }
+
+/**
+ * Opens Search scoped specifically to Live TV.
+ *
+ * This searches the already-loaded liveChannels catalog, including large
+ * Eternal/Xtream lineups, without making another provider catalog request.
+ */
+internal fun MainActivity.showLiveSearchDialog(initialQuery: String? = null) {
+    searchFilter = MainActivity.SearchFilter.LIVE
+    showSearchDialog(initialQuery)
+}
