@@ -493,10 +493,7 @@ class MainActivity : AppCompatActivity() {
     internal var showingDiscover = false
     // Favorites is a standalone catalog destination, not a fourth activeTab.
     // activeTab remains reserved for Live / Series / Movies.
-    // Favorites is the default visible destination on cold start.
-    // activeTab remains 0 so the existing Live / Series / Movies 0..2 contract
-    // stays untouched internally.
-    internal var showingFavorites = true
+    internal var showingFavorites = false
     /** Catch Up is a pane of its own rather than a fourth catalogue tab: it browses the
      *  same live channels through a different axis (time), and every tab-indexed path
      *  (activeTab 0/1/2, its prefs, its category rail) would otherwise need a fourth case
@@ -1304,73 +1301,6 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         }
-        // ── DIRECT 15-SECOND TV SEEK ─────────────────────────────
-        //
-        // Rewind / Fast Forward are playback commands, not UI-navigation commands.
-        // They work immediately without first revealing the control/progress overlay.
-        //
-        // VOD only. Live TV stays untouched because seeking a live stream can have
-        // provider-specific DVR/timeshift semantics and must not inherit VOD behavior.
-        if (
-            isPlayerVisible &&
-            !isPlayerSideMenuOpen() &&
-            !upNextActive &&
-            nowPlayingChannel?.mediaType != MediaType.LIVE &&
-            event.action == android.view.KeyEvent.ACTION_DOWN
-        ) {
-            val controlsVisible =
-                binding.controlsOverlay.visibility == View.VISIBLE
-
-            val seekDeltaMs = when (event.keyCode) {
-                // Dedicated transport buttons always seek.
-                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ->
-                    15_000L
-
-                android.view.KeyEvent.KEYCODE_MEDIA_REWIND ->
-                    -15_000L
-
-                // DPAD left/right are blind seek shortcuts ONLY while
-                // the controls are hidden. Once controls are visible,
-                // they belong to normal TV focus navigation so Audio,
-                // Subtitles, Versions, etc. remain reachable.
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT ->
-                    if (!controlsVisible) 15_000L else 0L
-
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT ->
-                    if (!controlsVisible) -15_000L else 0L
-
-                else -> 0L
-            }
-
-            if (seekDeltaMs != 0L) {
-                val duration = playerManager.duration
-                val current = playerManager.currentPosition
-
-                if (
-                    current != androidx.media3.common.C.TIME_UNSET &&
-                    current >= 0L
-                ) {
-                    val target = if (
-                        duration != androidx.media3.common.C.TIME_UNSET &&
-                        duration > 0L
-                    ) {
-                        (current + seekDeltaMs).coerceIn(0L, duration)
-                    } else {
-                        (current + seekDeltaMs).coerceAtLeast(0L)
-                    }
-
-                    playerManager.seekTo(target)
-
-                    android.util.Log.d(
-                        "LumoraPlayback",
-                        "Direct seek ${if (seekDeltaMs > 0) "+15s" else "-15s"}: $current -> $target"
-                    )
-                }
-
-                return true
-            }
-        }
-
         // Two-stage OK while fullscreen: first press only reveals the controls, a second one
         // (on the play/pause button they land focus on) is what actually pauses. Glancing at
         // the clock or the now-playing programme is then free - on LIVE especially, where an

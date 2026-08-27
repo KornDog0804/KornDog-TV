@@ -24,9 +24,6 @@ data class StremioStream(
     val url: String? = null,
     val magnet: String? = null,
     val source: String? = null,
-    val description: String? = null,
-    val filename: String? = null,
-    val audioLanguage: String? = null,
     val behaviorHints: Map<String, String> = emptyMap(),
     val requestHeaders: Map<String, String> = emptyMap()
 )
@@ -40,47 +37,6 @@ data class StremioSubtitle(
 )
 
 class StremioAddonClient {
-
-    private fun inferAudioLanguage(vararg values: String?): String? {
-        val text = values
-            .filterNotNull()
-            .joinToString(" ")
-            .lowercase()
-
-        if (text.isBlank()) return null
-
-        fun has(pattern: String): Boolean =
-            Regex(pattern, RegexOption.IGNORE_CASE).containsMatchIn(text)
-
-        val hasEnglish = has("""\b(eng|english|en)\b""")
-        val hasRussian = has("""\b(rus|russian|ru)\b""")
-        val hasJapanese = has("""\b(jpn|japanese|ja|jap)\b""")
-        val hasChinese = has("""\b(chi|chinese|zho|zh|chs|cht)\b""")
-        val hasSpanish = has("""\b(spa|spanish|es|latino|castellano)\b""")
-        val hasFrench = has("""\b(fre|fra|french|fr)\b""")
-        val hasGerman = has("""\b(ger|deu|german|de)\b""")
-        val hasItalian = has("""\b(ita|italian|it)\b""")
-        val hasKorean = has("""\b(kor|korean|ko)\b""")
-
-        val found = buildList {
-            if (hasEnglish) add("ENG")
-            if (hasRussian) add("RUS")
-            if (hasJapanese) add("JPN")
-            if (hasChinese) add("CHI")
-            if (hasSpanish) add("SPA")
-            if (hasFrench) add("FRE")
-            if (hasGerman) add("GER")
-            if (hasItalian) add("ITA")
-            if (hasKorean) add("KOR")
-        }
-
-        return when {
-            found.size > 1 -> "MULTI ${found.joinToString("/")}"
-            found.size == 1 -> found.first()
-            has("""\b(multi|dual[\s._-]*audio|multi[\s._-]*audio)\b""") -> "MULTI"
-            else -> null
-        }
-    }
 
     private fun stremioLog(message: String) {
         runCatching {
@@ -266,14 +222,7 @@ class StremioAddonClient {
                     val hints = mutableMapOf<String, String>()
                     val requestHeaders = mutableMapOf<String, String>()
 
-                    val description = item.optString("description")
-                        .takeIf(String::isNotBlank)
-
-                    var filename: String? = null
-
                     item.optJSONObject("behaviorHints")?.let { behavior ->
-                        filename = behavior.optString("filename")
-                            .takeIf(String::isNotBlank)
                         behavior.keys().forEach { key ->
                             val value = behavior.opt(key)
                             if (value is String && value.isNotBlank()) {
@@ -305,27 +254,12 @@ class StremioAddonClient {
                         }
                     }
 
-                    val inferredAudioLanguage = inferAudioLanguage(
-                        title,
-                        description,
-                        filename
-                    )
-
-                    stremioLog(
-                        "LANG_META addon=${manifest.name} index=$i " +
-                            "filename=${filename?.take(300) ?: "null"} " +
-                            "inferred=${inferredAudioLanguage ?: "null"}"
-                    )
-
                     add(
                         StremioStream(
                             title = title,
                             url = directUrl,
                             magnet = magnet,
                             source = manifest.name,
-                            description = description,
-                            filename = filename,
-                            audioLanguage = inferredAudioLanguage,
                             behaviorHints = hints,
                             requestHeaders = requestHeaders
                         )
@@ -408,14 +342,13 @@ class StremioAddonClient {
                 ?: return@mapNotNull null
 
             TorrentResult(
-                title = stream.filename ?: stream.title,
+                title = stream.title,
                 token = token,
                 seeders = null,
                 size = null,
                 quality = qualityFrom(stream.title),
                 source = stream.source,
-                audio = null,
-                language = stream.audioLanguage
+                audio = null
             )
         }
 

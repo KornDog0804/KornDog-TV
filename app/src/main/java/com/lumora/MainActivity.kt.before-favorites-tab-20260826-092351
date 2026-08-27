@@ -491,12 +491,6 @@ class MainActivity : AppCompatActivity() {
     internal var homeSeeAllShelf: ContentShelf? = null
     internal var showingDownloads = false
     internal var showingDiscover = false
-    // Favorites is a standalone catalog destination, not a fourth activeTab.
-    // activeTab remains reserved for Live / Series / Movies.
-    // Favorites is the default visible destination on cold start.
-    // activeTab remains 0 so the existing Live / Series / Movies 0..2 contract
-    // stays untouched internally.
-    internal var showingFavorites = true
     /** Catch Up is a pane of its own rather than a fourth catalogue tab: it browses the
      *  same live channels through a different axis (time), and every tab-indexed path
      *  (activeTab 0/1/2, its prefs, its category rail) would otherwise need a fourth case
@@ -772,19 +766,6 @@ class MainActivity : AppCompatActivity() {
             }
         ) { item ->
             onDiscoverItemClick(item)
-        }
-
-    // Favorites intentionally has its own adapter even though it shares the
-    // Discover RecyclerView. Favorites may contain LIVE, provider VOD and TMDB
-    // items together, so its click path must be the universal Home handler.
-    internal val favoritesGridAdapter =
-        com.lumora.adapter.PosterGridAdapter(
-            onItemLongClick = { item ->
-                toggleFavoriteVodItem(item)
-                if (showingFavorites) refreshFavoritesTab()
-            }
-        ) { item ->
-            onHomeItemClick(item)
         }
     internal var discoverSearchJob: Job? = null
     internal var discoverPage = 1
@@ -1136,7 +1117,6 @@ class MainActivity : AppCompatActivity() {
     /** The list filling the content area of whatever section is on screen. */
     private fun activeContentList(): RecyclerView = when {
         showingCatchup -> binding.catchupCategoryList
-        showingFavorites -> binding.discoverGrid
         showingDiscover -> binding.discoverGrid
         showingDownloads -> binding.downloadsContent
         activeTab == 1 -> binding.seriesContent
@@ -1159,7 +1139,7 @@ class MainActivity : AppCompatActivity() {
         // programme list is showing, Back walks the crumb back up rather than leaving.
         if (showingCatchup && catchupStage != CatchupStage.CATEGORIES) return false
         if (!isListAtTop(activeContentList())) return false
-        if (showingCatchup || showingFavorites || showingDiscover || showingDownloads) return true
+        if (showingCatchup || showingDiscover || showingDownloads) return true
         // Collapsed rail (or a tab whose sidebar is otherwise hidden) has nothing to scroll
         // to - the content list alone decides "top" then. Without this guard, a GONE
         // RecyclerView keeps stale child geometry and can report a mid-list scroll position.
@@ -1183,7 +1163,7 @@ class MainActivity : AppCompatActivity() {
         content.scrollToPosition(0)
         // No rail to focus when the sidebar is hidden (collapsed / Downloads-style) - focus
         // the content instead, same as the non-categorized panes below.
-        if (showingCatchup || showingFavorites || showingDiscover || showingDownloads || binding.categorySidebar.visibility != View.VISIBLE) {
+        if (showingCatchup || showingDiscover || showingDownloads || binding.categorySidebar.visibility != View.VISIBLE) {
             focusFirstItemWhenReady(content)
             return
         }
@@ -1195,7 +1175,7 @@ class MainActivity : AppCompatActivity() {
      *  rather than its shelves. Live TV is excluded on purpose - it always has a row
      *  selected (see selectTab), so there's no shelf level there to go back up to. */
     private fun isTabDrilledIn(): Boolean =
-        !showingHome && !showingFavorites && !showingDiscover && !showingDownloads && !showingCatchup && activeTab != 0 &&
+        !showingHome && !showingDiscover && !showingDownloads && !showingCatchup && activeTab != 0 &&
             (selectedShelfItems != null || selectedRowId != null ||
                 selectedCategoryIds != null || selectedBrandChannelIds != null)
 
@@ -1304,73 +1284,6 @@ class MainActivity : AppCompatActivity() {
                 return true
             }
         }
-        // ── DIRECT 15-SECOND TV SEEK ─────────────────────────────
-        //
-        // Rewind / Fast Forward are playback commands, not UI-navigation commands.
-        // They work immediately without first revealing the control/progress overlay.
-        //
-        // VOD only. Live TV stays untouched because seeking a live stream can have
-        // provider-specific DVR/timeshift semantics and must not inherit VOD behavior.
-        if (
-            isPlayerVisible &&
-            !isPlayerSideMenuOpen() &&
-            !upNextActive &&
-            nowPlayingChannel?.mediaType != MediaType.LIVE &&
-            event.action == android.view.KeyEvent.ACTION_DOWN
-        ) {
-            val controlsVisible =
-                binding.controlsOverlay.visibility == View.VISIBLE
-
-            val seekDeltaMs = when (event.keyCode) {
-                // Dedicated transport buttons always seek.
-                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ->
-                    15_000L
-
-                android.view.KeyEvent.KEYCODE_MEDIA_REWIND ->
-                    -15_000L
-
-                // DPAD left/right are blind seek shortcuts ONLY while
-                // the controls are hidden. Once controls are visible,
-                // they belong to normal TV focus navigation so Audio,
-                // Subtitles, Versions, etc. remain reachable.
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT ->
-                    if (!controlsVisible) 15_000L else 0L
-
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT ->
-                    if (!controlsVisible) -15_000L else 0L
-
-                else -> 0L
-            }
-
-            if (seekDeltaMs != 0L) {
-                val duration = playerManager.duration
-                val current = playerManager.currentPosition
-
-                if (
-                    current != androidx.media3.common.C.TIME_UNSET &&
-                    current >= 0L
-                ) {
-                    val target = if (
-                        duration != androidx.media3.common.C.TIME_UNSET &&
-                        duration > 0L
-                    ) {
-                        (current + seekDeltaMs).coerceIn(0L, duration)
-                    } else {
-                        (current + seekDeltaMs).coerceAtLeast(0L)
-                    }
-
-                    playerManager.seekTo(target)
-
-                    android.util.Log.d(
-                        "LumoraPlayback",
-                        "Direct seek ${if (seekDeltaMs > 0) "+15s" else "-15s"}: $current -> $target"
-                    )
-                }
-
-                return true
-            }
-        }
-
         // Two-stage OK while fullscreen: first press only reveals the controls, a second one
         // (on the play/pause button they land focus on) is what actually pauses. Glancing at
         // the clock or the now-playing programme is then free - on LIVE especially, where an

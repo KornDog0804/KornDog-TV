@@ -101,12 +101,6 @@ internal fun MainActivity.setupPlayerControls() {
     binding.navLive.setOnClickListener { onSideMenuSectionRowClicked(0) }
     binding.navSeries.setOnClickListener { onSideMenuSectionRowClicked(1) }
     binding.navFilms.setOnClickListener { onSideMenuSectionRowClicked(2) }
-    binding.navFavorites.setOnClickListener {
-        closeSideMenu()
-        hidePlayer()
-        showingHome = false
-        selectFavorites()
-    }
     binding.navDiscover.setOnClickListener { closeSideMenu(); hidePlayer(); showingHome = false; selectDiscover() }
     binding.navDownloads.setOnClickListener { closeSideMenu(); hidePlayer(); showingHome = false; selectDownloads() }
     // Settings lives behind the browse screen's gear button, which the player covers -
@@ -204,7 +198,7 @@ internal fun MainActivity.setupPlayerControls() {
     binding.btnChapters.setOnClickListener { showChapterPicker() }
     binding.btnLiveVersions.setOnClickListener { showVersionPicker() }
     binding.btnRewind.setOnClickListener { playerManager.seekBy(-15_000); showControls() }
-    binding.btnFastForward.setOnClickListener { playerManager.seekBy(15_000); showControls() }
+    binding.btnFastForward.setOnClickListener { playerManager.seekBy(30_000); showControls() }
     applyAspectMode(loadSavedAspectMode())
     binding.btnAspectRatio.setOnClickListener { cycleAspectMode() }
 
@@ -536,19 +530,7 @@ internal fun MainActivity.setupPlayerControls() {
             if (state == Player.STATE_BUFFERING) onBufferingStarted() else onBufferingEnded()
             if (state == Player.STATE_READY || state == Player.STATE_ENDED) {
                 updateProgress(); updatePlayPauseIcon()
-                if (state == Player.STATE_READY) {
-                    // READY happens again after ordinary seeks. Fast-forwarding or
-                    // rewinding must never reopen the Start Over / Resume dialog.
-                    //
-                    // Only the first READY transition for this playback attempt is
-                    // eligible to ask about a previously saved resume position.
-                    val firstReadyForThisAttempt = !currentStreamPlayed
-                    currentStreamPlayed = true
-
-                    if (firstReadyForThisAttempt) {
-                        maybeShowResumePrompt()
-                    }
-                }
+                if (state == Player.STATE_READY) { currentStreamPlayed = true; maybeShowResumePrompt() }
             if (state == Player.STATE_ENDED) {
                 saveCurrentPlaybackPosition()
                 // The plain save above leaves a just-finished episode near-complete
@@ -1612,12 +1594,7 @@ internal fun MainActivity.hidePlayer() {
     activeTorrentSession = null
     TorrentForegroundService.stop(this)
     if (isCastManagerReady) castManager.stopCasting()
-    // activeTab may still be 0 simply because Live is the app's default tab.
-    // That does NOT mean playback is returning to Live. A movie/episode commonly
-    // returns to its detail page while activeTab is still 0.
-    //
-    // Never resurrect the Live preview unless the real Live pane owns the screen.
-    if (isLivePaneActuallyVisible()) {
+    if (activeTab == 0) {
         showLivePreviewPane()
         val previewTarget = lastFocusedLiveChannel ?: wasPlaying
         previewTarget?.let { requestPreviewLoad(it) }

@@ -408,14 +408,13 @@ class StremioAddonClient {
                 ?: return@mapNotNull null
 
             TorrentResult(
-                title = stream.filename ?: stream.title,
+                title = stream.title,
                 token = token,
                 seeders = null,
                 size = null,
                 quality = qualityFrom(stream.title),
                 source = stream.source,
-                audio = null,
-                language = stream.audioLanguage
+                audio = stream.audioLanguage
             )
         }
 

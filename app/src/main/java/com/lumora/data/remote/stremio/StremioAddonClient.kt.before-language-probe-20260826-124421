@@ -305,18 +305,6 @@ class StremioAddonClient {
                         }
                     }
 
-                    val inferredAudioLanguage = inferAudioLanguage(
-                        title,
-                        description,
-                        filename
-                    )
-
-                    stremioLog(
-                        "LANG_META addon=${manifest.name} index=$i " +
-                            "filename=${filename?.take(300) ?: "null"} " +
-                            "inferred=${inferredAudioLanguage ?: "null"}"
-                    )
-
                     add(
                         StremioStream(
                             title = title,
@@ -325,7 +313,11 @@ class StremioAddonClient {
                             source = manifest.name,
                             description = description,
                             filename = filename,
-                            audioLanguage = inferredAudioLanguage,
+                            audioLanguage = inferAudioLanguage(
+                                title,
+                                description,
+                                filename
+                            ),
                             behaviorHints = hints,
                             requestHeaders = requestHeaders
                         )
@@ -408,14 +400,13 @@ class StremioAddonClient {
                 ?: return@mapNotNull null
 
             TorrentResult(
-                title = stream.filename ?: stream.title,
+                title = stream.title,
                 token = token,
                 seeders = null,
                 size = null,
                 quality = qualityFrom(stream.title),
                 source = stream.source,
-                audio = null,
-                language = stream.audioLanguage
+                audio = stream.audioLanguage
             )
         }
 

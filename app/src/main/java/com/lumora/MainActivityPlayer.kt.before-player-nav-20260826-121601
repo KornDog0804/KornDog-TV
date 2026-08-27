@@ -204,7 +204,7 @@ internal fun MainActivity.setupPlayerControls() {
     binding.btnChapters.setOnClickListener { showChapterPicker() }
     binding.btnLiveVersions.setOnClickListener { showVersionPicker() }
     binding.btnRewind.setOnClickListener { playerManager.seekBy(-15_000); showControls() }
-    binding.btnFastForward.setOnClickListener { playerManager.seekBy(15_000); showControls() }
+    binding.btnFastForward.setOnClickListener { playerManager.seekBy(30_000); showControls() }
     applyAspectMode(loadSavedAspectMode())
     binding.btnAspectRatio.setOnClickListener { cycleAspectMode() }
 

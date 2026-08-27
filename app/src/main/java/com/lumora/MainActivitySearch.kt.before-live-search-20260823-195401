@@ -241,7 +241,7 @@ internal fun MainActivity.showSearchDialog(initialQuery: String? = null) {
         activeSearchOverlay = null
         if (tabBarWasVisible) binding.tabBar.visibility = View.VISIBLE
         applyStatus()
-        if (showingHome) selectHome() else if (showingFavorites) selectFavorites() else if (showingDiscover) selectDiscover() else if (showingDownloads) selectDownloads() else selectTab(activeTab)
+        if (showingHome) selectHome() else if (showingDiscover) selectDiscover() else if (showingDownloads) selectDownloads() else selectTab(activeTab)
     }
     activeSearchOverlay = overlay
     applyStatus()
@@ -442,15 +442,4 @@ internal fun MainActivity.addSearchRecent(q: String) {
 
 internal fun MainActivity.clearSearchRecents() {
     getSharedPreferences("search_recents", Context.MODE_PRIVATE).edit().remove("list").apply()
-}
-
-/**
- * Opens Search scoped specifically to Live TV.
- *
- * This searches the already-loaded liveChannels catalog, including large
- * Eternal/Xtream lineups, without making another provider catalog request.
- */
-internal fun MainActivity.showLiveSearchDialog(initialQuery: String? = null) {
-    searchFilter = MainActivity.SearchFilter.LIVE
-    showSearchDialog(initialQuery)
 }

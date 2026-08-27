@@ -186,7 +186,6 @@ internal fun MainActivity.classifyAndShowLiveFirst() {
             updateTopChromeVisibility()
             when {
                 showingHome -> selectHome()
-                showingFavorites -> selectFavorites()
                 showingDiscover -> selectDiscover()
                 activeTab == 0 -> selectTab(activeTab)
                 // Guard: user already moved to another tab - live side only, no selectTab.
@@ -241,17 +240,7 @@ internal fun MainActivity.deriveFilmsSeries() {
             // Mirror of classifyAndShow()'s shelf submits for the films/series shelves.
             seriesShelfAdapter.submitList(seriesShelves)
             filmsShelfAdapter.submitList(filmShelves)
-
-            if (showingHome) {
-                homeShelfAdapter.submitList(buildHomeShelves())
-            }
-
-            // Provider-backed Movies / Series finish deriving after the fast Live pass.
-            // If Favorites owns the screen, refresh it in-place when those items land
-            // instead of switching destinations.
-            if (showingFavorites) {
-                refreshFavoritesTab()
-            }
+            if (showingHome) homeShelfAdapter.submitList(buildHomeShelves())
         }
     }
 }

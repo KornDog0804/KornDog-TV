@@ -610,17 +610,6 @@ internal fun MainActivity.showStreamSearchDialog(
     var autoPlayCommitted = false
     var autoPlayDecisionJob: Job? = null
 
-    // Manual Find Stream should always land on the first actual stream result.
-    // Addons answer asynchronously, so layout changes can otherwise push focus
-    // down to the quality filters / Cancel button after the first row appears.
-    var initialStreamFocusClaimed = false
-
-    // Results are ranked while addons are still answering. A row that was
-    // first when it arrived may end up 150 rows down after better sources
-    // are inserted ahead of it. Track whether the user has actually moved
-    // so we can safely land on the FINAL #1 result once scraping finishes.
-    var manualStreamUserMoved = false
-
     fun qualityTierOf(title: String): String = when {
         title.contains("2160") || title.contains("4K", true) -> "4K"
         title.contains("1080") -> "1080p"
@@ -772,12 +761,11 @@ internal fun MainActivity.showStreamSearchDialog(
             attemptedStreamTokens += next.result.token
 
             runOnUiThread {
-                // Failover can happen after the chooser/detail window has already
-                // been dismissed. Do not attach transient UI to that old window.
-                android.util.Log.i(
-                    "LumoraPlayback",
-                    "Find Stream failover: trying ${next.result.source ?: "another source"}"
-                )
+                Toast.makeText(
+                    this@showStreamSearchDialog,
+                    "Trying ${next.result.source ?: "another source"}…",
+                    Toast.LENGTH_SHORT
+                ).show()
 
                 playResult(next)
             }
@@ -1019,7 +1007,7 @@ internal fun MainActivity.showStreamSearchDialog(
         // Surface audio/language hints directly in Find Stream.
         // Stremio add-ons commonly encode these in the stream title rather
         // than a dedicated field, so keep this display-only and conservative.
-        val language = entry.result.language ?: when {
+        val language = when {
             Regex(
                 "\\b(english|eng|en)\\b",
                 RegexOption.IGNORE_CASE
@@ -1067,10 +1055,6 @@ internal fun MainActivity.showStreamSearchDialog(
 
             entry.result.audio.equals("dub", true) -> "Dub"
             entry.result.audio.equals("sub", true) -> "Sub"
-
-            !entry.result.audio.isNullOrBlank() ->
-                entry.result.audio
-
             else -> null
         }
 
@@ -1089,21 +1073,6 @@ internal fun MainActivity.showStreamSearchDialog(
             .distinct()
             .joinToString("  ·  ")
 
-        row.setOnKeyListener { _, keyCode, event ->
-            if (
-                event.action == android.view.KeyEvent.ACTION_DOWN &&
-                keyCode in listOf(
-                    android.view.KeyEvent.KEYCODE_DPAD_UP,
-                    android.view.KeyEvent.KEYCODE_DPAD_DOWN,
-                    android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                )
-            ) {
-                manualStreamUserMoved = true
-            }
-            false
-        }
-
         row.setOnClickListener {
             playResult(entry)
         }
@@ -1119,13 +1088,8 @@ internal fun MainActivity.showStreamSearchDialog(
 
         status.text = "${results.size} result(s)"
 
-        if (!autoPlayBest && !initialStreamFocusClaimed) {
-            initialStreamFocusClaimed = true
-
-            row.post {
-                row.requestFocus()
-                scroll.scrollTo(0, 0)
-            }
+        if (resultsHost.childCount == 1) {
+            row.post { row.requestFocus() }
         }
 
         // Playback intent: arm a short decision window off the FIRST result that
@@ -1357,17 +1321,6 @@ internal fun MainActivity.showStreamSearchDialog(
 
         if (results.isEmpty()) {
             status.text = "No streams found"
-        } else if (!manualStreamUserMoved) {
-            // Results have finished ranking. The view currently holding focus
-            // may have been pushed far down by later higher-ranked inserts.
-            // Land on the actual top result and put the viewport at y=0.
-            resultsHost.post {
-                val topResult = resultsHost.getChildAt(0)
-                if (topResult != null) {
-                    scroll.scrollTo(0, 0)
-                    topResult.requestFocus()
-                }
-            }
         }
     }
 

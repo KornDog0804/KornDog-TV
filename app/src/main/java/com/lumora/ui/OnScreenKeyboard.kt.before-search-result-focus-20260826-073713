@@ -133,32 +133,15 @@ class OnScreenKeyboard @JvmOverloads constructor(
     private fun routeDown(): Boolean {
         val target = bottomRowDownTarget ?: return false
         if (!target.isShown) return false
-
-        // RecyclerView itself can accept focus, but that creates a dead landing pad:
-        // OK then belongs to the container instead of the first movie/channel tile.
-        // Always route directly into the first result item instead.
-        if (target is RecyclerView) {
-            if ((target.adapter?.itemCount ?: 0) <= 0) return false
-
+        if (target.requestFocus()) return true
+        // Non-focusable container (a RecyclerView): scroll the first row in, then focus its
+        // first item on the next frame - same retry pattern the episode list uses.
+        if (target is RecyclerView && (target.adapter?.itemCount ?: 0) > 0) {
             target.scrollToPosition(0)
-            target.post {
-                val first = target.layoutManager?.findViewByPosition(0)
-
-                if (first != null) {
-                    first.requestFocus()
-                } else {
-                    // One extra frame for RecyclerView layout/binding after a fresh search.
-                    target.post {
-                        target.layoutManager
-                            ?.findViewByPosition(0)
-                            ?.requestFocus()
-                    }
-                }
-            }
+            target.post { target.layoutManager?.findViewByPosition(0)?.requestFocus() }
             return true
         }
-
-        return target.requestFocus()
+        return false
     }
 
     private fun keyRow(labels: List<String>, weights: List<Float>? = null): LinearLayout {

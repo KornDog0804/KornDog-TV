@@ -1316,29 +1316,12 @@ class MainActivity : AppCompatActivity() {
             !isPlayerSideMenuOpen() &&
             !upNextActive &&
             nowPlayingChannel?.mediaType != MediaType.LIVE &&
-            event.action == android.view.KeyEvent.ACTION_DOWN
+            event.action == android.view.KeyEvent.ACTION_DOWN &&
+            event.repeatCount == 0
         ) {
-            val controlsVisible =
-                binding.controlsOverlay.visibility == View.VISIBLE
-
             val seekDeltaMs = when (event.keyCode) {
-                // Dedicated transport buttons always seek.
-                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD ->
-                    15_000L
-
-                android.view.KeyEvent.KEYCODE_MEDIA_REWIND ->
-                    -15_000L
-
-                // DPAD left/right are blind seek shortcuts ONLY while
-                // the controls are hidden. Once controls are visible,
-                // they belong to normal TV focus navigation so Audio,
-                // Subtitles, Versions, etc. remain reachable.
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT ->
-                    if (!controlsVisible) 15_000L else 0L
-
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT ->
-                    if (!controlsVisible) -15_000L else 0L
-
+                android.view.KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> 15_000L
+                android.view.KeyEvent.KEYCODE_MEDIA_REWIND -> -15_000L
                 else -> 0L
             }
 

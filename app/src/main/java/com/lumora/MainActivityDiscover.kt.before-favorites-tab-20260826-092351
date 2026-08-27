@@ -56,16 +56,7 @@ internal fun MainActivity.selectDiscover() {
     activeSearchOverlay?.dismiss()
     showingHome = false
     showingDownloads = false
-    showingFavorites = false
     showingDiscover = true
-
-    // Favorites and Discover deliberately share this RecyclerView.
-    // Restore Discover's adapter whenever its tab is entered.
-    if (binding.discoverGrid.adapter !== discoverGridAdapter) {
-        binding.discoverGrid.adapter = discoverGridAdapter
-    }
-    binding.discoverPrevPage.visibility = View.VISIBLE
-    binding.discoverNextPage.visibility = View.VISIBLE
     releaseLivePreview()
     binding.contentRow.visibility = View.GONE
     binding.homeDashboard.visibility = View.GONE
@@ -81,121 +72,6 @@ internal fun MainActivity.selectDiscover() {
     } else if (discoverGridAdapter.itemCount == 0) {
         loadDiscover(null)
     }
-    applyStatus()
-}
-
-
-/**
- * One Favorites destination for everything the user has starred.
- *
- * The existing stores remain authoritative:
- * - FavoritesStore.favorite_channel_ids = Live TV
- * - FavoritesStore.favorite_series_ids = provider Movies + Series
- * - DiscoverFavoritesStore = TMDB / Discover items
- *
- * Nothing is copied into a new database.
- */
-internal fun MainActivity.favoriteItemsForTab(): List<Channel> {
-    val liveIds =
-        com.lumora.cache.FavoritesStore.getFavoriteChannelIds(this)
-
-    val vodIds =
-        com.lumora.cache.FavoritesStore.getFavoriteSeriesIds(this)
-
-    val liveFavorites =
-        liveChannels
-            .filter { it.id in liveIds }
-            .filterNot(::isAdultHomeItem)
-
-    val providerFavorites =
-        (seriesList + filmList)
-            .filter { it.id in vodIds }
-            .filterNot(::isAdultHomeItem)
-
-    val discoverFavorites =
-        com.lumora.cache.DiscoverFavoritesStore
-            .getAll(this)
-            .filterNot(::isAdultHomeItem)
-
-    return (
-        liveFavorites +
-            discoverFavorites +
-            providerFavorites
-        )
-        .distinctBy { item ->
-            item.id.ifBlank { item.url }
-        }
-}
-
-/**
- * Rebuild the visible Favorites page directly from the authoritative stores.
- * This makes add/remove operations appear immediately without reloading
- * providers or rebuilding the whole catalog.
- */
-internal fun MainActivity.refreshFavoritesTab() {
-    if (!showingFavorites) return
-
-    val items = favoriteItemsForTab()
-
-    if (binding.discoverGrid.adapter !== favoritesGridAdapter) {
-        binding.discoverGrid.adapter = favoritesGridAdapter
-    }
-
-    favoritesGridAdapter.submitList(items)
-
-    if (items.isEmpty()) {
-        setDiscoverStatus("No favorites yet. Star something and it will show up here.")
-    } else {
-        setDiscoverStatus("")
-    }
-
-    binding.discoverGrid.post {
-        setGridSpan(
-            binding.discoverGrid,
-            favoritesGridAdapter,
-            R.id.tabFavorites
-        )
-
-        if (items.isNotEmpty()) {
-            binding.discoverGrid.scrollToPosition(0)
-        }
-    }
-}
-
-/**
- * Favorites is a standalone destination like Discover / Downloads.
- * It deliberately does not consume activeTab = 3 because activeTab's
- * 0/1/2 contract is deeply shared by Live / Series / Movies.
- */
-internal fun MainActivity.selectFavorites() {
-    hideCatchup()
-    activeSettingsOverlay?.dismiss()
-    activeSearchOverlay?.dismiss()
-
-    showingHome = false
-    showingDownloads = false
-    showingDiscover = false
-    showingFavorites = true
-
-    releaseLivePreview()
-
-    binding.contentRow.visibility = View.GONE
-    binding.homeDashboard.visibility = View.GONE
-    binding.homeContent.visibility = View.GONE
-    binding.homeSearchBar.visibility = View.GONE
-    binding.concertContent.visibility = View.GONE
-
-    // Favorites reuses Discover's poster canvas.
-    binding.discoverContent.visibility = View.VISIBLE
-    binding.discoverPrevPage.visibility = View.GONE
-    binding.discoverNextPage.visibility = View.GONE
-
-    if (binding.discoverGrid.adapter !== favoritesGridAdapter) {
-        binding.discoverGrid.adapter = favoritesGridAdapter
-    }
-
-    updateTabStyles(binding.tabFavorites)
-    refreshFavoritesTab()
     applyStatus()
 }
 
@@ -284,12 +160,10 @@ internal fun MainActivity.loadTmdbVodCatalog() {
         when {
             activeTab == 1 &&
                 !showingHome &&
-                !showingFavorites &&
                 !showingDiscover -> showTmdbSeriesTab()
 
             activeTab == 2 &&
                 !showingHome &&
-                !showingFavorites &&
                 !showingDiscover -> showTmdbMoviesTab()
         }
     }
@@ -630,182 +504,54 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
 
                     episodeLoading.dismiss()
 
-                    // Rich TV episode picker.
-                    //
-                    // TMDB already gives us episode number, title, air date and overview.
-                    // The old setItems() picker threw most of that away and forced the
-                    // viewer to choose episodes nearly blind. Keep the exact same
-                    // playback/search path, but make the selection screen useful.
-                    val density = resources.displayMetrics.density
-                    val pad = (16 * density).toInt()
-                    val rowPad = (12 * density).toInt()
-
-                    val episodeContainer = LinearLayout(
-                        this@showSeriesEpisodePicker
-                    ).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(pad, pad / 2, pad, pad / 2)
-                    }
-
-                    val episodeScroll = ScrollView(
-                        this@showSeriesEpisodePicker
-                    ).apply {
-                        isFillViewport = true
-                        addView(episodeContainer)
-                    }
-
-                    val episodeDialog = AlertDialog.Builder(
-                        this@showSeriesEpisodePicker
-                    )
-                        .setTitle(season.name)
-                        .setView(episodeScroll)
-                        .setNegativeButton("Back") { _, _ ->
-                            showSeriesEpisodePicker(plugin, item)
-                        }
-                        .create()
-
-                    val episodeRows =
+                    val epLabels =
                         if (episodes.isNotEmpty()) {
-                            episodes.mapIndexed { index, ep ->
-                                Triple(
-                                    ep.number,
-                                    ep.name ?: "Episode ${ep.number}",
-                                    ep
-                                )
-                            }
-                        } else {
-                            (1..season.episodeCount).map { number ->
-                                Triple(
-                                    number,
-                                    "Episode $number",
-                                    null
-                                )
-                            }
-                        }
+                            episodes.map { ep ->
+                                buildString {
+                                    append("E")
+                                    append(
+                                        ep.number
+                                            .toString()
+                                            .padStart(2, '0')
+                                    )
 
-                    var firstEpisodeRow: View? = null
-
-                    episodeRows.forEachIndexed { index, (episodeNumber, episodeName, ep) ->
-
-                        val row = LinearLayout(
-                            this@showSeriesEpisodePicker
-                        ).apply {
-                            orientation = LinearLayout.VERTICAL
-                            isClickable = true
-                            isFocusable = true
-                            isFocusableInTouchMode = true
-
-                            setPadding(
-                                rowPad,
-                                rowPad,
-                                rowPad,
-                                rowPad
-                            )
-
-                            background = ContextCompat.getDrawable(
-                                this@showSeriesEpisodePicker,
-                                R.drawable.bg_select_item
-                            )
-
-                            setOnClickListener {
-                                episodeDialog.dismiss()
-
-                                showStreamSearchDialog(
-                                    plugin,
-                                    item,
-                                    season = season.number,
-                                    episode = episodeNumber
-                                )
-                            }
-                        }
-
-                        val title = TextView(
-                            this@showSeriesEpisodePicker
-                        ).apply {
-                            text = buildString {
-                                append("E")
-                                append(
-                                    episodeNumber
-                                        .toString()
-                                        .padStart(2, '0')
-                                )
-                                append("  ·  ")
-                                append(episodeName)
-
-                                ep?.airDate
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?.let {
+                                    ep.name?.let {
                                         append("  ·  ")
                                         append(it)
                                     }
-                            }
 
-                            textSize = 17f
+                                    ep.airDate?.let {
+                                        append("  ·  ")
+                                        append(it)
+                                    }
+                                }
+                            }.toTypedArray()
+                        } else {
+                            (1..season.episodeCount)
+                                .map { "Episode $it" }
+                                .toTypedArray()
+                        }
 
-                            setTextColor(
-                                ContextCompat.getColor(
-                                    this@showSeriesEpisodePicker,
-                                    R.color.text_primary
-                                )
+                    AlertDialog.Builder(
+                        this@showSeriesEpisodePicker
+                    )
+                        .setTitle(season.name)
+                        .setItems(epLabels) { _, ei ->
+                            val episodeNumber =
+                                episodes.getOrNull(ei)?.number
+                                    ?: (ei + 1)
+
+                            showStreamSearchDialog(
+                                plugin,
+                                item,
+                                season = season.number,
+                                episode = episodeNumber
                             )
                         }
-
-                        row.addView(title)
-
-                        ep?.overview
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { overview ->
-                                val description = TextView(
-                                    this@showSeriesEpisodePicker
-                                ).apply {
-                                    text = overview
-                                    textSize = 14f
-                                    maxLines = 3
-                                    ellipsize =
-                                        android.text.TextUtils.TruncateAt.END
-
-                                    setTextColor(
-                                        ContextCompat.getColor(
-                                            this@showSeriesEpisodePicker,
-                                            R.color.text_secondary
-                                        )
-                                    )
-
-                                    setPadding(
-                                        0,
-                                        (6 * density).toInt(),
-                                        0,
-                                        0
-                                    )
-                                }
-
-                                row.addView(description)
-                            }
-
-                        episodeContainer.addView(
-                            row,
-                            LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT
-                            ).apply {
-                                bottomMargin =
-                                    (8 * density).toInt()
-                            }
-                        )
-
-                        if (index == 0) {
-                            firstEpisodeRow = row
+                        .setNegativeButton("Back") { _, _ ->
+                            showSeriesEpisodePicker(plugin, item)
                         }
-                    }
-
-                    episodeDialog.setOnShowListener {
-                        firstEpisodeRow?.post {
-                            firstEpisodeRow?.requestFocus()
-                            episodeScroll.scrollTo(0, 0)
-                        }
-                    }
-
-                    episodeDialog.show()
+                        .show()
                 }
             }
             .setNegativeButton("Cancel", null)
@@ -1022,7 +768,7 @@ internal fun MainActivity.clearContinueWatching() {
     getHiddenCategories(1).let { if (it.remove("Continue Watching")) prefs.edit().putStringSet(hiddenCategoriesPrefsKey(1), it).apply() }
     getHiddenCategories(2).let { if (it.remove("Continue Watching")) prefs.edit().putStringSet(hiddenCategoriesPrefsKey(2), it).apply() }
     homeShelfAdapter.submitList(buildHomeShelves())
-    if (!showingHome && !showingFavorites && activeTab != 0) scope.launch { classifyAndShow() }
+    if (!showingHome && activeTab != 0) scope.launch { classifyAndShow() }
 }
 
 /** Adult content never reaches a Home shelf, regardless of the "Hide adult categories"

@@ -918,10 +918,7 @@
         <LinearLayout
             android:id="@+id/homeDashboard"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="20dp"
-            android:layout_marginEnd="20dp"
-            android:layout_marginTop="16dp"
+            android:layout_height="0dp"
             android:orientation="vertical"
             android:visibility="gone">
 
@@ -930,7 +927,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="10dp"
                 android:fontFamily="@font/inter_semibold"
-                android:text="Your Streaming Apps"
+                android:text="What are we watching?"
                 android:textColor="@color/text_primary"
                 android:textSize="@dimen/text_title" />
 
@@ -957,7 +954,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="NETFLIX"
+                        android:text="LIVE TV"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -965,7 +962,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open Netflix"
+                        android:text="Channels and favorites"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>
@@ -987,7 +984,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="HULU"
+                        android:text="GUIDE"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -995,7 +992,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open Hulu"
+                        android:text="Now and next"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>
@@ -1017,7 +1014,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="DISNEY+"
+                        android:text="MOVIES"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -1025,7 +1022,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open Disney+"
+                        android:text="Popular and trending"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>
@@ -1055,7 +1052,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="ESPN"
+                        android:text="SERIES"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -1063,7 +1060,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open ESPN"
+                        android:text="Shows and episodes"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>
@@ -1085,7 +1082,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="ANGEL"
+                        android:text="CONCERT CORNER"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -1093,7 +1090,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open Angel Studios"
+                        android:text="Live sets and sessions"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>
@@ -1115,7 +1112,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:fontFamily="@font/inter_semibold"
-                        android:text="FANDANGO"
+                        android:text="DISCOVER"
                         android:textColor="@color/text_primary"
                         android:textSize="@dimen/text_title" />
 
@@ -1123,37 +1120,7 @@
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="4dp"
-                        android:text="Open Fandango at Home"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:id="@+id/dashboardMax"
-                    android:layout_width="0dp"
-                    android:layout_height="112dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="10dp"
-                    android:background="@drawable/bg_dashboard_card"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="bottom"
-                    android:orientation="vertical"
-                    android:stateListAnimator="@animator/focus_scale_flat">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:fontFamily="@font/inter_semibold"
-                        android:text="HBO MAX"
-                        android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_title" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="4dp"
-                        android:text="Open HBO Max"
+                        android:text="Find something new"
                         android:textColor="@color/text_secondary"
                         android:textSize="@dimen/text_body" />
                 </LinearLayout>

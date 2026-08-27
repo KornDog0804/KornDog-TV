@@ -872,16 +872,6 @@ internal fun MainActivity.buildCategoryRows(
         }
         if (tab != 0) result.add(allRow)
         if (tab == 0) {
-            // Search belongs inside Live TV itself, not buried in the global
-            // toolbar. It opens the existing search overlay scoped to LIVE.
-            result.add(
-                CategoryFilter(
-                    id = LIVE_SEARCH_CATEGORY_ID,
-                    name = "Search channels",
-                    count = -1
-                )
-            )
-
             val favoriteCount = list.count { it.id in favoriteChannelIds }
             if (favoriteCount > 0) {
                 result.add(CategoryFilter(id = FAVOURITES_CATEGORY_ID, name = "Favourites", count = favoriteCount))
@@ -1001,7 +991,6 @@ internal fun MainActivity.showHomeSeeAll(shelf: ContentShelf) {
     showingHome = true
     showingDownloads = false
     showingDiscover = false
-    showingFavorites = false
     hideCatchup()
     releaseLivePreview()
 
@@ -1154,11 +1143,6 @@ internal suspend fun MainActivity.applyCategoryFilter(focusFirstLiveChannel: Boo
 }
 
 internal fun MainActivity.onCategorySelected(category: CategoryFilter) {
-    if (category.id == LIVE_SEARCH_CATEGORY_ID) {
-        showLiveSearchDialog()
-        return
-    }
-
     if (category.id == COLLAPSE_CATEGORIES_TOGGLE_ID) {
         collapseCategorySidebar()
         return
@@ -1283,7 +1267,6 @@ internal fun MainActivity.applyStatus() {
     val slotTaken = activeSettingsOverlay != null || activeSearchOverlay != null ||
         isPlayerVisible || isContentDetailVisible ||
         binding.contentRow.visibility == View.VISIBLE ||
-        binding.homeDashboard.visibility == View.VISIBLE ||
         binding.homeContent.visibility == View.VISIBLE ||
         binding.discoverContent.visibility == View.VISIBLE
     val show = statusWanted && !slotTaken
@@ -1299,10 +1282,6 @@ internal fun MainActivity.applyStatus() {
 
 internal fun MainActivity.setupTabs() {
     binding.tabHome.setOnClickListener { selectHome() }
-    binding.tabFavorites.setOnClickListener {
-        showingHome = false
-        selectFavorites()
-    }
 
     binding.bottomNavLive.setOnClickListener {
         showingHome = false
@@ -1323,95 +1302,34 @@ internal fun MainActivity.setupTabs() {
     binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
 
-    fun launchStreamingApp(
-        packageName: String,
-        activityName: String,
-        displayName: String
-    ) {
-        try {
-            // Match the proven ADB behavior:
-            // adb shell am start -n package/activity
-            //
-            // Do NOT add MAIN or LEANBACK categories here. The explicit
-            // ComponentName is enough and avoids launcher intent filtering.
-            val intent = android.content.Intent().apply {
-                component = android.content.ComponentName(
-                    packageName,
-                    activityName
-                )
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            android.util.Log.e(
-                "StreamingLauncher",
-                "Launch failed for $displayName: ${e.javaClass.simpleName}: ${e.message}",
-                e
-            )
-
-            Toast.makeText(
-                this,
-                "$displayName could not be launched",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
     binding.dashboardLive.setOnClickListener {
-        launchStreamingApp(
-            "com.netflix.ninja",
-            "com.netflix.ninja.MainActivity",
-            "Netflix"
-        )
+        showingHome = false
+        selectTab(0)
     }
 
     binding.dashboardGuide.setOnClickListener {
-        launchStreamingApp(
-            "com.hulu.livingroomplus",
-            "com.hulu.livingroomplus.WKFactivity",
-            "Hulu"
-        )
+        showingHome = false
+        selectTab(0)
     }
 
     binding.dashboardMovies.setOnClickListener {
-        launchStreamingApp(
-            "com.disney.disneyplus",
-            "com.bamtechmedia.dominguez.main.MainActivity",
-            "Disney+"
-        )
+        showingHome = false
+        selectTab(2)
     }
 
     binding.dashboardSeries.setOnClickListener {
-        launchStreamingApp(
-            "com.espn.score_center",
-            "com.espn.startup.presentation.StartupActivity",
-            "ESPN"
-        )
+        showingHome = false
+        selectTab(1)
     }
 
     binding.dashboardConcerts.setOnClickListener {
-        launchStreamingApp(
-            "com.angel.tv",
-            "com.angel.tv.MainActivity",
-            "Angel"
-        )
+        showingHome = false
+        selectConcertCorner()
     }
 
     binding.dashboardDiscover.setOnClickListener {
-        launchStreamingApp(
-            "air.com.vudu.air.DownloaderTablet",
-            "com.vudu.android.app.TvMainActivity",
-            "Fandango at Home"
-        )
-    }
-
-    binding.dashboardMax.setOnClickListener {
-        launchStreamingApp(
-            "com.wbd.stream",
-            "com.wbd.stream.MainActivity",
-            "HBO Max"
-        )
+        showingHome = false
+        selectDiscover()
     }
     binding.tabLive.setOnClickListener { selectTab(0) }
     binding.tabCatchup.setOnClickListener { showingHome = false; selectCatchup() }
@@ -1426,7 +1344,7 @@ internal fun MainActivity.setupTabs() {
     // self-invalidate on unfocus doesn't always clear it. Forcing the whole bar to
     // redraw on every focus change is a blunt but reliable fix.
     val invalidateBarOnFocus = View.OnFocusChangeListener { _, _ -> binding.tabBar.invalidate() }
-    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabFavorites, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
+    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
         tv.onFocusChangeListener = invalidateBarOnFocus
     }
     // Hide tab bar + search until an enabled provider exists
@@ -1434,7 +1352,7 @@ internal fun MainActivity.setupTabs() {
 }
 
 internal fun MainActivity.updateTabStyles(selected: View) {
-    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabFavorites, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
+    for (tv in listOf(binding.tabHome, binding.tabLive, binding.tabCatchup, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabConcerts, binding.tabDownloads)) {
         val isSelected = tv === selected
         tv.isSelected = isSelected
         val (labelId, iconId, indicatorId) = when (tv.id) {
@@ -1443,7 +1361,6 @@ internal fun MainActivity.updateTabStyles(selected: View) {
             R.id.tabSeries -> Triple(R.id.tabSeriesLabel, R.id.tabSeriesIcon, R.id.tabSeriesIndicator)
             R.id.tabFilms -> Triple(R.id.tabFilmsLabel, R.id.tabFilmsIcon, R.id.tabFilmsIndicator)
             R.id.tabHome -> Triple(R.id.tabHomeLabel, R.id.tabHomeIcon, R.id.tabHomeIndicator)
-            R.id.tabFavorites -> Triple(R.id.tabFavoritesLabel, R.id.tabFavoritesIcon, R.id.tabFavoritesIndicator)
             R.id.tabDiscover -> Triple(R.id.tabDiscoverLabel, R.id.tabDiscoverIcon, R.id.tabDiscoverIndicator)
             R.id.tabConcerts -> Triple(R.id.tabConcertsLabel, R.id.tabConcertsIcon, R.id.tabConcertsIndicator)
             R.id.tabDownloads -> Triple(R.id.tabDownloadsLabel, R.id.tabDownloadsIcon, R.id.tabDownloadsIndicator)
@@ -1479,9 +1396,7 @@ internal fun MainActivity.selectHome() {
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
     binding.homeDashboard.visibility = View.VISIBLE
-    // Home is now the external streaming-app hub only.
-    // Favorites / Continue Watching already live elsewhere.
-    binding.homeContent.visibility = View.GONE
+    binding.homeContent.visibility = View.VISIBLE
     // Search on Home is only useful with something to search; with no enabled provider
     // updateTopChromeVisibility() keeps it hidden. selectHome used to force it visible
     // unconditionally, which is why it lingered on the empty first screen.
@@ -1508,7 +1423,6 @@ internal fun MainActivity.selectDownloads() {
     activeSearchOverlay?.dismiss()
     showingDownloads = true
     showingDiscover = false
-    showingFavorites = false
     hideCatchup()
     releaseLivePreview()
     binding.discoverContent.visibility = View.GONE
@@ -1590,7 +1504,6 @@ internal fun MainActivity.closeSideMenu() {
  *  categorized tabs (activeTab). */
 internal fun MainActivity.activeSideMenuRow(): View = when {
     showingHome -> binding.navHome
-    showingFavorites -> binding.navFavorites
     showingDiscover -> binding.navDiscover
     showingDownloads -> binding.navDownloads
     else -> listOf(binding.navLive, binding.navSeries, binding.navFilms)[activeTab.coerceIn(0, 2)]
@@ -1604,7 +1517,7 @@ internal fun MainActivity.updateSideMenuSelection(): View {
     val active = activeSideMenuRow()
     for (row in listOf(
         binding.navHome, binding.navLive, binding.navSeries,
-        binding.navFilms, binding.navFavorites, binding.navDiscover, binding.navDownloads
+        binding.navFilms, binding.navDiscover, binding.navDownloads
     )) {
         row.isSelected = row === active
     }
@@ -1614,7 +1527,7 @@ internal fun MainActivity.updateSideMenuSelection(): View {
 internal fun MainActivity.clearSideMenuSelection() {
     for (row in listOf(
         binding.navHome, binding.navLive, binding.navSeries,
-        binding.navFilms, binding.navFavorites, binding.navDiscover, binding.navDownloads
+        binding.navFilms, binding.navDiscover, binding.navDownloads
     )) {
         row.isSelected = false
     }

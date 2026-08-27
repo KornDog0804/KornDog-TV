@@ -1019,7 +1019,7 @@ internal fun MainActivity.showStreamSearchDialog(
         // Surface audio/language hints directly in Find Stream.
         // Stremio add-ons commonly encode these in the stream title rather
         // than a dedicated field, so keep this display-only and conservative.
-        val language = entry.result.language ?: when {
+        val language = when {
             Regex(
                 "\\b(english|eng|en)\\b",
                 RegexOption.IGNORE_CASE
@@ -1067,10 +1067,6 @@ internal fun MainActivity.showStreamSearchDialog(
 
             entry.result.audio.equals("dub", true) -> "Dub"
             entry.result.audio.equals("sub", true) -> "Sub"
-
-            !entry.result.audio.isNullOrBlank() ->
-                entry.result.audio
-
             else -> null
         }
 
@@ -1089,10 +1085,10 @@ internal fun MainActivity.showStreamSearchDialog(
             .distinct()
             .joinToString("  ·  ")
 
-        row.setOnKeyListener { _, keyCode, event ->
+        row.setOnKeyListener { _, event ->
             if (
                 event.action == android.view.KeyEvent.ACTION_DOWN &&
-                keyCode in listOf(
+                event.keyCode in listOf(
                     android.view.KeyEvent.KEYCODE_DPAD_UP,
                     android.view.KeyEvent.KEYCODE_DPAD_DOWN,
                     android.view.KeyEvent.KEYCODE_DPAD_LEFT,

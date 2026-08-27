@@ -24,30 +24,14 @@ android {
         val ciBuildNumber =
             System.getenv("GITHUB_RUN_NUMBER")
                 ?.toIntOrNull()
+                ?: 0
 
-        // GitHub Actions keeps using its normal run number.
-        //
-        // Local/Termux release builds need a versionCode newer than any
-        // previously installed CI build, otherwise Android rejects them as
-        // INSTALL_FAILED_VERSION_DOWNGRADE. Use epoch minutes locally so each
-        // build naturally moves forward without manually editing Gradle.
-        val localBuildNumber =
-            (System.currentTimeMillis() / 60_000L)
-                .coerceAtMost(1_700_000_000L)
-                .toInt()
-
-        versionCode =
-            if (ciBuildNumber != null) {
-                400000 + ciBuildNumber
-            } else {
-                500000000 + localBuildNumber
-            }
-
+        versionCode = 400000 + ciBuildNumber
         versionName =
-            if (ciBuildNumber != null) {
+            if (ciBuildNumber > 0) {
                 "3.2.$ciBuildNumber"
             } else {
-                "3.2.local.$localBuildNumber"
+                "3.2.local"
             }
 
         ksp {

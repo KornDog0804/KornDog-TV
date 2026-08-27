@@ -1278,7 +1278,7 @@ internal fun MainActivity.showProviderSettings() {
         } else {
             binding.emptyState.visibility = View.GONE
             updateTopChromeVisibility()
-            if (showingHome) selectHome() else if (showingFavorites) selectFavorites() else if (showingDiscover) selectDiscover() else if (showingDownloads) selectDownloads() else selectTab(activeTab)
+            if (showingHome) selectHome() else if (showingDiscover) selectDiscover() else if (showingDownloads) selectDownloads() else selectTab(activeTab)
         }
     }
     activeSettingsOverlay = dialog

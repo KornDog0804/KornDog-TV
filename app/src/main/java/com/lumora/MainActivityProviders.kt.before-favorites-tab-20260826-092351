@@ -123,7 +123,7 @@ internal fun MainActivity.applySimpleModeUi() {
         // is worth no space, so it goes away exactly as it used to.
         val catchupAvailable = catchupChannels().isNotEmpty()
         binding.tabBar.visibility = if (isTv && chromeUp && catchupAvailable) View.VISIBLE else View.GONE
-        for (tab in listOf(binding.tabHome, binding.tabSeries, binding.tabFilms, binding.tabFavorites, binding.tabDiscover, binding.tabDownloads)) {
+        for (tab in listOf(binding.tabHome, binding.tabSeries, binding.tabFilms, binding.tabDiscover, binding.tabDownloads)) {
             tab.visibility = View.GONE
         }
         binding.tabLive.visibility = View.VISIBLE
@@ -139,11 +139,11 @@ internal fun MainActivity.applySimpleModeUi() {
         binding.btnSearch.nextFocusLeftId = if (catchupAvailable) R.id.tabCatchup else R.id.btnSearch
         // Home/Discover/Downloads (and any Series/Movies drill) aren't reachable in
         // simple mode - land back on Live TV instead of leaving a hidden pane on screen.
-        if (chromeUp && (showingHome || showingFavorites || showingDiscover || showingDownloads || activeTab != 0)) {
+        if (chromeUp && (showingHome || showingDiscover || showingDownloads || activeTab != 0)) {
             if (!showingCatchup) selectTab(0)
         }
     } else {
-        for (tab in listOf(binding.tabHome, binding.tabLive, binding.tabSeries, binding.tabFilms, binding.tabFavorites, binding.tabDiscover)) {
+        for (tab in listOf(binding.tabHome, binding.tabLive, binding.tabSeries, binding.tabFilms, binding.tabDiscover)) {
             tab.visibility = View.VISIBLE
         }
         // Back to the full-row chain: Live -> Series ... Home -> Catch Up -> Discover.

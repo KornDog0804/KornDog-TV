@@ -150,7 +150,6 @@ internal fun MainActivity.selectTab(index: Int) {
     activeTab = index
     showingDownloads = false
     showingDiscover = false
-    showingFavorites = false
     hideCatchup()
     // Owned here rather than by each caller. Every tab-bar handler already paired
     // "showingHome = false" with this call, so any *other* entry point (the launch
@@ -237,7 +236,7 @@ internal fun MainActivity.selectTab(index: Int) {
         // sidebar and the content row back on screen unconditionally, so landing late
         // dropped this tab's sidebar on top of whatever the user had moved to - most
         // visibly Discover, which has no sidebar of its own to overwrite it.
-        if (activeTab != index || showingHome || showingFavorites || showingDiscover || showingDownloads) {
+        if (activeTab != index || showingHome || showingDiscover || showingDownloads) {
             setStatus("", visible = false)
             return@launch
         }
@@ -1077,7 +1076,6 @@ internal fun MainActivity.showEpgSourceListDialog() {
 internal fun MainActivity.restoreTabFocus() {
     val target = when {
         showingHome -> binding.tabHome
-        showingFavorites -> binding.tabFavorites
         showingDiscover -> binding.tabDiscover
         showingDownloads -> binding.tabDownloads
         activeTab == 0 -> binding.tabLive

@@ -630,182 +630,54 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
 
                     episodeLoading.dismiss()
 
-                    // Rich TV episode picker.
-                    //
-                    // TMDB already gives us episode number, title, air date and overview.
-                    // The old setItems() picker threw most of that away and forced the
-                    // viewer to choose episodes nearly blind. Keep the exact same
-                    // playback/search path, but make the selection screen useful.
-                    val density = resources.displayMetrics.density
-                    val pad = (16 * density).toInt()
-                    val rowPad = (12 * density).toInt()
-
-                    val episodeContainer = LinearLayout(
-                        this@showSeriesEpisodePicker
-                    ).apply {
-                        orientation = LinearLayout.VERTICAL
-                        setPadding(pad, pad / 2, pad, pad / 2)
-                    }
-
-                    val episodeScroll = ScrollView(
-                        this@showSeriesEpisodePicker
-                    ).apply {
-                        isFillViewport = true
-                        addView(episodeContainer)
-                    }
-
-                    val episodeDialog = AlertDialog.Builder(
-                        this@showSeriesEpisodePicker
-                    )
-                        .setTitle(season.name)
-                        .setView(episodeScroll)
-                        .setNegativeButton("Back") { _, _ ->
-                            showSeriesEpisodePicker(plugin, item)
-                        }
-                        .create()
-
-                    val episodeRows =
+                    val epLabels =
                         if (episodes.isNotEmpty()) {
-                            episodes.mapIndexed { index, ep ->
-                                Triple(
-                                    ep.number,
-                                    ep.name ?: "Episode ${ep.number}",
-                                    ep
-                                )
-                            }
-                        } else {
-                            (1..season.episodeCount).map { number ->
-                                Triple(
-                                    number,
-                                    "Episode $number",
-                                    null
-                                )
-                            }
-                        }
+                            episodes.map { ep ->
+                                buildString {
+                                    append("E")
+                                    append(
+                                        ep.number
+                                            .toString()
+                                            .padStart(2, '0')
+                                    )
 
-                    var firstEpisodeRow: View? = null
-
-                    episodeRows.forEachIndexed { index, (episodeNumber, episodeName, ep) ->
-
-                        val row = LinearLayout(
-                            this@showSeriesEpisodePicker
-                        ).apply {
-                            orientation = LinearLayout.VERTICAL
-                            isClickable = true
-                            isFocusable = true
-                            isFocusableInTouchMode = true
-
-                            setPadding(
-                                rowPad,
-                                rowPad,
-                                rowPad,
-                                rowPad
-                            )
-
-                            background = ContextCompat.getDrawable(
-                                this@showSeriesEpisodePicker,
-                                R.drawable.bg_select_item
-                            )
-
-                            setOnClickListener {
-                                episodeDialog.dismiss()
-
-                                showStreamSearchDialog(
-                                    plugin,
-                                    item,
-                                    season = season.number,
-                                    episode = episodeNumber
-                                )
-                            }
-                        }
-
-                        val title = TextView(
-                            this@showSeriesEpisodePicker
-                        ).apply {
-                            text = buildString {
-                                append("E")
-                                append(
-                                    episodeNumber
-                                        .toString()
-                                        .padStart(2, '0')
-                                )
-                                append("  ·  ")
-                                append(episodeName)
-
-                                ep?.airDate
-                                    ?.takeIf { it.isNotBlank() }
-                                    ?.let {
+                                    ep.name?.let {
                                         append("  ·  ")
                                         append(it)
                                     }
-                            }
 
-                            textSize = 17f
+                                    ep.airDate?.let {
+                                        append("  ·  ")
+                                        append(it)
+                                    }
+                                }
+                            }.toTypedArray()
+                        } else {
+                            (1..season.episodeCount)
+                                .map { "Episode $it" }
+                                .toTypedArray()
+                        }
 
-                            setTextColor(
-                                ContextCompat.getColor(
-                                    this@showSeriesEpisodePicker,
-                                    R.color.text_primary
-                                )
+                    AlertDialog.Builder(
+                        this@showSeriesEpisodePicker
+                    )
+                        .setTitle(season.name)
+                        .setItems(epLabels) { _, ei ->
+                            val episodeNumber =
+                                episodes.getOrNull(ei)?.number
+                                    ?: (ei + 1)
+
+                            showStreamSearchDialog(
+                                plugin,
+                                item,
+                                season = season.number,
+                                episode = episodeNumber
                             )
                         }
-
-                        row.addView(title)
-
-                        ep?.overview
-                            ?.takeIf { it.isNotBlank() }
-                            ?.let { overview ->
-                                val description = TextView(
-                                    this@showSeriesEpisodePicker
-                                ).apply {
-                                    text = overview
-                                    textSize = 14f
-                                    maxLines = 3
-                                    ellipsize =
-                                        android.text.TextUtils.TruncateAt.END
-
-                                    setTextColor(
-                                        ContextCompat.getColor(
-                                            this@showSeriesEpisodePicker,
-                                            R.color.text_secondary
-                                        )
-                                    )
-
-                                    setPadding(
-                                        0,
-                                        (6 * density).toInt(),
-                                        0,
-                                        0
-                                    )
-                                }
-
-                                row.addView(description)
-                            }
-
-                        episodeContainer.addView(
-                            row,
-                            LinearLayout.LayoutParams(
-                                ViewGroup.LayoutParams.MATCH_PARENT,
-                                ViewGroup.LayoutParams.WRAP_CONTENT
-                            ).apply {
-                                bottomMargin =
-                                    (8 * density).toInt()
-                            }
-                        )
-
-                        if (index == 0) {
-                            firstEpisodeRow = row
+                        .setNegativeButton("Back") { _, _ ->
+                            showSeriesEpisodePicker(plugin, item)
                         }
-                    }
-
-                    episodeDialog.setOnShowListener {
-                        firstEpisodeRow?.post {
-                            firstEpisodeRow?.requestFocus()
-                            episodeScroll.scrollTo(0, 0)
-                        }
-                    }
-
-                    episodeDialog.show()
+                        .show()
                 }
             }
             .setNegativeButton("Cancel", null)

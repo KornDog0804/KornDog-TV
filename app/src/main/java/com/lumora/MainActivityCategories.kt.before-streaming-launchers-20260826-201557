@@ -1283,7 +1283,6 @@ internal fun MainActivity.applyStatus() {
     val slotTaken = activeSettingsOverlay != null || activeSearchOverlay != null ||
         isPlayerVisible || isContentDetailVisible ||
         binding.contentRow.visibility == View.VISIBLE ||
-        binding.homeDashboard.visibility == View.VISIBLE ||
         binding.homeContent.visibility == View.VISIBLE ||
         binding.discoverContent.visibility == View.VISIBLE
     val show = statusWanted && !slotTaken
@@ -1323,95 +1322,34 @@ internal fun MainActivity.setupTabs() {
     binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
 
-    fun launchStreamingApp(
-        packageName: String,
-        activityName: String,
-        displayName: String
-    ) {
-        try {
-            // Match the proven ADB behavior:
-            // adb shell am start -n package/activity
-            //
-            // Do NOT add MAIN or LEANBACK categories here. The explicit
-            // ComponentName is enough and avoids launcher intent filtering.
-            val intent = android.content.Intent().apply {
-                component = android.content.ComponentName(
-                    packageName,
-                    activityName
-                )
-                addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-
-            startActivity(intent)
-        } catch (e: Exception) {
-            android.util.Log.e(
-                "StreamingLauncher",
-                "Launch failed for $displayName: ${e.javaClass.simpleName}: ${e.message}",
-                e
-            )
-
-            Toast.makeText(
-                this,
-                "$displayName could not be launched",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-    }
-
     binding.dashboardLive.setOnClickListener {
-        launchStreamingApp(
-            "com.netflix.ninja",
-            "com.netflix.ninja.MainActivity",
-            "Netflix"
-        )
+        showingHome = false
+        selectTab(0)
     }
 
     binding.dashboardGuide.setOnClickListener {
-        launchStreamingApp(
-            "com.hulu.livingroomplus",
-            "com.hulu.livingroomplus.WKFactivity",
-            "Hulu"
-        )
+        showingHome = false
+        selectTab(0)
     }
 
     binding.dashboardMovies.setOnClickListener {
-        launchStreamingApp(
-            "com.disney.disneyplus",
-            "com.bamtechmedia.dominguez.main.MainActivity",
-            "Disney+"
-        )
+        showingHome = false
+        selectTab(2)
     }
 
     binding.dashboardSeries.setOnClickListener {
-        launchStreamingApp(
-            "com.espn.score_center",
-            "com.espn.startup.presentation.StartupActivity",
-            "ESPN"
-        )
+        showingHome = false
+        selectTab(1)
     }
 
     binding.dashboardConcerts.setOnClickListener {
-        launchStreamingApp(
-            "com.angel.tv",
-            "com.angel.tv.MainActivity",
-            "Angel"
-        )
+        showingHome = false
+        selectConcertCorner()
     }
 
     binding.dashboardDiscover.setOnClickListener {
-        launchStreamingApp(
-            "air.com.vudu.air.DownloaderTablet",
-            "com.vudu.android.app.TvMainActivity",
-            "Fandango at Home"
-        )
-    }
-
-    binding.dashboardMax.setOnClickListener {
-        launchStreamingApp(
-            "com.wbd.stream",
-            "com.wbd.stream.MainActivity",
-            "HBO Max"
-        )
+        showingHome = false
+        selectDiscover()
     }
     binding.tabLive.setOnClickListener { selectTab(0) }
     binding.tabCatchup.setOnClickListener { showingHome = false; selectCatchup() }
@@ -1479,9 +1417,7 @@ internal fun MainActivity.selectHome() {
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
     binding.homeDashboard.visibility = View.VISIBLE
-    // Home is now the external streaming-app hub only.
-    // Favorites / Continue Watching already live elsewhere.
-    binding.homeContent.visibility = View.GONE
+    binding.homeContent.visibility = View.VISIBLE
     // Search on Home is only useful with something to search; with no enabled provider
     // updateTopChromeVisibility() keeps it hidden. selectHome used to force it visible
     // unconditionally, which is why it lingered on the empty first screen.
