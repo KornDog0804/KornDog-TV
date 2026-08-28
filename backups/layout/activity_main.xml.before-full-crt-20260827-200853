@@ -78,8 +78,8 @@
                         android:background="@drawable/bg_korndog_brand_mark">
 
                         <ImageView
-                            android:layout_width="39dp"
-                            android:layout_height="39dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/app_name"
                             android:src="@drawable/korndog_toolbar_brand"

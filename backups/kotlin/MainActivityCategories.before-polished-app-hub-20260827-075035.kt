@@ -1358,31 +1358,6 @@ internal fun MainActivity.setupTabs() {
         }
     }
 
-    fun loadStreamingAppIcon(
-        imageView: android.widget.ImageView,
-        packageName: String
-    ) {
-        runCatching {
-            packageManager.getApplicationIcon(packageName)
-        }.onSuccess { drawable ->
-            imageView.setImageDrawable(drawable)
-            imageView.visibility = android.view.View.VISIBLE
-        }.onFailure {
-            imageView.visibility = android.view.View.INVISIBLE
-        }
-    }
-
-    loadStreamingAppIcon(binding.dashboardNetflixIcon, "com.netflix.ninja")
-    loadStreamingAppIcon(binding.dashboardHuluIcon, "com.hulu.livingroomplus")
-    loadStreamingAppIcon(binding.dashboardDisneyIcon, "com.disney.disneyplus")
-    loadStreamingAppIcon(binding.dashboardMaxIcon, "com.wbd.stream")
-    loadStreamingAppIcon(binding.dashboardPrimeIcon, "com.amazon.amazonvideo.livingroom")
-    loadStreamingAppIcon(binding.dashboardEspnIcon, "com.espn.score_center")
-    loadStreamingAppIcon(binding.dashboardAngelIcon, "com.angel.tv")
-    loadStreamingAppIcon(binding.dashboardFandangoIcon, "air.com.vudu.air.DownloaderTablet")
-    loadStreamingAppIcon(binding.dashboardYouTubeIcon, "com.google.android.youtube.tv")
-    loadStreamingAppIcon(binding.dashboardYouTubeMusicIcon, "com.google.android.youtube.tvmusic")
-
     binding.dashboardLive.setOnClickListener {
         launchStreamingApp(
             "com.netflix.ninja",

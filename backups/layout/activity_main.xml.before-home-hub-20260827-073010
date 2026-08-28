@@ -78,12 +78,12 @@
                         android:background="@drawable/bg_korndog_brand_mark">
 
                         <ImageView
-                            android:layout_width="39dp"
-                            android:layout_height="39dp"
+                            android:layout_width="24dp"
+                            android:layout_height="24dp"
                             android:layout_gravity="center"
                             android:contentDescription="@string/app_name"
-                            android:src="@drawable/korndog_toolbar_brand"
-                            android:scaleType="fitCenter" />
+                            android:src="@drawable/ic_toolbar_brand"
+                            android:tint="@android:color/white" />
                     </FrameLayout>
 
                     <LinearLayout
@@ -918,18 +918,17 @@
         <LinearLayout
             android:id="@+id/homeDashboard"
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="20dp"
+            android:layout_marginEnd="20dp"
+            android:layout_marginTop="16dp"
             android:orientation="vertical"
-            android:paddingStart="20dp"
-            android:paddingEnd="20dp"
-            android:paddingTop="8dp"
             android:visibility="gone">
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
+                android:layout_marginBottom="10dp"
                 android:fontFamily="@font/inter_semibold"
                 android:text="Your Streaming Apps"
                 android:textColor="@color/text_primary"
@@ -938,477 +937,225 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:baselineAligned="false"
-                android:orientation="horizontal">
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
                 <LinearLayout
                     android:id="@+id/dashboardLive"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="0dp"
                     android:layout_marginEnd="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardNetflixIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="NETFLIX"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="NETFLIX"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
+                        android:layout_marginTop="4dp"
                         android:text="Open Netflix"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/dashboardGuide"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
+                    android:layout_marginHorizontal="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardHuluIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="HULU"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="HULU"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
+                        android:layout_marginTop="4dp"
                         android:text="Open Hulu"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/dashboardMovies"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
                     android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardDisneyIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="DISNEY+"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="DISNEY+"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
+                        android:layout_marginTop="4dp"
                         android:text="Open Disney+"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/dashboardMax"
-                    android:layout_width="0dp"
-                    android:layout_height="138dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
-                    android:background="@drawable/bg_dashboard_card"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:stateListAnimator="@animator/focus_scale_flat">
-
-                    <ImageView
-                        android:id="@+id/dashboardMaxIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="HBO MAX"
-                        android:scaleType="centerInside" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="HBO MAX"
-                        android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open Max"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/dashboardPrime"
-                    android:layout_width="0dp"
-                    android:layout_height="138dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="0dp"
-                    android:background="@drawable/bg_dashboard_card"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:stateListAnimator="@animator/focus_scale_flat">
-
-                    <ImageView
-                        android:id="@+id/dashboardPrimeIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="PRIME VIDEO"
-                        android:scaleType="centerInside" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="PRIME VIDEO"
-                        android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open Prime Video"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
             </LinearLayout>
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="10dp" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:baselineAligned="false"
-                android:orientation="horizontal">
+                android:layout_marginTop="10dp"
+                android:orientation="horizontal"
+                android:baselineAligned="false">
+
                 <LinearLayout
                     android:id="@+id/dashboardSeries"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="0dp"
                     android:layout_marginEnd="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardEspnIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="ESPN"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="ESPN"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
+                        android:layout_marginTop="4dp"
                         android:text="Open ESPN"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/dashboardConcerts"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
+                    android:layout_marginHorizontal="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardAngelIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="ANGEL"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="ANGEL"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open Angel"
+                        android:layout_marginTop="4dp"
+                        android:text="Open Angel Studios"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
+
                 <LinearLayout
                     android:id="@+id/dashboardDiscover"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
                     android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardFandangoIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="FANDANGO"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
                         android:text="FANDANGO"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open Fandango"
+                        android:layout_marginTop="4dp"
+                        android:text="Open Fandango at Home"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
+
                 <LinearLayout
-                    android:id="@+id/dashboardYouTube"
+                    android:id="@+id/dashboardMax"
                     android:layout_width="0dp"
-                    android:layout_height="138dp"
+                    android:layout_height="112dp"
                     android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="5dp"
+                    android:layout_marginStart="10dp"
                     android:background="@drawable/bg_dashboard_card"
                     android:clickable="true"
                     android:focusable="true"
-                    android:gravity="center"
+                    android:gravity="bottom"
                     android:orientation="vertical"
-                    android:padding="12dp"
                     android:stateListAnimator="@animator/focus_scale_flat">
 
-                    <ImageView
-                        android:id="@+id/dashboardYouTubeIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="YOUTUBE"
-                        android:scaleType="centerInside" />
-
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:ellipsize="end"
                         android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="YOUTUBE"
+                        android:text="HBO MAX"
                         android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
+                        android:textSize="@dimen/text_title" />
 
                     <TextView
-                        android:layout_width="match_parent"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open YouTube"
+                        android:layout_marginTop="4dp"
+                        android:text="Open HBO Max"
                         android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/dashboardYouTubeMusic"
-                    android:layout_width="0dp"
-                    android:layout_height="138dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="5dp"
-                    android:layout_marginEnd="0dp"
-                    android:background="@drawable/bg_dashboard_card"
-                    android:clickable="true"
-                    android:focusable="true"
-                    android:gravity="center"
-                    android:orientation="vertical"
-                    android:padding="12dp"
-                    android:stateListAnimator="@animator/focus_scale_flat">
-
-                    <ImageView
-                        android:id="@+id/dashboardYouTubeMusicIcon"
-                        android:layout_width="56dp"
-                        android:layout_height="56dp"
-                        android:layout_marginBottom="8dp"
-                        android:adjustViewBounds="true"
-                        android:contentDescription="YT MUSIC"
-                        android:scaleType="centerInside" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:ellipsize="end"
-                        android:fontFamily="@font/inter_semibold"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="YT MUSIC"
-                        android:textColor="@color/text_primary"
-                        android:textSize="@dimen/text_subhead" />
-
-                    <TextView
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:layout_marginTop="3dp"
-                        android:ellipsize="end"
-                        android:gravity="center"
-                        android:maxLines="1"
-                        android:text="Open YouTube Music"
-                        android:textColor="@color/text_secondary"
-                        android:textSize="@dimen/text_body_s" />
+                        android:textSize="@dimen/text_body" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
