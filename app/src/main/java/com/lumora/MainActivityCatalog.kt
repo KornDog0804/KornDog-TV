@@ -324,6 +324,92 @@ internal fun MainActivity.computeDerivedContent(allChannels: List<Channel>, hide
 /** Live half of the derive pass: filter + adult-drop + quality-version grouping into
  *  liveChannels/liveVersions. Cheap relative to the films/series half (no shelves), so
  *  it's extracted first and reused by the paint-Live-ASAP path. */
+
+private const val ETERNAL_US_FILTER_VERSION = 1
+
+private fun MainActivity.isEternalLiveChannel(ch: Channel): Boolean {
+    val providerName = ch.sourceProviderId
+        ?.let { providerNamesById[it] }
+        ?.trim()
+        .orEmpty()
+
+    return providerName.contains("eternal", ignoreCase = true)
+}
+
+private fun MainActivity.keepEternalUsChannel(ch: Channel): Boolean {
+    if (!isEternalLiveChannel(ch)) return true
+
+    val raw = listOfNotNull(
+        ch.categoryName,
+        ch.group,
+        ch.name
+    ).joinToString(" ")
+        .uppercase()
+        .replace('|', ' ')
+        .replace('_', ' ')
+
+    // Explicit USA markers.
+    if (
+        raw.contains(" USA ") ||
+        raw.startsWith("USA ") ||
+        raw.contains(" US ") ||
+        raw.startsWith("US ") ||
+        raw.contains("UNITED STATES")
+    ) return true
+
+    // Major US sports categories commonly supplied without a USA prefix.
+    val usSports = listOf(
+        "NFL",
+        "NCAAF",
+        "NCAA FOOTBALL",
+        "SEC+",
+        "SEC ",
+        "ACC ",
+        "NBA",
+        "NCAAB",
+        "NCAA BASKETBALL",
+        "MLB",
+        "NHL",
+        "MLS",
+        "WNBA",
+        "NASCAR",
+        "INDYCAR",
+        "INDY CAR",
+        "FORMULA 1",
+        " F1 ",
+        "MOTOCROSS",
+        "SUPERCROSS",
+        "MOTORSPORT",
+        "UFC",
+        "AEW",
+        "WWE",
+        "BOXING",
+        "MMA",
+        "BOWLING"
+    )
+
+    if (usSports.any { raw.contains(it) }) return true
+
+    // Common US category labels that Eternal exposes without country decoration.
+    val usGeneral = listOf(
+        "US NEWS",
+        "LOCAL NEWS",
+        "US LOCAL",
+        "PREMIUM USA",
+        "USA PREMIUM",
+        "US ENTERTAINMENT",
+        "USA ENTERTAINMENT",
+        "US MOVIES",
+        "USA MOVIES",
+        "US KIDS",
+        "USA KIDS",
+        "US MUSIC",
+        "USA MUSIC"
+    )
+
+    return usGeneral.any { raw.contains(it) }
+}
+
 internal fun MainActivity.deriveLiveHalf(list: List<Channel>) {
     val startedAt = System.currentTimeMillis()
     val hideAdult = prefs.getBoolean(PREF_HIDE_ADULT, true)
@@ -345,7 +431,8 @@ internal fun MainActivity.deriveLiveHalf(list: List<Channel>) {
         ch.mediaType == MediaType.LIVE &&
         !ch.name.contains("##") &&
         !(hideAdult && isAdultCategory(ch.categoryName, ch.group)) &&
-        ch.id !in hiddenLiveChannelIds
+        ch.id !in hiddenLiveChannelIds &&
+        keepEternalUsChannel(ch)
     }
     if (useClassic || !groupChannels) {
         // Classic: no quality version merging — show every channel as-is from the provider.
@@ -369,7 +456,10 @@ internal fun MainActivity.liveDerivedFingerprint(
     hideAdult: Boolean,
     useClassic: Boolean,
     groupChannels: Boolean
-): String = DerivedCache.catalogFingerprint(list, "live:$hideAdult:$useClassic:$groupChannels")
+): String = DerivedCache.catalogFingerprint(
+    list,
+    "live:$hideAdult:$useClassic:$groupChannels:eternalUs=$ETERNAL_US_FILTER_VERSION:providers=${providerNamesById.hashCode()}"
+)
 
 /** Cache key for the films/series derive - see [liveDerivedFingerprint]. */
 internal fun MainActivity.vodDerivedFingerprint(

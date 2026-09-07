@@ -515,6 +515,88 @@ internal suspend fun MainActivity.buildCategoriesForActiveTab(tab: Int = activeT
 /** Pure ordering pipeline behind the sidebar - shared with the Series/Films poster
  *  shelves (see computeDerivedContent) so both render the same categories in the same
  *  order, by construction. No prefs/state reads: every caller passes its own snapshots. */
+
+private fun normalizeLiveCategoryLabel(rawLabel: String): String {
+    var raw = rawLabel.trim()
+
+    raw = raw.replace(
+        Regex("""(?i)^\s*(USA|US|UNITED STATES)\s*[\|\-:]+\s*"""),
+        ""
+    ).trim()
+
+    val lower = raw.lowercase()
+
+    return when {
+        lower.contains("korndog") && lower.contains("sport") ->
+            "KornDog Sports"
+
+        listOf("nfl", "ncaaf", "ncaa football", "football", "sec+", "acc network")
+            .any { lower.contains(it) } ->
+            "Football"
+
+        listOf("nba", "ncaab", "ncaa basketball", "basketball", "wnba")
+            .any { lower.contains(it) } ->
+            "Basketball"
+
+        listOf("mlb", "baseball")
+            .any { lower.contains(it) } ->
+            "Baseball"
+
+        listOf("nhl", "hockey")
+            .any { lower.contains(it) } ->
+            "Hockey"
+
+        listOf(
+            "motorsport",
+            "motor sport",
+            "nascar",
+            "indycar",
+            "indy car",
+            "formula 1",
+            "f1",
+            "motocross",
+            "supercross",
+            "racing"
+        ).any { lower.contains(it) } ->
+            "Motorsports"
+
+        listOf("ufc", "mma", "boxing", "combat", "wrestling", "aew", "wwe")
+            .any { lower.contains(it) } ->
+            "Combat Sports"
+
+        lower.contains("golf") ->
+            "Golf"
+
+        listOf("soccer", "mls", "futbol")
+            .any { lower.contains(it) } ->
+            "Soccer"
+
+        lower.contains("bowling") ->
+            "Bowling"
+
+        lower.contains("sports news") ->
+            "Sports News"
+
+        listOf("kid", "family", "cartoon")
+            .any { lower.contains(it) } ->
+            "Kids & Family"
+
+        lower.contains("music") ->
+            "Music"
+
+        lower.contains("movie") || lower.contains("cinema") ->
+            "Movies"
+
+        lower.contains("news") || lower.contains("local") ->
+            "News / Local"
+
+        lower.contains("entertainment") ->
+            "Entertainment"
+
+        else -> raw
+    }
+}
+
 internal fun MainActivity.buildCategoryRows(
     list: List<Channel>,
     versionsById: Map<String, List<Channel>>,
@@ -567,7 +649,11 @@ internal fun MainActivity.buildCategoryRows(
             // "4K-D+ - ") so noisy panels get a clean, consistent sidebar and more categories
             // fall into the genre buckets. Live keeps its raw names - its leading country tags
             // ("UK|", "US:") are the grouping people actually want there.
-            val label = if (tab != 0) cleanVodCategoryLabel(rawLabel) else rawLabel
+            val label = if (tab != 0) {
+                cleanVodCategoryLabel(rawLabel)
+            } else {
+                normalizeLiveCategoryLabel(rawLabel)
+            }
             names.putIfAbsent(key, label)
             counts[key] = (counts[key] ?: 0) + 1
         }
@@ -1966,4 +2052,4 @@ internal fun MainActivity.formatTime(ms: Long): String {
 
 /** Bumped whenever buildCategoryRows' output changes shape - see the rows fingerprint.
  *  2: utility rows (collapse rail / classic layout) became un-hideable. */
-private const val CATEGORY_ROWS_LOGIC_VERSION = 4
+private const val CATEGORY_ROWS_LOGIC_VERSION = 5
