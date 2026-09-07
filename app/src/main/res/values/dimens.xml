@@ -56,15 +56,15 @@
 
     <!-- Live TV: category sidebar and the EPG guide grid. Same story as the settings scale -
          these were sized for a phone in the hand; values-television/ steps them up. -->
-    <dimen name="category_row_text">10sp</dimen>
+    <dimen name="category_row_text">12sp</dimen>
     <dimen name="category_row_padding_vertical">8dp</dimen>
-    <dimen name="guide_channel_name_text">9sp</dimen>
-    <dimen name="guide_channel_number_text">8sp</dimen>
-    <dimen name="guide_channel_initial_text">9sp</dimen>
-    <dimen name="guide_program_text">11sp</dimen>
+    <dimen name="guide_channel_name_text">11sp</dimen>
+    <dimen name="guide_channel_number_text">9sp</dimen>
+    <dimen name="guide_channel_initial_text">11sp</dimen>
+    <dimen name="guide_program_text">12sp</dimen>
     <dimen name="guide_channel_logo_size">32dp</dimen>
     <!-- Floor only - the row is wrap_content and normally taller than this on its own. -->
-    <dimen name="guide_row_min_height">48dp</dimen>
+    <dimen name="guide_row_min_height">50dp</dimen>
     <dimen name="category_row_padding_horizontal">10dp</dimen>
 
     <!-- Toolbar / tab bar / poster grid. Padding shrinks on TV as the type grows: the tabs

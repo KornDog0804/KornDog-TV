@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_marginHorizontal="8dp"
         android:layout_marginVertical="3dp"
-        android:background="@drawable/bg_select_item"
+        android:background="@drawable/bg_live_category_row"
         android:clickable="true"
         android:focusable="true"
         android:gravity="center_vertical"
