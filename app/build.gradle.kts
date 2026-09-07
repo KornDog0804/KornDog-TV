@@ -38,7 +38,7 @@ android {
 
         versionCode =
             if (ciBuildNumber != null) {
-                400000 + ciBuildNumber
+                600000000 + ciBuildNumber
             } else {
                 500000000 + localBuildNumber
             }
