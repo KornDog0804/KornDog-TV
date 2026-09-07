@@ -21,6 +21,7 @@ import com.lumora.model.IptvProviderConfig
 import com.lumora.data.IptvProviderStore
 import com.lumora.data.remote.stremio.StremioAddonClient
 import com.lumora.data.remote.stremio.StremioAddonStore
+import com.lumora.data.remote.torbox.TorBoxClient
 import com.lumora.plugin.DiscoveredProvider
 import com.lumora.plugin.DiscoveryResult
 import com.lumora.plugin.ResolveResult
@@ -285,6 +286,47 @@ internal suspend fun MainActivity.resolveTorrentStream(
  *  the saved playback position above all - needs this to come out the same for the same
  *  episode on a later launch, so it's derived from the plugin + token + episode rather than
  *  anything about the particular resolve that produced the URL. */
+
+private fun chooseTorBoxVideoFile(
+    files: List<TorBoxClient.TorrentFile>,
+    season: Int?,
+    episode: Int?
+): TorBoxClient.TorrentFile? {
+
+    val videos = files.filter {
+        val n = it.name.lowercase()
+        n.endsWith(".mkv") ||
+            n.endsWith(".mp4") ||
+            n.endsWith(".avi") ||
+            n.endsWith(".mov") ||
+            n.endsWith(".m4v") ||
+            n.endsWith(".webm")
+    }
+
+    if (videos.isEmpty()) return null
+
+    if (season != null && episode != null) {
+        val patterns = listOf(
+            Regex(
+                """\bS0?${season}E0?${episode}\b""",
+                RegexOption.IGNORE_CASE
+            ),
+            Regex(
+                """\b0?${season}x0?${episode}\b""",
+                RegexOption.IGNORE_CASE
+            )
+        )
+
+        videos.firstOrNull { file ->
+            patterns.any { it.containsMatchIn(file.name) }
+        }?.let { return it }
+    }
+
+    return videos.maxByOrNull {
+        it.size ?: 0L
+    }
+}
+
 internal fun MainActivity.pluginChannelId(plugin: PluginScript, token: String, episode: Int?): String =
     "plugin:${plugin.id}:$token" + (episode?.let { ":e$it" } ?: "")
 
@@ -1143,6 +1185,165 @@ internal fun MainActivity.showStreamSearchDialog(
 
         row.setOnClickListener {
             playResult(entry)
+        }
+
+        if (entry.result.token.startsWith("magnet:", ignoreCase = true)) {
+            val torBoxButton = Button(this).apply {
+                text = "ADD TO TORBOX"
+                isAllCaps = false
+                isFocusable = true
+
+                setOnClickListener {
+                    val apiKey =
+                        prefs.getString("torbox_api_key", "")
+                            ?.trim()
+                            .orEmpty()
+
+                    if (apiKey.isBlank()) {
+                        Toast.makeText(
+                            this@showStreamSearchDialog,
+                            "Add your TorBox API key in Settings → General",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@setOnClickListener
+                    }
+
+                    isEnabled = false
+                    text = "ADDING…"
+
+                    val magnet = entry.result.token
+                    val torBox = TorBoxClient(apiKey)
+
+                    scope.launch {
+                        try {
+                            status.text = "Adding source to TorBox…"
+
+                            val created = withContext(Dispatchers.IO) {
+                                torBox.createTorrent(magnet)
+                            }
+
+                            text = "QUEUED"
+
+                            val ready = torBox.waitUntilReady(
+                                created.id
+                            ) { torrentState ->
+                                runOnUiThread {
+                                    val pct =
+                                        torrentState.progress
+                                            ?.let {
+                                                if (it <= 1.0) {
+                                                    (it * 100).toInt()
+                                                } else {
+                                                    it.toInt()
+                                                }
+                                            }
+
+                                    text =
+                                        if (pct != null) {
+                                            "TORBOX $pct%"
+                                        } else {
+                                            "TORBOX ${torrentState.downloadState ?: "WORKING"}"
+                                        }
+
+                                    status.text =
+                                        "TorBox: ${
+                                            torrentState.downloadState
+                                                ?: "working"
+                                        }"
+                                }
+                            }
+
+                            val selected =
+                                chooseTorBoxVideoFile(
+                                    ready.files,
+                                    effectiveSeason,
+                                    effectiveEpisode
+                                )
+                                    ?: throw IllegalStateException(
+                                        "No playable video file found"
+                                    )
+
+                            status.text =
+                                "TorBox ready · ${selected.name}"
+
+                            val playableUrl =
+                                withContext(Dispatchers.IO) {
+                                    torBox.requestDownloadUrl(
+                                        torrentId = ready.id,
+                                        fileId = selected.id
+                                    )
+                                }
+
+                            val episodeQueueSnapshot =
+                                currentEpisodeQueue
+                            val episodeQueueIndexSnapshot =
+                                currentEpisodeQueueIndex
+                            val seriesContextSnapshot =
+                                currentSeriesVersionContext
+
+                            dialog.dismiss()
+                            hideContentDetail()
+
+                            showPlayerFor(
+                                Channel(
+                                    id = stableId(entry) + ":torbox",
+                                    name = item.name + epTag,
+                                    url = playableUrl,
+                                    posterUrl = item.posterUrl,
+                                    logoUrl = item.logoUrl,
+                                    group = item.group,
+                                    categoryName = item.categoryName,
+                                    mediaType = item.mediaType,
+                                    episodeNum = effectiveEpisode,
+                                    streamSearchItemId = item.id,
+                                    streamSearchSeason = effectiveSeason
+                                ),
+                                pluginStreamAlreadyResolved = true
+                            )
+
+                            if (
+                                episodeQueueIndexSnapshot >= 0 &&
+                                episodeQueueSnapshot.isNotEmpty()
+                            ) {
+                                currentEpisodeQueue =
+                                    episodeQueueSnapshot
+                                currentEpisodeQueueIndex =
+                                    episodeQueueIndexSnapshot
+                                currentSeriesVersionContext =
+                                    seriesContextSnapshot
+                            }
+
+                        } catch (e: Exception) {
+                            android.util.Log.e(
+                                "TorBox",
+                                "TorBox playback failed",
+                                e
+                            )
+
+                            text = "ADD TO TORBOX"
+                            isEnabled = true
+
+                            Toast.makeText(
+                                this@showStreamSearchDialog,
+                                e.message ?: "TorBox failed",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            status.text = "TorBox failed"
+                        }
+                    }
+                }
+            }
+
+            (row as ViewGroup).addView(
+                torBoxButton,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 8
+                }
+            )
         }
 
         if (atFront) {

@@ -1134,7 +1134,86 @@ internal fun MainActivity.showProviderSettings() {
         R.id.navPlugins to R.id.panePlugins,
         R.id.navGeneral to R.id.paneGeneral,
         R.id.navAbout to R.id.paneAbout
-    ).map { (navId, paneId) -> dialogView.findViewById<View>(navId) to dialogView.findViewById<View>(paneId) }
+    ).map { (navId, paneId) ->
+        dialogView.findViewById<View>(navId) to
+            dialogView.findViewById<View>(paneId)
+    }
+
+    // TorBox
+    val torBoxCard = LinearLayout(this).apply {
+        orientation = LinearLayout.VERTICAL
+        setPadding(0, 18, 0, 18)
+
+        addView(TextView(this@showProviderSettings).apply {
+            text = "TorBox"
+            setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    this@showProviderSettings,
+                    R.color.text_primary
+                )
+            )
+            textSize = 16f
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+        })
+
+        addView(TextView(this@showProviderSettings).apply {
+            text = "Use TorBox for torrent results that are not instantly playable."
+            setTextColor(
+                androidx.core.content.ContextCompat.getColor(
+                    this@showProviderSettings,
+                    R.color.text_secondary
+                )
+            )
+            textSize = 13f
+            setPadding(0, 4, 0, 10)
+        })
+
+        val torBoxKeyInput = EditText(this@showProviderSettings).apply {
+            hint = "TorBox API key"
+            setSingleLine(true)
+            inputType =
+                android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+            transformationMethod =
+                android.text.method.PasswordTransformationMethod.getInstance()
+            setText(prefs.getString("torbox_api_key", "").orEmpty())
+        }
+
+        addView(
+            torBoxKeyInput,
+            LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        )
+
+        val saveTorBox = Button(this@showProviderSettings).apply {
+            text = "Save TorBox Key"
+            isAllCaps = false
+            setOnClickListener {
+                val key = torBoxKeyInput.text.toString().trim()
+
+                prefs.edit()
+                    .putString("torbox_api_key", key)
+                    .apply()
+
+                Toast.makeText(
+                    this@showProviderSettings,
+                    if (key.isBlank()) {
+                        "TorBox disconnected"
+                    } else {
+                        "TorBox key saved"
+                    },
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        }
+
+        addView(saveTorBox)
+    }
+
+    generalPane.addView(torBoxCard)
+
     fun selectSection(index: Int) {
         navRows.forEachIndexed { i, (row, pane) ->
             row.isSelected = i == index
