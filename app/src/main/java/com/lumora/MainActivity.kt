@@ -1289,7 +1289,174 @@ class MainActivity : AppCompatActivity() {
      *  the row's download button instead, and an unresolved neighbour there falls through to the
      *  same broken default search. Activity-level dispatch always sees the key, and resolving the
      *  holder from whatever view actually has focus covers both cases. */
+
+    /**
+     * TV-first Live navigation.
+     *
+     * Android's default FocusFinder is geometry based, so two neighbouring RecyclerViews
+     * can leak focus into one another during fast DPAD navigation, RecyclerView recycling,
+     * or an async category diff. Live TV must instead behave like a dedicated guide:
+     *
+     *   category rail  <->  channel guide
+     *
+     * UP/DOWN stay inside the current vertical list. RIGHT is the deliberate hand-off
+     * from categories into the guide. LEFT from a guide channel returns to the currently
+     * selected category. This keeps focus movement deterministic regardless of layout
+     * timing or EPG refreshes.
+     */
+    private fun handleLiveTvFocusNavigation(event: android.view.KeyEvent): Boolean {
+        if (
+            event.action != android.view.KeyEvent.ACTION_DOWN ||
+            isPlayerVisible ||
+            isContentDetailVisible ||
+            activeTab != 0 ||
+            binding.contentRow.visibility != View.VISIBLE
+        ) {
+            return false
+        }
+
+        val focused = currentFocus ?: return false
+
+        // ── CATEGORY RAIL ─────────────────────────────────────────────
+        val categoryHolder = runCatching {
+            binding.categorySidebar.findContainingViewHolder(focused)
+        }.getOrNull()
+
+        if (
+            categoryHolder != null &&
+            binding.categorySidebar.visibility == View.VISIBLE
+        ) {
+            val position = categoryHolder.bindingAdapterPosition
+
+            if (position != RecyclerView.NO_POSITION) {
+                when (event.keyCode) {
+                    android.view.KeyEvent.KEYCODE_DPAD_UP,
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        val step =
+                            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) -1 else 1
+                        val count = categoryAdapter.itemCount
+                        val target = (position + step).coerceIn(0, (count - 1).coerceAtLeast(0))
+
+                        // At the edge, consume the press instead of allowing FocusFinder
+                        // to escape sideways into the guide or toolbar.
+                        if (target == position) return true
+
+                        binding.categorySidebar.scrollToPosition(target)
+                        binding.categorySidebar.post {
+                            val holder =
+                                binding.categorySidebar.findViewHolderForAdapterPosition(target)
+
+                            if (holder != null) {
+                                holder.itemView.requestFocus()
+                            } else {
+                                binding.categorySidebar.post {
+                                    binding.categorySidebar
+                                        .findViewHolderForAdapterPosition(target)
+                                        ?.itemView
+                                        ?.requestFocus()
+                                }
+                            }
+                        }
+                        return true
+                    }
+
+                    android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                        val count = liveAdapter.itemCount
+                        if (count <= 0) return true
+
+                        // Prefer the channel the preview/user was already on when possible.
+                        val preferredIndex = lastFocusedLiveChannel
+                            ?.let { remembered ->
+                                liveAdapter.currentList.indexOfFirst { it.id == remembered.id }
+                            }
+                            ?.takeIf { it >= 0 }
+                            ?: 0
+
+                        binding.liveContent.scrollToPosition(preferredIndex)
+                        binding.liveContent.post {
+                            val focusGuide = {
+                                (binding.liveContent
+                                    .findViewHolderForAdapterPosition(preferredIndex)
+                                    as? LiveGuideAdapter.RowViewHolder)
+                                    ?.requestChannelFocus()
+                            }
+
+                            focusGuide()
+                            binding.liveContent.post { focusGuide() }
+                        }
+                        return true
+                    }
+                }
+            }
+        }
+
+        // ── LIVE GUIDE ────────────────────────────────────────────────
+        val guideHolder = runCatching {
+            binding.liveContent.findContainingViewHolder(focused)
+        }.getOrNull() as? LiveGuideAdapter.RowViewHolder
+
+        if (guideHolder != null) {
+            val position = guideHolder.bindingAdapterPosition
+
+            if (position != RecyclerView.NO_POSITION) {
+                when (event.keyCode) {
+                    android.view.KeyEvent.KEYCODE_DPAD_UP,
+                    android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                        val step =
+                            if (event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP) -1 else 1
+                        val count = liveAdapter.itemCount
+                        val target = (position + step).coerceIn(0, (count - 1).coerceAtLeast(0))
+
+                        if (target == position) return true
+
+                        binding.liveContent.scrollToPosition(target)
+                        binding.liveContent.post {
+                            val focusTarget = {
+                                (binding.liveContent
+                                    .findViewHolderForAdapterPosition(target)
+                                    as? LiveGuideAdapter.RowViewHolder)
+                                    ?.requestChannelFocus()
+                            }
+
+                            focusTarget()
+                            binding.liveContent.post { focusTarget() }
+                        }
+                        return true
+                    }
+
+                    android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                        if (binding.categorySidebar.visibility != View.VISIBLE) {
+                            return false
+                        }
+
+                        val selectedPosition = categoryAdapter.currentList
+                            .indexOfFirst { it.id == categoryAdapter.selectedId }
+                            .takeIf { it >= 0 }
+                            ?: 0
+
+                        binding.categorySidebar.scrollToPosition(selectedPosition)
+                        binding.categorySidebar.post {
+                            val focusRail = {
+                                binding.categorySidebar
+                                    .findViewHolderForAdapterPosition(selectedPosition)
+                                    ?.itemView
+                                    ?.requestFocus()
+                            }
+
+                            focusRail()
+                            binding.categorySidebar.post { focusRail() }
+                        }
+                        return true
+                    }
+                }
+            }
+        }
+
+        return false
+    }
+
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (handleLiveTvFocusNavigation(event)) return true
         // Real-keyboard typing while search is open. The query field is deliberately not
         // focusable (see dialog_search.xml), so nothing else would receive these.
         val onSearchKey = searchKeyHandler
