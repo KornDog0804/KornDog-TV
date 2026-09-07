@@ -854,6 +854,24 @@ internal fun MainActivity.showStreamSearchDialog(
 
             when (resolved) {
                 is ResolveResult.Ready -> {
+                    // Find Stream resolves asynchronously. Preserve the episode
+                    // chain across the second showPlayerFor() handoff.
+                    val episodeQueueSnapshot = currentEpisodeQueue
+                    val episodeQueueIndexSnapshot = currentEpisodeQueueIndex
+                    val seriesContextSnapshot = currentSeriesVersionContext
+
+                    val queuedEpisode =
+                        episodeQueueSnapshot.getOrNull(episodeQueueIndexSnapshot)
+
+                    val preserveEpisodeQueue =
+                        effectiveEpisode != null &&
+                        queuedEpisode != null &&
+                        queuedEpisode.episodeNum == effectiveEpisode &&
+                        (
+                            queuedEpisode.streamSearchItemId == null ||
+                            queuedEpisode.streamSearchItemId == item.id
+                        )
+
                     dialog.dismiss()
                     hideContentDetail()
 
@@ -905,6 +923,25 @@ internal fun MainActivity.showStreamSearchDialog(
                         pluginStreamAlreadyResolved = true,
                         audio = result.audio
                     )
+
+                    // showPlayerFor() clears episode state for ordinary new
+                    // playback. This is not a new title, it is the resolved
+                    // stream for the same episode, so restore the chain.
+                    if (preserveEpisodeQueue) {
+                        currentEpisodeQueue = episodeQueueSnapshot
+                        currentEpisodeQueueIndex =
+                            episodeQueueIndexSnapshot
+                        currentSeriesVersionContext =
+                            seriesContextSnapshot
+
+                        android.util.Log.i(
+                            "LumoraPlayback",
+                            "Episode queue restored after stream resolve: " +
+                                "index=$episodeQueueIndexSnapshot/" +
+                                "${episodeQueueSnapshot.size}, " +
+                                "episode=$effectiveEpisode"
+                        )
+                    }
 
                     detailReturnItem = item
                 }

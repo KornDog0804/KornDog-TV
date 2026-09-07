@@ -54,4 +54,6 @@
     <dimen name="catchup_channel_column_width">160dp</dimen>
     <dimen name="catchup_day_column_width">110dp</dimen>
     <dimen name="search_keyboard_width">340dp</dimen>
+    <!-- Lets the final Live TV category scroll fully above the phone bottom navigation. -->
+    <dimen name="live_category_bottom_clearance">72dp</dimen>
 </resources>

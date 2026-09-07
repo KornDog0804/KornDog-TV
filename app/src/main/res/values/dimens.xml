@@ -245,5 +245,6 @@
     <dimen name="mobile_bottom_nav_icon">22dp</dimen>
     <dimen name="mobile_bottom_nav_text">11sp</dimen>
     <dimen name="mobile_bottom_nav_indicator_width">24dp</dimen>
+    <dimen name="live_category_bottom_clearance">10dp</dimen>
 </resources>
 

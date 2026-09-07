@@ -673,6 +673,14 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
+                    val queue = itemAdapter.currentList
+                    currentEpisodeQueue = queue
+                    currentEpisodeQueueIndex = queue.indexOf(chosen)
+                    currentSeriesVersionContext =
+                        item to (seriesGroup ?: listOf(item))
+                    detailReturnItem = item
+                    detailReturnGroup = seriesGroup
+
                     showStreamSearchDialog(
                         plugin,
                         item,
@@ -688,6 +696,14 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                 val seasonNum = seasonPair?.first?.let { Regex("""\d+""").find(it)?.value }?.toIntOrNull()
                 val plugin = enabledStreamSearchPlugin(item)
                 if (plugin != null) {
+                    val queue = itemAdapter.currentList
+                    currentEpisodeQueue = queue
+                    currentEpisodeQueueIndex = queue.indexOf(chosen)
+                    currentSeriesVersionContext =
+                        item to (seriesGroup ?: listOf(item))
+                    detailReturnItem = item
+                    detailReturnGroup = seriesGroup
+
                     showStreamSearchDialog(
                         plugin,
                         item,

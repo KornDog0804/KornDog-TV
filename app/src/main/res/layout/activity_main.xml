@@ -1549,8 +1549,10 @@
                 android:layout_marginTop="4dp"
                 android:layout_marginBottom="12dp"
                 android:background="@drawable/bg_category_panel"
+                android:clipToPadding="false"
                 android:defaultFocusHighlightEnabled="true"
                 android:padding="10dp"
+                android:paddingBottom="@dimen/live_category_bottom_clearance"
                 android:visibility="gone" />
 
             <FrameLayout
