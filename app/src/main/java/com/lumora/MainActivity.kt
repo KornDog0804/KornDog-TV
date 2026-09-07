@@ -810,11 +810,17 @@ class MainActivity : AppCompatActivity() {
     internal val hideControlsRunnable = Runnable { hideControls() }
     internal val progressRunnable = object : Runnable {
         override fun run() {
+            // Keep the progress / Up Next watchdog alive for the entire
+            // fullscreen playback session. A temporary BUFFERING/paused state
+            // must not permanently kill autoplay checks.
+            if (!isPlayerVisible) return
+
             if (playerManager.isPlaying) {
                 updateProgress()
                 checkUpNextTrigger()
-                mainHandler.postDelayed(this, 1000)
             }
+
+            mainHandler.postDelayed(this, 1000)
         }
     }
     // Phone touch gestures on the player. TV sends no touch events, so these are inert there -
