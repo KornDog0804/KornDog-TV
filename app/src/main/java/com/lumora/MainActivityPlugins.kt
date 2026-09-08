@@ -584,7 +584,9 @@ internal fun MainActivity.showStreamSearchDialog(
     data class StreamEntry(
         val result: TorrentResult,
         val resolver: String,
-        val headers: Map<String, String> = emptyMap()
+        val headers: Map<String, String> = emptyMap(),
+        val provider: String? = null,
+        val magnetToken: String? = null
     )
 
     val epTag =
@@ -643,7 +645,37 @@ internal fun MainActivity.showStreamSearchDialog(
 
     val results = mutableListOf<StreamEntry>()
     val stremioClient = StremioAddonClient()
+
+    data class StreamRowTag(
+        val quality: String,
+        val lane: String
+    )
+
     var currentQualityFilter = "All"
+    var currentSourceLane = "AIOStreams"
+
+    fun sourceLaneOf(entry: StreamEntry): String {
+        val provider = entry.provider.orEmpty().lowercase()
+        val source = entry.result.source.orEmpty().lowercase()
+
+        return when {
+            "cauldron" in provider ||
+                "cauldron" in source ->
+                "Cauldron"
+
+            "aiostreams" in provider ||
+                "aio streams" in provider ||
+                "aiostreams" in source ||
+                "aio streams" in source ->
+                "AIOStreams"
+
+            entry.resolver == "plugin" ->
+                "Torrents"
+
+            else ->
+                "Other"
+        }
+    }
 
     // ── Autoplay guard ─────────────────────────────
     // Guards against playing more than one source at once and lets both the
@@ -673,13 +705,71 @@ internal fun MainActivity.showStreamSearchDialog(
         orientation = LinearLayout.HORIZONTAL
         setPadding(0, 8, 0, 8)
     }
-    fun applyQualityFilter() {
+    fun applyStreamFilters() {
         for (i in 0 until resultsHost.childCount) {
             val child = resultsHost.getChildAt(i)
-            val tier = child.tag as? String ?: "Other"
-            child.visibility = if (currentQualityFilter == "All" || currentQualityFilter == tier) android.view.View.VISIBLE else android.view.View.GONE
+            val tag = child.tag as? StreamRowTag
+
+            val qualityMatches =
+                currentQualityFilter == "All" ||
+                    tag?.quality == currentQualityFilter
+
+            val sourceMatches =
+                currentSourceLane == "All" ||
+                    tag?.lane == currentSourceLane
+
+            child.visibility =
+                if (qualityMatches && sourceMatches) {
+                    android.view.View.VISIBLE
+                } else {
+                    android.view.View.GONE
+                }
         }
     }
+
+    fun applyQualityFilter() {
+        applyStreamFilters()
+    }
+
+    val sourceFilterRow =
+        LinearLayout(this@showStreamSearchDialog).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, 8, 0, 8)
+        }
+
+    listOf(
+        "AIOStreams",
+        "Cauldron",
+        "Torrents",
+        "All"
+    ).forEach { label ->
+        val btn = TextView(this@showStreamSearchDialog).apply {
+            text = label
+            textSize = 13f
+            setPadding(22, 12, 22, 12)
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+
+            setOnClickListener {
+                currentSourceLane = label
+                applyStreamFilters()
+
+                val count = results.count {
+                    label == "All" ||
+                        sourceLaneOf(it) == label
+                }
+
+                status.text = "$label · $count result(s)"
+                requestFocus()
+            }
+        }
+
+        sourceFilterRow.addView(btn)
+    }
+
+    container.addView(sourceFilterRow, 1)
+
     listOf("All", "4K", "1080p", "720p").forEach { label ->
         val btn = TextView(this@showStreamSearchDialog).apply {
             text = label
@@ -1059,8 +1149,24 @@ internal fun MainActivity.showStreamSearchDialog(
         row.findViewById<TextView>(
             R.id.streamTitle
         ).text = entry.result.title
-        row.tag = qualityTierOf(entry.result.title)
-        row.visibility = if (currentQualityFilter == "All" || currentQualityFilter == row.tag) android.view.View.VISIBLE else android.view.View.GONE
+        row.tag = StreamRowTag(
+            quality = qualityTierOf(entry.result.title),
+            lane = sourceLaneOf(entry)
+        )
+
+        val rowTag = row.tag as StreamRowTag
+
+        row.visibility =
+            if (
+                (currentQualityFilter == "All" ||
+                    currentQualityFilter == rowTag.quality) &&
+                (currentSourceLane == "All" ||
+                    currentSourceLane == rowTag.lane)
+            ) {
+                android.view.View.VISIBLE
+            } else {
+                android.view.View.GONE
+            }
 
         val displayTitle = entry.result.title
 
@@ -1187,9 +1293,18 @@ internal fun MainActivity.showStreamSearchDialog(
             playResult(entry)
         }
 
-        if (entry.result.token.startsWith("magnet:", ignoreCase = true)) {
+        val torBoxMagnet =
+            entry.magnetToken
+                ?: entry.result.token.takeIf {
+                    it.startsWith(
+                        "magnet:",
+                        ignoreCase = true
+                    )
+                }
+
+        if (torBoxMagnet != null) {
             val torBoxButton = Button(this).apply {
-                text = "ADD TO TORBOX"
+                text = "PLAY WITH TORBOX"
                 isAllCaps = false
                 isFocusable = true
 
@@ -1209,9 +1324,9 @@ internal fun MainActivity.showStreamSearchDialog(
                     }
 
                     isEnabled = false
-                    text = "ADDING…"
+                    text = "SENDING TO TORBOX…"
 
-                    val magnet = entry.result.token
+                    val magnet = torBoxMagnet
                     val torBox = TorBoxClient(apiKey)
 
                     scope.launch {
@@ -1320,7 +1435,7 @@ internal fun MainActivity.showStreamSearchDialog(
                                 e
                             )
 
-                            text = "ADD TO TORBOX"
+                            text = "PLAY WITH TORBOX"
                             isEnabled = true
 
                             Toast.makeText(
@@ -1405,9 +1520,17 @@ internal fun MainActivity.showStreamSearchDialog(
 
                             addResult(
                                 StreamEntry(
-                                    result = result,
-                                    resolver = "plugin"
-                                ),
+                                      result = result,
+                                      resolver = "plugin",
+                                      provider = plugin.id,
+                                      magnetToken =
+                                          result.token.takeIf {
+                                              it.startsWith(
+                                                  "magnet:",
+                                                  ignoreCase = true
+                                              )
+                                          }
+                                  ),
                                 atFront
                             )
                         }
@@ -1563,7 +1686,9 @@ internal fun MainActivity.showStreamSearchDialog(
                                             } else {
                                                 "torrent"
                                             },
-                                        headers = stream.requestHeaders
+                                        headers = stream.requestHeaders,
+                                    provider = manifest.name,
+                                    magnetToken = stream.magnet
                                     )
                                 )
                             }
@@ -1713,8 +1838,13 @@ internal fun MainActivity.wirePluginsPane(dialogView: View, onProviderAdded: () 
                     }
                 }
             } catch (e: Exception) {
-                null
-            }
+            android.util.Log.e(
+                "KornDogPluginFetch",
+                "Failed fetching plugin script from $url",
+                e
+            )
+            null
+        }
             if (text.isNullOrBlank()) {
                 Toast.makeText(this@wirePluginsPane, "Couldn't fetch that script", Toast.LENGTH_SHORT).show()
                 return@launch
