@@ -1217,11 +1217,32 @@ internal fun MainActivity.showStreamSearchDialog(
                 nativeDebridResolved
                     ?: when (entry.resolver) {
                 "direct" -> {
-                    ResolveResult.Ready(
-                        url = result.token,
-                        headers = entry.headers
-                    )
-                }
+                        status.text = "KornDog · resolving direct stream…"
+
+                        val direct =
+                            com.lumora.data.remote.debrid.KornDogUrlResolver.resolve(
+                                url = result.token,
+                                headers = entry.headers
+                            )
+
+                        if (direct != null) {
+                            status.text =
+                                if (direct.redirected) {
+                                    "KornDog · direct stream verified · redirected"
+                                } else {
+                                    "KornDog · direct stream verified"
+                                }
+
+                            ResolveResult.Ready(
+                                url = direct.url,
+                                headers = direct.headers
+                            )
+                        } else {
+                            ResolveResult.Failed(
+                                "KornDog · direct source was not playable"
+                            )
+                        }
+                    }
 
                 "torrent" -> {
                     resolveTorrentStream(
@@ -1966,29 +1987,15 @@ internal fun MainActivity.showStreamSearchDialog(
                                 if (!seenStreamKeys.add(key)) {
                                     return@forEach
                                 }
+                                /*
+                                 * Do not reject a direct candidate because of
+                                 * provider branding alone.
+                                 *
+                                 * KornDogUrlResolver now decides whether the URL
+                                 * resolves to real media or merely an HTML/JSON
+                                 * wrapper.
+                                 */
 
-                                val sourceText =
-                                    stream.source.orEmpty().lowercase()
-
-                                val titleText =
-                                    stream.title.lowercase()
-
-                                val elfHostedOnly =
-                                    stream.magnet == null &&
-                                        (
-                                            "elfhosted" in sourceText ||
-                                            "elfcache" in sourceText ||
-                                            "elfhosted" in titleText ||
-                                            "elfcache" in titleText
-                                        )
-
-                                if (elfHostedOnly) {
-                                    android.util.Log.i(
-                                        "KornDogResolver",
-                                        "Dropped ElfHosted-only direct result"
-                                    )
-                                    return@forEach
-                                }
 
                                 val token =
                                     stream.magnet
@@ -2030,16 +2037,97 @@ internal fun MainActivity.showStreamSearchDialog(
         /*
          * Manual Find Stream:
          *
-         * Discovery is finished. Convert the raw magnet firehose into the
-         * small KornDog provider-specific chooser.
+         * Discovery providers FIND candidates.
          *
-         * AUTO playback is intentionally left alone in this first pass.
+         * KornDog now owns BOTH playback lanes:
+         *
+         *   HTTP/HTTPS -> KornDogUrlResolver
+         *   magnet     -> TorBox / Premiumize / Real-Debrid
+         *
+         * The final chooser contains only candidates KornDog can actually
+         * do something useful with.
+         *
+         * AUTO playback remains untouched for now.
          */
         if (!autoPlayBest && results.isNotEmpty()) {
-            status.text = "KornDog · checking the best sources…"
+            status.text = "KornDog · verifying streams and magnets…"
 
-            val rawResults =
-                results
+            /*
+             * Preserve the discovery set before rebuilding the visible list.
+             */
+            val discoveredResults = results.toList()
+
+            /*
+             * ------------------------------------------------------------
+             * LANE 1: DIRECT HTTP/HTTPS STREAMS
+             * ------------------------------------------------------------
+             *
+             * Probe only a small ranked set. We do not need to hammer every
+             * addon result just to build a useful chooser.
+             */
+            val directCandidates =
+                discoveredResults
+                    .filter { entry ->
+                        entry.resolver == "direct" &&
+                            (
+                                entry.result.token.startsWith(
+                                    "http://",
+                                    ignoreCase = true
+                                ) ||
+                                entry.result.token.startsWith(
+                                    "https://",
+                                    ignoreCase = true
+                                )
+                            )
+                    }
+                    .distinctBy { entry ->
+                        entry.result.token
+                    }
+                    .sortedByDescending { entry ->
+                        streamRank(entry)
+                    }
+                    .take(8)
+
+            val verifiedDirect =
+                coroutineScope {
+                    directCandidates
+                        .map { entry ->
+                            async {
+                                val resolved =
+                                    runCatching {
+                                        com.lumora.data.remote.debrid.KornDogUrlResolver.resolve(
+                                            url = entry.result.token,
+                                            headers = entry.headers
+                                        )
+                                    }.onFailure { error ->
+                                        android.util.Log.w(
+                                            "KornDogResolver",
+                                            "Direct chooser probe failed: ${entry.result.source}",
+                                            error
+                                        )
+                                    }.getOrNull()
+
+                                entry to resolved
+                            }
+                        }
+                        .awaitAll()
+                }
+                    .mapNotNull { (entry, resolved) ->
+                        if (resolved == null) {
+                            null
+                        } else {
+                            entry to resolved
+                        }
+                    }
+                    .take(4)
+
+            /*
+             * ------------------------------------------------------------
+             * LANE 2: MAGNET / DEBRID
+             * ------------------------------------------------------------
+             */
+            val magnetResults =
+                discoveredResults
                     .filter { entry ->
                         entry.magnetToken != null ||
                             entry.result.token.startsWith(
@@ -2049,8 +2137,8 @@ internal fun MainActivity.showStreamSearchDialog(
                     }
                     .toList()
 
-            val candidates =
-                rawResults.mapNotNull { entry ->
+            val magnetCandidates =
+                magnetResults.mapNotNull { entry ->
                     val magnet =
                         entry.magnetToken
                             ?: entry.result.token.takeIf {
@@ -2098,26 +2186,30 @@ internal fun MainActivity.showStreamSearchDialog(
                     .takeIf { it.isNotBlank() }
                     ?.let { PremiumizeClient(it) }
 
-            val choices =
+            val debridChoices =
                 runCatching {
                     com.lumora.data.remote.debrid.KornDogChoiceBuilder.build(
-                        candidates = candidates,
+                        candidates = magnetCandidates,
                         torBox = torBoxClient,
                         premiumize = premiumizeClient
                     )
                 }.onFailure { error ->
                     android.util.Log.w(
                         "KornDogResolver",
-                        "Curated chooser failed",
+                        "Curated debrid chooser failed",
                         error
                     )
                 }.getOrDefault(emptyList())
 
-            if (choices.isNotEmpty()) {
-                /*
-                 * The raw results have done their job.
-                 * Replace them with the provider-specific shortlist.
-                 */
+            /*
+             * ------------------------------------------------------------
+             * BUILD ONE KORNDOG CHOOSER
+             * ------------------------------------------------------------
+             */
+            if (
+                verifiedDirect.isNotEmpty() ||
+                debridChoices.isNotEmpty()
+            ) {
                 results.clear()
                 resultsHost.removeAllViews()
 
@@ -2127,9 +2219,56 @@ internal fun MainActivity.showStreamSearchDialog(
                 initialStreamFocusClaimed = false
                 manualStreamUserMoved = false
 
-                choices.forEach { choice ->
+                /*
+                 * Verified direct streams first.
+                 *
+                 * The URL stored here is the FINAL URL after redirects.
+                 * Headers discovered/provided by the source are preserved.
+                 */
+                verifiedDirect.forEach { (raw, direct) ->
+                    val redirectLabel =
+                        if (direct.redirected) {
+                            "Resolved"
+                        } else {
+                            "Verified"
+                        }
+
+                    val directTitle =
+                        "DIRECT · $redirectLabel · ${raw.result.title}"
+
+                    val directSource =
+                        listOfNotNull(
+                            "KornDog Direct",
+                            raw.result.source,
+                            direct.contentType
+                        )
+                            .filter { it.isNotBlank() }
+                            .distinct()
+                            .joinToString(" · ")
+
+                    addResult(
+                        raw.copy(
+                            result =
+                                raw.result.copy(
+                                    title = directTitle,
+                                    token = direct.url,
+                                    source = directSource
+                                ),
+                            resolver = "direct",
+                            headers = direct.headers,
+                            provider = "KornDog · Direct",
+                            magnetToken = null,
+                            debridProvider = null
+                        )
+                    )
+                }
+
+                /*
+                 * Debrid-backed magnet choices.
+                 */
+                debridChoices.forEach { choice ->
                     val raw =
-                        rawResults.firstOrNull { entry ->
+                        magnetResults.firstOrNull { entry ->
                             val magnet =
                                 entry.magnetToken
                                     ?: entry.result.token.takeIf {
@@ -2188,7 +2327,8 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
 
                 status.text =
-                    "KornDog · ${results.size} curated choice(s)"
+                    "KornDog · ${verifiedDirect.size} direct + " +
+                        "${debridChoices.size} debrid choice(s)"
 
                 resultsHost.post {
                     scroll.scrollTo(0, 0)
@@ -2199,7 +2339,7 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
             } else {
                 status.text =
-                    "KornDog · no curated magnet choices found"
+                    "KornDog · no verified direct or debrid sources found"
             }
         }
 
