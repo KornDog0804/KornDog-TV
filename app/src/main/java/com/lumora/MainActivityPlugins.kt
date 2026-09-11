@@ -22,6 +22,9 @@ import com.lumora.data.IptvProviderStore
 import com.lumora.data.remote.stremio.StremioAddonClient
 import com.lumora.data.remote.stremio.StremioAddonStore
 import com.lumora.data.remote.torbox.TorBoxClient
+import com.lumora.data.remote.premiumize.PremiumizeClient
+import com.lumora.data.remote.realdebrid.RealDebridClient
+import com.lumora.data.remote.debrid.KornDogFilePicker
 import com.lumora.plugin.DiscoveredProvider
 import com.lumora.plugin.DiscoveryResult
 import com.lumora.plugin.ResolveResult
@@ -935,7 +938,258 @@ internal fun MainActivity.showStreamSearchDialog(
                 } ?: emptyList()
             }
 
-            val resolved = when (entry.resolver) {
+            /*
+         * KornDog native debrid resolver.
+         *
+         * Discovery can come from AIOStreams, Cauldron, or torrent plugins.
+         * If a real magnet exists, KornDog owns the debrid resolution.
+         */
+        suspend fun resolveWithKornDogDebrid(
+            magnet: String
+        ): ResolveResult? {
+
+            val torBoxKey =
+                prefs.getString("torbox_api_key", "")
+                    ?.trim()
+                    .orEmpty()
+
+            val premiumizeKey =
+                prefs.getString("premiumize_api_key", "")
+                    ?.trim()
+                    .orEmpty()
+
+            val realDebridKey =
+                prefs.getString("realdebrid_api_key", "")
+                    ?.trim()
+                    .orEmpty()
+
+            /*
+             * 1. TORBOX
+             */
+            if (torBoxKey.isNotBlank()) {
+                try {
+                    status.text = "KornDog · trying TorBox…"
+
+                    val torBox = TorBoxClient(torBoxKey)
+
+                    val created =
+                        withContext(Dispatchers.IO) {
+                            torBox.createTorrent(magnet)
+                        }
+
+                    val ready =
+                        withContext(Dispatchers.IO) {
+                            torBox.waitUntilReady(created.id) { torrentState ->
+                                runOnUiThread {
+                                    val pct =
+                                        torrentState.progress?.let {
+                                            if (it <= 1.0) {
+                                                (it * 100).toInt()
+                                            } else {
+                                                it.toInt()
+                                            }
+                                        }
+
+                                    status.text =
+                                        if (pct != null) {
+                                            "KornDog · TorBox $pct%"
+                                        } else {
+                                            "KornDog · TorBox ${
+                                                torrentState.downloadState
+                                                    ?: "working"
+                                            }"
+                                        }
+                                }
+                            }
+                        }
+
+                    val selected =
+                        KornDogFilePicker.choose(
+                            items = ready.files,
+                            season = effectiveSeason,
+                            episode = effectiveEpisode,
+                            name = { it.name },
+                            size = { it.size ?: 0L }
+                        )
+
+                    if (selected != null) {
+                        status.text =
+                            "KornDog · TorBox · ${selected.name}"
+
+                        val playableUrl =
+                            withContext(Dispatchers.IO) {
+                                torBox.requestDownloadUrl(
+                                    torrentId = ready.id,
+                                    fileId = selected.id
+                                )
+                            }
+
+                        return ResolveResult.Ready(
+                            url = playableUrl,
+                            headers = emptyMap()
+                        )
+                    }
+
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "TorBox returned no matching playable file"
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "TorBox failed",
+                        e
+                    )
+                }
+            }
+
+            /*
+             * 2. PREMIUMIZE
+             */
+            if (premiumizeKey.isNotBlank()) {
+                try {
+                    status.text = "KornDog · trying Premiumize…"
+
+                    val premiumize =
+                        PremiumizeClient(premiumizeKey)
+
+                    val files =
+                        premiumize.directDownload(magnet)
+
+                    val selected =
+                        KornDogFilePicker.choose(
+                            items = files,
+                            season = effectiveSeason,
+                            episode = effectiveEpisode,
+                            name = { it.path },
+                            size = { it.size }
+                        )
+
+                    if (selected != null) {
+                        status.text =
+                            "KornDog · Premiumize · ${selected.path}"
+
+                        return ResolveResult.Ready(
+                            url = selected.link,
+                            headers = emptyMap()
+                        )
+                    }
+
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "Premiumize returned no matching playable file"
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "Premiumize failed",
+                        e
+                    )
+                }
+            }
+
+            /*
+             * 3. REAL-DEBRID
+             */
+            if (realDebridKey.isNotBlank()) {
+                try {
+                    status.text = "KornDog · trying Real-Debrid…"
+
+                    val realDebrid =
+                        RealDebridClient(realDebridKey)
+
+                    val torrentId =
+                        realDebrid.addMagnet(magnet)
+
+                    /*
+                     * RD may need a moment before its file list appears.
+                     */
+                    var info =
+                        realDebrid.getTorrentInfo(torrentId)
+
+                    var fileListAttempts = 0
+
+                    while (
+                        info.files.isEmpty() &&
+                        fileListAttempts < 10
+                    ) {
+                        delay(500)
+
+                        info =
+                            realDebrid.getTorrentInfo(torrentId)
+
+                        fileListAttempts++
+                    }
+
+                    val selected =
+                        KornDogFilePicker.choose(
+                            items = info.files,
+                            season = effectiveSeason,
+                            episode = effectiveEpisode,
+                            name = { it.path },
+                            size = { it.bytes }
+                        )
+
+                    if (selected != null) {
+                        status.text =
+                            "KornDog · Real-Debrid · ${selected.path}"
+
+                        realDebrid.selectFiles(
+                            torrentId,
+                            listOf(selected.id)
+                        )
+
+                        val ready =
+                            realDebrid.waitForLinks(torrentId)
+
+                        val restricted =
+                            ready.links.firstOrNull()
+                                ?: throw IllegalStateException(
+                                    "Real-Debrid returned no link for selected file"
+                                )
+
+                        val playableUrl =
+                            realDebrid.unrestrict(restricted)
+
+                        return ResolveResult.Ready(
+                            url = playableUrl,
+                            headers = emptyMap()
+                        )
+                    }
+
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "Real-Debrid returned no matching playable file"
+                    )
+                } catch (e: Exception) {
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "Real-Debrid failed",
+                        e
+                    )
+                }
+            }
+
+            return null
+        }
+
+        val nativeMagnet =
+            entry.magnetToken
+                ?: result.token.takeIf {
+                    it.startsWith(
+                        "magnet:",
+                        ignoreCase = true
+                    )
+                }
+
+        val nativeDebridResolved =
+            nativeMagnet?.let { magnet ->
+                resolveWithKornDogDebrid(magnet)
+            }
+
+        val resolved =
+            nativeDebridResolved
+                ?: when (entry.resolver) {
                 "direct" -> {
                     ResolveResult.Ready(
                         url = result.token,

@@ -1139,80 +1139,204 @@ internal fun MainActivity.showProviderSettings() {
             dialogView.findViewById<View>(paneId)
     }
 
-    // TorBox
-    val torBoxCard = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
-        setPadding(0, 18, 0, 18)
+    // ─────────────────────────────────────────────────────────────
+    // KornDog Native Debrid Accounts
+    // TorBox → Premiumize → Real-Debrid
+    // ─────────────────────────────────────────────────────────────
 
-        addView(TextView(this@showProviderSettings).apply {
-            text = "TorBox"
-            setTextColor(
-                androidx.core.content.ContextCompat.getColor(
-                    this@showProviderSettings,
-                    R.color.text_primary
+    fun makeDebridCard(
+        title: String,
+        description: String,
+        preferenceKey: String,
+        hintText: String,
+        saveButtonText: String,
+        connectedMessage: String,
+        disconnectedMessage: String
+    ): LinearLayout {
+
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, 18, 0, 18)
+
+            addView(
+                TextView(this@showProviderSettings).apply {
+                    text = title
+                    setTextColor(
+                        androidx.core.content.ContextCompat.getColor(
+                            this@showProviderSettings,
+                            R.color.text_primary
+                        )
+                    )
+                    textSize = 16f
+                    typeface =
+                        android.graphics.Typeface.DEFAULT_BOLD
+                }
+            )
+
+            addView(
+                TextView(this@showProviderSettings).apply {
+                    text = description
+                    setTextColor(
+                        androidx.core.content.ContextCompat.getColor(
+                            this@showProviderSettings,
+                            R.color.text_secondary
+                        )
+                    )
+                    textSize = 13f
+                    setPadding(0, 4, 0, 10)
+                }
+            )
+
+            val keyInput =
+                EditText(this@showProviderSettings).apply {
+                    hint = hintText
+                    setSingleLine(true)
+
+                    inputType =
+                        android.text.InputType.TYPE_CLASS_TEXT or
+                            android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
+
+                    transformationMethod =
+                        android.text.method.PasswordTransformationMethod
+                            .getInstance()
+
+                    setText(
+                        prefs.getString(
+                            preferenceKey,
+                            ""
+                        ).orEmpty()
+                    )
+                }
+
+            addView(
+                keyInput,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
                 )
             )
-            textSize = 16f
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-        })
 
-        addView(TextView(this@showProviderSettings).apply {
-            text = "Use TorBox for torrent results that are not instantly playable."
-            setTextColor(
-                androidx.core.content.ContextCompat.getColor(
-                    this@showProviderSettings,
-                    R.color.text_secondary
-                )
+            addView(
+                Button(this@showProviderSettings).apply {
+                    text = saveButtonText
+                    isAllCaps = false
+
+                    setOnClickListener {
+                        val key =
+                            keyInput.text
+                                .toString()
+                                .trim()
+
+                        prefs.edit()
+                            .putString(
+                                preferenceKey,
+                                key
+                            )
+                            .apply()
+
+                        Toast.makeText(
+                            this@showProviderSettings,
+                            if (key.isBlank()) {
+                                disconnectedMessage
+                            } else {
+                                connectedMessage
+                            },
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
             )
-            textSize = 13f
-            setPadding(0, 4, 0, 10)
-        })
-
-        val torBoxKeyInput = EditText(this@showProviderSettings).apply {
-            hint = "TorBox API key"
-            setSingleLine(true)
-            inputType =
-                android.text.InputType.TYPE_CLASS_TEXT or
-                android.text.InputType.TYPE_TEXT_VARIATION_PASSWORD
-            transformationMethod =
-                android.text.method.PasswordTransformationMethod.getInstance()
-            setText(prefs.getString("torbox_api_key", "").orEmpty())
         }
-
-        addView(
-            torBoxKeyInput,
-            LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT
-            )
-        )
-
-        val saveTorBox = Button(this@showProviderSettings).apply {
-            text = "Save TorBox Key"
-            isAllCaps = false
-            setOnClickListener {
-                val key = torBoxKeyInput.text.toString().trim()
-
-                prefs.edit()
-                    .putString("torbox_api_key", key)
-                    .apply()
-
-                Toast.makeText(
-                    this@showProviderSettings,
-                    if (key.isBlank()) {
-                        "TorBox disconnected"
-                    } else {
-                        "TorBox key saved"
-                    },
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-
-        addView(saveTorBox)
     }
 
+
+    // ── TorBox ──
+
+    val torBoxCard =
+        makeDebridCard(
+            title = "TorBox",
+
+            description =
+                "Primary KornDog debrid resolver. " +
+                    "KornDog tries TorBox first for magnet results.",
+
+            preferenceKey =
+                "torbox_api_key",
+
+            hintText =
+                "TorBox API key",
+
+            saveButtonText =
+                "Save TorBox Key",
+
+            connectedMessage =
+                "TorBox key saved",
+
+            disconnectedMessage =
+                "TorBox disconnected"
+        )
+
     generalPane.addView(torBoxCard)
+
+
+    // ── Premiumize ──
+
+    val premiumizeCard =
+        makeDebridCard(
+            title = "Premiumize",
+
+            description =
+                "Secondary KornDog debrid resolver. " +
+                    "KornDog inspects the returned files and " +
+                    "selects the requested movie or exact episode.",
+
+            preferenceKey =
+                "premiumize_api_key",
+
+            hintText =
+                "Premiumize API key",
+
+            saveButtonText =
+                "Save Premiumize Key",
+
+            connectedMessage =
+                "Premiumize key saved",
+
+            disconnectedMessage =
+                "Premiumize disconnected"
+        )
+
+    generalPane.addView(premiumizeCard)
+
+
+    // ── Real-Debrid ──
+
+    val realDebridCard =
+        makeDebridCard(
+            title = "Real-Debrid",
+
+            description =
+                "KornDog Real-Debrid resolver. " +
+                    "For series, KornDog selects the exact episode " +
+                    "before requesting the playable link.",
+
+            preferenceKey =
+                "realdebrid_api_key",
+
+            hintText =
+                "Real-Debrid API key",
+
+            saveButtonText =
+                "Save Real-Debrid Key",
+
+            connectedMessage =
+                "Real-Debrid key saved",
+
+            disconnectedMessage =
+                "Real-Debrid disconnected"
+        )
+
+    generalPane.addView(realDebridCard)
 
     fun selectSection(index: Int) {
         navRows.forEachIndexed { i, (row, pane) ->
