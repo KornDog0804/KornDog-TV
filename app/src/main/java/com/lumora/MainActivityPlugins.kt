@@ -1557,6 +1557,29 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
 
         if (torBoxMagnet != null) {
+            val kornDogButton = Button(this).apply {
+                text = "PLAY WITH KORNDOG"
+                isAllCaps = false
+                isFocusable = true
+
+                setOnClickListener {
+                    status.text = "KornDog · resolving source…"
+                    playResult(entry)
+                }
+            }
+
+            (row as ViewGroup).addView(
+                kornDogButton,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
+        }
+
+        // Legacy TorBox-only button path retained temporarily for rollback.
+        // KornDog native resolver above now owns magnet playback.
+        if (false && torBoxMagnet != null) {
             val torBoxButton = Button(this).apply {
                 text = "PLAY WITH TORBOX"
                 isAllCaps = false
