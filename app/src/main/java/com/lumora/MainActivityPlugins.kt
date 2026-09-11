@@ -589,7 +589,8 @@ internal fun MainActivity.showStreamSearchDialog(
         val resolver: String,
         val headers: Map<String, String> = emptyMap(),
         val provider: String? = null,
-        val magnetToken: String? = null
+        val magnetToken: String? = null,
+        val debridProvider: String? = null
     )
 
     val epTag =
@@ -825,11 +826,8 @@ internal fun MainActivity.showStreamSearchDialog(
 
         // Debrid/cache hints. Real-Debrid is currently the most reliable
         // path on this install, followed by TorBox and Premiumize.
-        when {
-            "[rd" in title || "real-debrid" in title -> score += 10000
-            "[tb" in title || "torbox" in title -> score += 9000
-            "[pm" in title || "premiumize" in title -> score += 8000
-        }
+        // Debrid providers do NOT influence raw-source ranking.
+        // KornDog chooses the backend after discovery.
 
         // AIO is useful as an aggregator, but a magnet result avoids stale
         // direct wrapper/session URLs and can be resolved by Lumora itself.
@@ -880,7 +878,6 @@ internal fun MainActivity.showStreamSearchDialog(
 
         // Useful source preferences without excluding anything.
         when {
-            "elfcache" in title -> score += 350
             "torrentio" in source -> score += 250
             "mediafusion" in source -> score += 150
             "comet" in source -> score += 50
@@ -945,7 +942,8 @@ internal fun MainActivity.showStreamSearchDialog(
          * If a real magnet exists, KornDog owns the debrid resolution.
          */
         suspend fun resolveWithKornDogDebrid(
-            magnet: String
+            magnet: String,
+            forcedProvider: String? = null
         ): ResolveResult? {
 
             val torBoxKey =
@@ -966,7 +964,10 @@ internal fun MainActivity.showStreamSearchDialog(
             /*
              * 1. TORBOX
              */
-            if (torBoxKey.isNotBlank()) {
+            if (
+                (forcedProvider == null || forcedProvider == "torbox") &&
+                torBoxKey.isNotBlank()
+            ) {
                 try {
                     status.text = "KornDog · trying TorBox…"
 
@@ -1046,7 +1047,10 @@ internal fun MainActivity.showStreamSearchDialog(
             /*
              * 2. PREMIUMIZE
              */
-            if (premiumizeKey.isNotBlank()) {
+            if (
+                (forcedProvider == null || forcedProvider == "premiumize") &&
+                premiumizeKey.isNotBlank()
+            ) {
                 try {
                     status.text = "KornDog · trying Premiumize…"
 
@@ -1091,7 +1095,10 @@ internal fun MainActivity.showStreamSearchDialog(
             /*
              * 3. REAL-DEBRID
              */
-            if (realDebridKey.isNotBlank()) {
+            if (
+                (forcedProvider == null || forcedProvider == "realdebrid") &&
+                realDebridKey.isNotBlank()
+            ) {
                 try {
                     status.text = "KornDog · trying Real-Debrid…"
 
@@ -1184,12 +1191,31 @@ internal fun MainActivity.showStreamSearchDialog(
 
         val nativeDebridResolved =
             nativeMagnet?.let { magnet ->
-                resolveWithKornDogDebrid(magnet)
+                resolveWithKornDogDebrid(
+                    magnet = magnet,
+                    forcedProvider = entry.debridProvider
+                )
             }
 
         val resolved =
-            nativeDebridResolved
-                ?: when (entry.resolver) {
+            if (
+                entry.debridProvider != null &&
+                nativeMagnet != null
+            ) {
+                nativeDebridResolved
+                    ?: ResolveResult.Failed(
+                        "KornDog · ${
+                            when (entry.debridProvider) {
+                                "torbox" -> "TorBox"
+                                "premiumize" -> "Premiumize"
+                                "realdebrid" -> "Real-Debrid"
+                                else -> entry.debridProvider
+                            }
+                        } could not resolve this source"
+                    )
+            } else {
+                nativeDebridResolved
+                    ?: when (entry.resolver) {
                 "direct" -> {
                     ResolveResult.Ready(
                         url = result.token,
@@ -1238,7 +1264,9 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
             }
 
-            when (resolved) {
+            }
+
+        when (resolved) {
                 is ResolveResult.Ready -> {
                     // Find Stream resolves asynchronously. Preserve the episode
                     // chain across the second showPlayerFor() handoff.
@@ -1374,7 +1402,8 @@ internal fun MainActivity.showStreamSearchDialog(
         atFront: Boolean = false
     ) {
         if (results.any {
-                it.result.token == entry.result.token
+                it.result.token == entry.result.token &&
+                    it.debridProvider == entry.debridProvider
             }
         ) {
             return
@@ -1930,17 +1959,40 @@ internal fun MainActivity.showStreamSearchDialog(
 
                             addonStreams.forEach { stream ->
                                 val key =
-                                    stream.url
-                                        ?: stream.magnet
+                                    stream.magnet
+                                        ?: stream.url
                                         ?: stream.title
 
                                 if (!seenStreamKeys.add(key)) {
                                     return@forEach
                                 }
 
+                                val sourceText =
+                                    stream.source.orEmpty().lowercase()
+
+                                val titleText =
+                                    stream.title.lowercase()
+
+                                val elfHostedOnly =
+                                    stream.magnet == null &&
+                                        (
+                                            "elfhosted" in sourceText ||
+                                            "elfcache" in sourceText ||
+                                            "elfhosted" in titleText ||
+                                            "elfcache" in titleText
+                                        )
+
+                                if (elfHostedOnly) {
+                                    android.util.Log.i(
+                                        "KornDogResolver",
+                                        "Dropped ElfHosted-only direct result"
+                                    )
+                                    return@forEach
+                                }
+
                                 val token =
-                                    stream.url
-                                        ?: stream.magnet
+                                    stream.magnet
+                                        ?: stream.url
                                         ?: return@forEach
 
                                 addResult(
@@ -1958,10 +2010,10 @@ internal fun MainActivity.showStreamSearchDialog(
                                             audio = null
                                         ),
                                         resolver =
-                                            if (stream.url != null) {
-                                                "direct"
-                                            } else {
+                                            if (stream.magnet != null) {
                                                 "torrent"
+                                            } else {
+                                                "direct"
                                             },
                                         headers = stream.requestHeaders,
                                     provider = manifest.name,
@@ -1972,6 +2024,182 @@ internal fun MainActivity.showStreamSearchDialog(
                         }
                     }
                 }
+            }
+        }
+
+        /*
+         * Manual Find Stream:
+         *
+         * Discovery is finished. Convert the raw magnet firehose into the
+         * small KornDog provider-specific chooser.
+         *
+         * AUTO playback is intentionally left alone in this first pass.
+         */
+        if (!autoPlayBest && results.isNotEmpty()) {
+            status.text = "KornDog · checking the best sources…"
+
+            val rawResults =
+                results
+                    .filter { entry ->
+                        entry.magnetToken != null ||
+                            entry.result.token.startsWith(
+                                "magnet:",
+                                ignoreCase = true
+                            )
+                    }
+                    .toList()
+
+            val candidates =
+                rawResults.mapNotNull { entry ->
+                    val magnet =
+                        entry.magnetToken
+                            ?: entry.result.token.takeIf {
+                                it.startsWith(
+                                    "magnet:",
+                                    ignoreCase = true
+                                )
+                            }
+                            ?: return@mapNotNull null
+
+                    com.lumora.data.remote.debrid.KornDogChoiceBuilder.Candidate(
+                        title = entry.result.title,
+                        magnet = magnet,
+                        quality = entry.result.quality,
+                        source = entry.result.source,
+                        size = null,
+                        season = effectiveSeason,
+                        episode = effectiveEpisode
+                    )
+                }
+
+            val torBoxKey =
+                prefs.getString(
+                    "torbox_api_key",
+                    ""
+                )
+                    ?.trim()
+                    .orEmpty()
+
+            val premiumizeKey =
+                prefs.getString(
+                    "premiumize_api_key",
+                    ""
+                )
+                    ?.trim()
+                    .orEmpty()
+
+            val torBoxClient =
+                torBoxKey
+                    .takeIf { it.isNotBlank() }
+                    ?.let { TorBoxClient(it) }
+
+            val premiumizeClient =
+                premiumizeKey
+                    .takeIf { it.isNotBlank() }
+                    ?.let { PremiumizeClient(it) }
+
+            val choices =
+                runCatching {
+                    com.lumora.data.remote.debrid.KornDogChoiceBuilder.build(
+                        candidates = candidates,
+                        torBox = torBoxClient,
+                        premiumize = premiumizeClient
+                    )
+                }.onFailure { error ->
+                    android.util.Log.w(
+                        "KornDogResolver",
+                        "Curated chooser failed",
+                        error
+                    )
+                }.getOrDefault(emptyList())
+
+            if (choices.isNotEmpty()) {
+                /*
+                 * The raw results have done their job.
+                 * Replace them with the provider-specific shortlist.
+                 */
+                results.clear()
+                resultsHost.removeAllViews()
+
+                currentSourceLane = "All"
+                currentQualityFilter = "All"
+
+                initialStreamFocusClaimed = false
+                manualStreamUserMoved = false
+
+                choices.forEach { choice ->
+                    val raw =
+                        rawResults.firstOrNull { entry ->
+                            val magnet =
+                                entry.magnetToken
+                                    ?: entry.result.token.takeIf {
+                                        it.startsWith(
+                                            "magnet:",
+                                            ignoreCase = true
+                                        )
+                                    }
+
+                            magnet == choice.magnet
+                        }
+                            ?: return@forEach
+
+                    val providerCode =
+                        when (choice.provider) {
+                            com.lumora.data.remote.debrid.KornDogResolvedChoice.Provider.TORBOX ->
+                                "torbox"
+
+                            com.lumora.data.remote.debrid.KornDogResolvedChoice.Provider.PREMIUMIZE ->
+                                "premiumize"
+
+                            com.lumora.data.remote.debrid.KornDogResolvedChoice.Provider.REAL_DEBRID ->
+                                "realdebrid"
+                        }
+
+                    val availability =
+                        if (choice.cached) {
+                            "Cached"
+                        } else {
+                            "Fallback"
+                        }
+
+                    val providerTitle =
+                        "${choice.providerLabel} · $availability · ${raw.result.title}"
+
+                    val providerSource =
+                        listOfNotNull(
+                            choice.providerLabel,
+                            availability,
+                            raw.result.source
+                        )
+                            .distinct()
+                            .joinToString(" · ")
+
+                    addResult(
+                        raw.copy(
+                            result =
+                                raw.result.copy(
+                                    title = providerTitle,
+                                    source = providerSource
+                                ),
+                            provider = "KornDog · ${choice.providerLabel}",
+                            debridProvider = providerCode
+                        )
+                    )
+                }
+
+                status.text =
+                    "KornDog · ${results.size} curated choice(s)"
+
+                resultsHost.post {
+                    scroll.scrollTo(0, 0)
+
+                    resultsHost
+                        .getChildAt(0)
+                        ?.requestFocus()
+                }
+            } else {
+                status.text =
+                    "KornDog · no curated magnet choices found"
             }
         }
 
