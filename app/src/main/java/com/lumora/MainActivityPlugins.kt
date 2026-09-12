@@ -663,6 +663,12 @@ internal fun MainActivity.showStreamSearchDialog(
         val source = entry.result.source.orEmpty().lowercase()
 
         return when {
+            entry.resolver == "torrent" ||
+                entry.resolver == "plugin" ||
+                entry.magnetToken != null ||
+                entry.result.token.startsWith("magnet:", ignoreCase = true) ->
+                "Torrents"
+
             "cauldron" in provider ||
                 "cauldron" in source ->
                 "Cauldron"
@@ -672,9 +678,6 @@ internal fun MainActivity.showStreamSearchDialog(
                 "aiostreams" in source ||
                 "aio streams" in source ->
                 "AIOStreams"
-
-            entry.resolver == "plugin" ->
-                "Torrents"
 
             else ->
                 "Other"
