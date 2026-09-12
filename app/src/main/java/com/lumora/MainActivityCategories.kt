@@ -1641,7 +1641,14 @@ internal fun MainActivity.applyKornDogTopNavOrder() {
     }
 
     // D-pad flow now follows the same order people see on screen.
-    binding.tabHome.nextFocusLeftId = android.view.View.NO_ID
+    // KornDog TV top navigation follows the actual visible TV order.
+    binding.tabConcerts.nextFocusLeftId = android.view.View.NO_ID
+    binding.tabConcerts.nextFocusRightId = binding.btnSearch.id
+
+    binding.btnSearch.nextFocusLeftId = binding.tabConcerts.id
+    binding.btnSearch.nextFocusRightId = binding.tabHome.id
+
+    binding.tabHome.nextFocusLeftId = binding.btnSearch.id
     binding.tabHome.nextFocusRightId = binding.tabLive.id
 
     binding.tabLive.nextFocusLeftId = binding.tabHome.id
@@ -1657,12 +1664,12 @@ internal fun MainActivity.applyKornDogTopNavOrder() {
     binding.tabDiscover.nextFocusRightId = binding.tabFavorites.id
 
     binding.tabFavorites.nextFocusLeftId = binding.tabDiscover.id
-    binding.tabFavorites.nextFocusRightId = binding.tabCatchup.id
+    binding.tabFavorites.nextFocusRightId = binding.btnSettings.id
 
-    binding.tabCatchup.nextFocusLeftId = binding.tabFavorites.id
-    binding.tabCatchup.nextFocusRightId = binding.tabDownloads.id
+    binding.btnSettings.nextFocusLeftId = binding.tabFavorites.id
+    binding.btnSettings.nextFocusRightId = binding.btnRefresh.id
 
-    binding.tabDownloads.nextFocusLeftId = binding.tabCatchup.id
+    binding.btnRefresh.nextFocusLeftId = binding.btnSettings.id
 }
 
 internal fun MainActivity.selectHome() {

@@ -1169,40 +1169,7 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     val hidden = getHiddenHomeShelves()
 
     // ============================================================
-    // CONTINUE WATCHING
-    // First thing on Home: get straight back into what you were
-    // watching. Jellyfin server state leads local resume state.
-    // ============================================================
-    val localContinue = PlaybackPositionStore.getAllInProgress(this)
-    val serverContinue = jellyfinResumeItems
-    val serverIds = serverContinue.map { it.id }.toSet()
-
-    val upNext =
-        buildUpNextSeriesTiles()
-            .filterNot(::isAdultHomeItem)
-
-    val continueItems =
-        (
-            serverContinue +
-                localContinue.filterNot { it.id in serverIds } +
-                upNext
-        )
-            .distinctBy { it.id.ifBlank { it.url } }
-            .filterNot(::isAdultHomeItem)
-
-    if (continueItems.isNotEmpty()) {
-        shelves.add(
-            ContentShelf(
-                "Continue Watching",
-                continueItems
-            )
-        )
-    }
-
-    // ============================================================
     // TRENDING NOW
-    // Reuse the TMDB catalog KornDog already loaded. No extra
-    // network request is created here.
     // ============================================================
     val trendingMovies =
         tmdbMovieShelves
@@ -1232,7 +1199,6 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
 
     // ============================================================
     // FAVORITES
-    // Merge Live, provider-backed VOD and Discover favorites.
     // ============================================================
     val favChannelIds =
         FavoritesStore.getFavoriteChannelIds(this)
@@ -1264,40 +1230,6 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
             ContentShelf(
                 "Favorites",
                 favoriteItems
-            )
-        )
-    }
-
-    // ============================================================
-    // NEXT UP
-    // ============================================================
-    val nextUpItems =
-        jellyfinNextUpItems.filterNot(::isAdultHomeItem)
-
-    if (nextUpItems.isNotEmpty()) {
-        shelves.add(
-            ContentShelf(
-                "Next Up",
-                nextUpItems
-            )
-        )
-    }
-
-    // ============================================================
-    // RECENTLY PLAYED
-    // ============================================================
-    val recentItems =
-        RecentlyPlayedStore.getRecentIds(this)
-            .mapNotNull { id ->
-                liveChannels.firstOrNull { it.id == id }
-            }
-            .filterNot(::isAdultHomeItem)
-
-    if (recentItems.isNotEmpty()) {
-        shelves.add(
-            ContentShelf(
-                "Recently Played",
-                recentItems
             )
         )
     }
