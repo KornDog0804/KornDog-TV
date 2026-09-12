@@ -241,7 +241,11 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
         if (item.mediaType == MediaType.SERIES) {
             showSeriesEpisodePicker(plugin, item)
         } else {
-            showStreamSearchDialog(plugin, item)
+            showStreamSearchDialog(
+                plugin,
+                item,
+                autoPlayBest = true
+            )
         }
     }
 }
