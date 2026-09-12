@@ -800,6 +800,167 @@ internal fun MainActivity.showStreamSearchDialog(
 
     container.addView(qualityFilterRow)
 
+    /*
+     * Explicit Android TV focus map.
+     *
+     * Do not leave navigation between source tabs, stream rows and quality
+     * filters to FocusFinder. The chooser changes dynamically while addons
+     * are returning results, which makes default DPAD navigation unreliable.
+     */
+    fun firstVisibleStreamRow(): View? {
+        for (i in 0 until resultsHost.childCount) {
+            val child = resultsHost.getChildAt(i)
+
+            if (
+                child.visibility == View.VISIBLE &&
+                child.isFocusable
+            ) {
+                return child
+            }
+        }
+
+        return null
+    }
+
+    fun lastVisibleStreamRow(): View? {
+        for (i in resultsHost.childCount - 1 downTo 0) {
+            val child = resultsHost.getChildAt(i)
+
+            if (
+                child.visibility == View.VISIBLE &&
+                child.isFocusable
+            ) {
+                return child
+            }
+        }
+
+        return null
+    }
+
+    fun currentSourceButton(): View? {
+        for (i in 0 until sourceFilterRow.childCount) {
+            val child = sourceFilterRow.getChildAt(i)
+            val label = (child as? TextView)?.text?.toString()
+
+            if (label == currentSourceLane) {
+                return child
+            }
+        }
+
+        return sourceFilterRow.getChildAt(0)
+    }
+
+    fun currentQualityButton(): View? {
+        for (i in 0 until qualityFilterRow.childCount) {
+            val child = qualityFilterRow.getChildAt(i)
+            val label = (child as? TextView)?.text?.toString()
+
+            if (label == currentQualityFilter) {
+                return child
+            }
+        }
+
+        return qualityFilterRow.getChildAt(0)
+    }
+
+    /*
+     * Source lane:
+     *
+     * LEFT/RIGHT = AIOStreams <-> Cauldron <-> Torrents <-> All
+     * DOWN       = first visible stream
+     */
+    for (i in 0 until sourceFilterRow.childCount) {
+        val button = sourceFilterRow.getChildAt(i)
+
+        button.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
+                return@setOnKeyListener false
+            }
+
+            when (keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    val target =
+                        sourceFilterRow.getChildAt(
+                            (i - 1).coerceAtLeast(0)
+                        )
+
+                    target.requestFocus()
+                    true
+                }
+
+                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val target =
+                        sourceFilterRow.getChildAt(
+                            (i + 1).coerceAtMost(
+                                sourceFilterRow.childCount - 1
+                            )
+                        )
+
+                    target.requestFocus()
+                    true
+                }
+
+                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    firstVisibleStreamRow()?.let {
+                        it.requestFocus()
+                        true
+                    } ?: false
+                }
+
+                else -> false
+            }
+        }
+    }
+
+    /*
+     * Quality lane:
+     *
+     * LEFT/RIGHT = All <-> 4K <-> 1080p <-> 720p
+     * UP         = last visible stream
+     */
+    for (i in 0 until qualityFilterRow.childCount) {
+        val button = qualityFilterRow.getChildAt(i)
+
+        button.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
+                return@setOnKeyListener false
+            }
+
+            when (keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    val target =
+                        qualityFilterRow.getChildAt(
+                            (i - 1).coerceAtLeast(0)
+                        )
+
+                    target.requestFocus()
+                    true
+                }
+
+                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    val target =
+                        qualityFilterRow.getChildAt(
+                            (i + 1).coerceAtMost(
+                                qualityFilterRow.childCount - 1
+                            )
+                        )
+
+                    target.requestFocus()
+                    true
+                }
+
+                android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                    lastVisibleStreamRow()?.let {
+                        it.requestFocus()
+                        true
+                    } ?: false
+                }
+
+                else -> false
+            }
+        }
+    }
+
     fun stableId(entry: StreamEntry): String {
         val hash = entry.result.token.hashCode()
             .toUInt()
@@ -1579,8 +1740,11 @@ internal fun MainActivity.showStreamSearchDialog(
             .joinToString("  ·  ")
 
         row.setOnKeyListener { _, keyCode, event ->
+            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
+                return@setOnKeyListener false
+            }
+
             if (
-                event.action == android.view.KeyEvent.ACTION_DOWN &&
                 keyCode in listOf(
                     android.view.KeyEvent.KEYCODE_DPAD_UP,
                     android.view.KeyEvent.KEYCODE_DPAD_DOWN,
@@ -1590,7 +1754,32 @@ internal fun MainActivity.showStreamSearchDialog(
             ) {
                 manualStreamUserMoved = true
             }
-            false
+
+            when (keyCode) {
+                android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                    if (row === firstVisibleStreamRow()) {
+                        currentSourceButton()?.let {
+                            it.requestFocus()
+                            true
+                        } ?: false
+                    } else {
+                        false
+                    }
+                }
+
+                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    if (row === lastVisibleStreamRow()) {
+                        currentQualityButton()?.let {
+                            it.requestFocus()
+                            true
+                        } ?: false
+                    } else {
+                        false
+                    }
+                }
+
+                else -> false
+            }
         }
 
         row.isClickable = true
