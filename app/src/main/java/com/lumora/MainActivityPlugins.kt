@@ -2065,7 +2065,7 @@ internal fun MainActivity.showStreamSearchDialog(
             playbackIntent &&
             item.mediaType == MediaType.SERIES
         ) {
-            val hasRawTorrentIdentity =
+            val hasTorrentIdentity =
                 !entry.infoHash.isNullOrBlank() ||
                     !entry.magnetToken.isNullOrBlank() ||
                     entry.result.token.startsWith(
@@ -2073,10 +2073,29 @@ internal fun MainActivity.showStreamSearchDialog(
                         ignoreCase = true
                     )
 
-            if (!hasRawTorrentIdentity) {
+            val hasDirectIdentity =
+                !entry.directUrl.isNullOrBlank() ||
+                    (
+                        entry.resolver == "direct" &&
+                            (
+                                entry.result.token.startsWith(
+                                    "https://",
+                                    ignoreCase = true
+                                ) ||
+                                entry.result.token.startsWith(
+                                    "http://",
+                                    ignoreCase = true
+                                )
+                            )
+                    )
+
+            val hasPlayableIdentity =
+                hasTorrentIdentity || hasDirectIdentity
+
+            if (!hasPlayableIdentity) {
                 android.util.Log.d(
                     "KornDogNative",
-                    "AUTO rejected non-debrid source " +
+                    "AUTO rejected source with no usable identity " +
                         "provider=${entry.provider} " +
                         "resolver=${entry.resolver}"
                 )
@@ -2528,27 +2547,8 @@ internal fun MainActivity.showStreamSearchDialog(
                  */
                 val nativeSources =
                     nativeSourcesRaw.filter { source ->
-
-                        val provider =
-                            source.provider.lowercase()
-
-                        val hostedWrapper =
-                            "elfhosted" in provider ||
-                                "elf hosted" in provider
-
-                        when {
-                            source.hasTorrentIdentity ->
-                                true
-
-                            hostedWrapper ->
-                                false
-
-                            source.hasDirectIdentity ->
-                                true
-
-                            else ->
-                                false
-                        }
+                        source.hasTorrentIdentity ||
+                            source.hasDirectIdentity
                     }
 
                 android.util.Log.d(
@@ -2715,7 +2715,8 @@ internal fun MainActivity.showStreamSearchDialog(
                                             },
                                         headers = stream.requestHeaders,
                                     provider = manifest.name,
-                                    magnetToken = stream.magnet
+                                    magnetToken = stream.magnet,
+                                    directUrl = stream.url
                                     )
                                 )
                             }
