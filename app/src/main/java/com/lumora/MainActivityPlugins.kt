@@ -2118,7 +2118,7 @@ internal fun MainActivity.showStreamSearchDialog(
                         providers = nativeProviders
                     )
 
-                val nativeSources =
+                val nativeSourcesRaw =
                     runCatching {
                         nativeRegistry.search(
                             KornDogSearchRequest(
@@ -2138,6 +2138,62 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
                         emptyList()
                     }
+
+                /*
+                 * Native KornDog mode only accepts source identities it can
+                 * own directly.
+                 *
+                 * Raw torrent identity is preferred because KornDog can hand
+                 * it straight to the user's configured debrid services.
+                 *
+                 * Hosted resolver wrappers such as ElfHosted remain outside
+                 * the native path.
+                 */
+                val nativeSources =
+                    nativeSourcesRaw.filter { source ->
+
+                        val provider =
+                            source.provider.lowercase()
+
+                        val hostedWrapper =
+                            "elfhosted" in provider ||
+                                "elf hosted" in provider
+
+                        when {
+                            source.hasTorrentIdentity ->
+                                true
+
+                            hostedWrapper ->
+                                false
+
+                            source.hasDirectIdentity ->
+                                true
+
+                            else ->
+                                false
+                        }
+                    }
+
+                android.util.Log.d(
+                    "KornDogNative",
+                    "Native filtering raw=${nativeSourcesRaw.size} " +
+                        "kept=${nativeSources.size}"
+                )
+
+                if (
+                    nativeSourcesRaw.isNotEmpty() &&
+                    nativeSources.isEmpty()
+                ) {
+                    status.text =
+                        "KornDog · no native source identities"
+
+                    android.util.Log.d(
+                        "KornDogNative",
+                        "All returned sources were hosted wrappers"
+                    )
+
+                    return@launch
+                }
 
                 if (nativeSources.isNotEmpty()) {
                     status.text =
