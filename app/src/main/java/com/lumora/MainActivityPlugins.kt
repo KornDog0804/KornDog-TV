@@ -596,13 +596,13 @@ internal fun MainActivity.showStreamSearchDialog(
      * user has selected SxxExx KornDog should search, rank, resolve and start
      * the best usable source automatically.
      */
-    val playbackIntent =
-        autoPlayBest ||
-            (
-                item.mediaType == MediaType.SERIES &&
-                    effectiveSeason != null &&
-                    effectiveEpisode != null
-            )
+    /*
+     * Playback intent is explicit.
+     *
+     * FIND STREAM passes autoPlayBest=true.
+     * Normal episode rows pass false and keep the manual chooser.
+     */
+    val playbackIntent = autoPlayBest
 
     data class StreamEntry(
         val result: TorrentResult,
@@ -627,21 +627,229 @@ internal fun MainActivity.showStreamSearchDialog(
             ""
         }
 
+    val density = resources.displayMetrics.density
+
     val container = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        val pad =
-            (16 * resources.displayMetrics.density).toInt()
-        setPadding(pad, pad, pad, pad)
+
+        val horizontalPad =
+            ((if (playbackIntent) 28 else 16) * density).toInt()
+
+        val verticalPad =
+            ((if (playbackIntent) 24 else 16) * density).toInt()
+
+        setPadding(
+            horizontalPad,
+            verticalPad,
+            horizontalPad,
+            verticalPad
+        )
+
+        if (playbackIntent) {
+            background =
+                android.graphics.drawable.GradientDrawable().apply {
+                    setColor(
+                        android.graphics.Color.rgb(
+                            22,
+                            25,
+                            32
+                        )
+                    )
+                    cornerRadius = 22f * density
+
+                    setStroke(
+                        (1 * density).toInt(),
+                        android.graphics.Color.rgb(
+                            57,
+                            66,
+                            82
+                        )
+                    )
+                }
+        }
     }
 
+    val loaderBrand =
+        TextView(this).apply {
+            text = "KORNDOG TV"
+            textSize = 13f
+            setTextColor(
+                android.graphics.Color.rgb(
+                    82,
+                    160,
+                    255
+                )
+            )
+            setTypeface(
+                typeface,
+                android.graphics.Typeface.BOLD
+            )
+            visibility =
+                if (playbackIntent) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+
+    val loaderTitle =
+        TextView(this).apply {
+            text =
+                if (playbackIntent) {
+                    "Finding your stream"
+                } else {
+                    ""
+                }
+
+            textSize = 24f
+            setTextColor(android.graphics.Color.WHITE)
+            setTypeface(
+                typeface,
+                android.graphics.Typeface.BOLD
+            )
+
+            setPadding(
+                0,
+                (5 * density).toInt(),
+                0,
+                0
+            )
+
+            visibility =
+                if (playbackIntent) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+
+    val loaderMedia =
+        TextView(this).apply {
+            text =
+                buildString {
+                    append(item.name)
+
+                    if (
+                        effectiveSeason != null &&
+                        effectiveEpisode != null
+                    ) {
+                        append("\n")
+                        append(
+                            "S%02d  •  E%02d".format(
+                                effectiveSeason,
+                                effectiveEpisode
+                            )
+                        )
+                    }
+                }
+
+            textSize = 16f
+
+            setTextColor(
+                android.graphics.Color.rgb(
+                    205,
+                    211,
+                    223
+                )
+            )
+
+            setPadding(
+                0,
+                (15 * density).toInt(),
+                0,
+                (18 * density).toInt()
+            )
+
+            visibility =
+                if (playbackIntent) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+
+    val progressRow =
+        LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+
+            visibility =
+                if (playbackIntent) {
+                    View.VISIBLE
+                } else {
+                    View.GONE
+                }
+        }
+
+    val loaderProgress =
+        ProgressBar(this).apply {
+            isIndeterminate = true
+        }
+
+    progressRow.addView(
+        loaderProgress,
+        LinearLayout.LayoutParams(
+            (32 * density).toInt(),
+            (32 * density).toInt()
+        )
+    )
+
     val status = TextView(this).apply {
-        text = "Searching…"
+        text =
+            if (playbackIntent) {
+                "Searching sources…"
+            } else {
+                "Searching…"
+            }
+
+        textSize =
+            if (playbackIntent) {
+                16f
+            } else {
+                14f
+            }
+
         setTextColor(
-            ContextCompat.getColor(
-                this@showStreamSearchDialog,
-                R.color.text_secondary
+            if (playbackIntent) {
+                android.graphics.Color.rgb(
+                    225,
+                    229,
+                    237
+                )
+            } else {
+                ContextCompat.getColor(
+                    this@showStreamSearchDialog,
+                    R.color.text_secondary
+                )
+            }
+        )
+
+        if (playbackIntent) {
+            setPadding(
+                (14 * density).toInt(),
+                0,
+                0,
+                0
+            )
+        }
+    }
+
+    if (playbackIntent) {
+        progressRow.addView(
+            status,
+            LinearLayout.LayoutParams(
+                0,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                1f
             )
         )
+
+        container.addView(loaderBrand)
+        container.addView(loaderTitle)
+        container.addView(loaderMedia)
+        container.addView(progressRow)
+    } else {
+        container.addView(status)
     }
 
     val resultsHost = LinearLayout(this).apply {
@@ -655,21 +863,52 @@ internal fun MainActivity.showStreamSearchDialog(
         addView(resultsHost)
     }
 
-    container.addView(status)
-    container.addView(
-        scroll,
-        LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            0,
-            1f
+    if (!playbackIntent) {
+        container.addView(
+            scroll,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                0,
+                1f
+            )
         )
-    )
+    }
 
-    val dialog = AlertDialog.Builder(this)
-        .setTitle("Find Stream — ${item.name}$epTag")
-        .setView(container)
-        .setNegativeButton("Cancel", null)
-        .create()
+    val dialogBuilder =
+        AlertDialog.Builder(this)
+            .setView(container)
+            .setNegativeButton("Cancel", null)
+
+    if (!playbackIntent) {
+        dialogBuilder.setTitle(
+            "Find Stream — ${item.name}$epTag"
+        )
+    }
+
+    val dialog = dialogBuilder.create()
+
+    dialog.setOnShowListener {
+        if (playbackIntent) {
+            dialog.window?.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(
+                    android.graphics.Color.TRANSPARENT
+                )
+            )
+
+            dialog.getButton(
+                AlertDialog.BUTTON_NEGATIVE
+            )?.apply {
+                text = "CANCEL"
+                setTextColor(
+                    android.graphics.Color.rgb(
+                        82,
+                        160,
+                        255
+                    )
+                )
+            }
+        }
+    }
 
     val pluginSource =
         plugin?.let { pluginScriptManager.readSource(it) }
@@ -802,7 +1041,9 @@ internal fun MainActivity.showStreamSearchDialog(
         sourceFilterRow.addView(btn)
     }
 
-    container.addView(sourceFilterRow, 1)
+    if (!playbackIntent) {
+        container.addView(sourceFilterRow, 1)
+    }
 
     listOf("All", "4K", "1080p", "720p").forEach { label ->
         val btn = TextView(this@showStreamSearchDialog).apply {
@@ -828,7 +1069,9 @@ internal fun MainActivity.showStreamSearchDialog(
         qualityFilterRow.addView(btn)
     }
 
-    container.addView(qualityFilterRow)
+    if (!playbackIntent) {
+        container.addView(qualityFilterRow)
+    }
 
     /*
      * Explicit Android TV focus map.
@@ -1731,6 +1974,39 @@ internal fun MainActivity.showStreamSearchDialog(
         entry: StreamEntry,
         atFront: Boolean = false
     ) {
+        /*
+         * Automatic series playback is debrid-owned.
+         *
+         * A series episode selected through FIND STREAM must never fall
+         * through hosted direct wrappers. Those are exactly what allowed a
+         * request for S02E22 to eventually play unrelated media.
+         *
+         * Manual mode still exposes direct candidates for inspection.
+         */
+        if (
+            playbackIntent &&
+            item.mediaType == MediaType.SERIES
+        ) {
+            val hasRawTorrentIdentity =
+                !entry.infoHash.isNullOrBlank() ||
+                    !entry.magnetToken.isNullOrBlank() ||
+                    entry.result.token.startsWith(
+                        "magnet:",
+                        ignoreCase = true
+                    )
+
+            if (!hasRawTorrentIdentity) {
+                android.util.Log.d(
+                    "KornDogNative",
+                    "AUTO rejected non-debrid source " +
+                        "provider=${entry.provider} " +
+                        "resolver=${entry.resolver}"
+                )
+
+                return
+            }
+        }
+
         if (results.any {
                 it.result.token == entry.result.token &&
                     it.debridProvider == entry.debridProvider

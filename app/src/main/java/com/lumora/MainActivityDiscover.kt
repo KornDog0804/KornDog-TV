@@ -714,7 +714,8 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
                                     plugin,
                                     item,
                                     season = season.number,
-                                    episode = episodeNumber
+                                    episode = episodeNumber,
+                                    autoPlayBest = true
                                 )
                             }
                         }

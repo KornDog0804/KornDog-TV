@@ -709,7 +709,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                         item,
                         season = seasonNum,
                         episode = chosen.episodeNum,
-                        autoPlayBest = true
+                        autoPlayBest = false
                     )
                 }
             } else {
