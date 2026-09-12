@@ -2652,8 +2652,115 @@ internal fun MainActivity.showStreamSearchDialog(
              *
              * Manual Find Stream remains unlimited.
              */
+            /*
+             * KORNDOG STRICT SERIES IDENTITY GATE
+             *
+             * Native discovery is intentionally broad, but playback is not.
+             * Before ranking/autoplay, require the requested S/E to appear in
+             * the actual candidate title/filename.
+             *
+             * Also protect franchise families such as:
+             *   Law & Order
+             *   Law & Order SVU
+             *   Law & Order CI
+             *   Law & Order UK
+             *
+             * If the requested title itself appears before the episode marker,
+             * only harmless numeric/season text may sit between them.
+             */
+            fun nativeSeriesIdentityMatches(candidateTitle: String): Boolean {
+                if (!playbackIntent || item.mediaType != MediaType.SERIES) {
+                    return true
+                }
+
+                val wantedSeason = effectiveSeason ?: return true
+                val wantedEpisode = effectiveEpisode ?: return true
+
+                fun normalizeIdentity(value: String): String =
+                    value
+                        .lowercase()
+                        .replace("&", " and ")
+                        .replace(Regex("""[^a-z0-9]+"""), " ")
+                        .trim()
+                        .replace(Regex("""\s+"""), " ")
+
+                val candidate = normalizeIdentity(candidateTitle)
+
+                val episodePattern = Regex(
+                    """\b(?:s0?$wantedSeason"""+
+                    """e0?$wantedEpisode|0?$wantedSeason"""+
+                    """x0?$wantedEpisode)\b"""
+                )
+
+                val episodeMatch = episodePattern.find(candidate)
+                    ?: return false
+
+                val requestedTitle = normalizeIdentity(item.name)
+
+                if (requestedTitle.isBlank()) {
+                    return true
+                }
+
+                /*
+                 * Use the last occurrence before SxxExx so folder paths such as
+                 * "Law & Order Season 6/Law & Order S06E15..." work naturally.
+                 */
+                val beforeEpisode =
+                    candidate.substring(0, episodeMatch.range.first)
+
+                val titleStart =
+                    beforeEpisode.lastIndexOf(requestedTitle)
+
+                /*
+                 * Some legitimate releases use abbreviations such as LAO.
+                 * Exact S/E is still mandatory, but don't throw those away
+                 * solely because the full series title is absent.
+                 */
+                if (titleStart < 0) {
+                    return true
+                }
+
+                val bridge =
+                    beforeEpisode
+                        .substring(titleStart + requestedTitle.length)
+                        .trim()
+
+                if (bridge.isBlank()) {
+                    return true
+                }
+
+                val allowedBridgeWords =
+                    setOf(
+                        "season",
+                        "series",
+                        "complete"
+                    )
+
+                val safeBridge =
+                    bridge
+                        .split(' ')
+                        .filter(String::isNotBlank)
+                        .all { token ->
+                            token.all(Char::isDigit) ||
+                                token in allowedBridgeWords
+                        }
+
+                return safeBridge
+            }
+
             val nativeEntries =
                 nativeSources.mapNotNull { source ->
+
+                    if (!nativeSeriesIdentityMatches(source.title)) {
+                        android.util.Log.w(
+                            "KornDogIdentity",
+                            "Rejected wrong series/episode candidate: " +
+                                "\"${source.title}\" " +
+                                "wanted=${item.name} " +
+                                "S${effectiveSeason}E${effectiveEpisode}"
+                        )
+                        return@mapNotNull null
+                    }
                     val token =
                         source.magnet
                             ?: source.directUrl
