@@ -49,6 +49,35 @@ internal fun MainActivity.setupDiscover() {
     }
 }
 
+
+/**
+ * KornDog Apps launcher.
+ *
+ * Reuses the existing streaming-app dashboard that previously occupied Home.
+ */
+internal fun MainActivity.selectApps() {
+    hideCatchup()
+    activeSettingsOverlay?.dismiss()
+    activeSearchOverlay?.dismiss()
+
+    showingHome = false
+    showingDownloads = false
+    showingFavorites = false
+    showingDiscover = false
+
+    releaseLivePreview()
+
+    binding.contentRow.visibility = View.GONE
+    binding.homeContent.visibility = View.GONE
+    binding.homeDashboard.visibility = View.VISIBLE
+    binding.homeSearchBar.visibility = View.GONE
+    binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
+
+    updateTabStyles(binding.tabDiscover)
+    applyStatus()
+}
+
 /** Discover is its own pane (like Downloads): browse/search TMDB, no category sidebar. */
 internal fun MainActivity.selectDiscover() {
     hideCatchup()
@@ -1140,18 +1169,82 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     val hidden = getHiddenHomeShelves()
 
     // ============================================================
-    // FAVORITES
-    // Home's primary shelf. Merge Live, provider-backed VOD,
-    // and Discover favorites into one horizontally scrolling row.
+    // CONTINUE WATCHING
+    // First thing on Home: get straight back into what you were
+    // watching. Jellyfin server state leads local resume state.
     // ============================================================
-    val favChannelIds = FavoritesStore.getFavoriteChannelIds(this)
+    val localContinue = PlaybackPositionStore.getAllInProgress(this)
+    val serverContinue = jellyfinResumeItems
+    val serverIds = serverContinue.map { it.id }.toSet()
+
+    val upNext =
+        buildUpNextSeriesTiles()
+            .filterNot(::isAdultHomeItem)
+
+    val continueItems =
+        (
+            serverContinue +
+                localContinue.filterNot { it.id in serverIds } +
+                upNext
+        )
+            .distinctBy { it.id.ifBlank { it.url } }
+            .filterNot(::isAdultHomeItem)
+
+    if (continueItems.isNotEmpty()) {
+        shelves.add(
+            ContentShelf(
+                "Continue Watching",
+                continueItems
+            )
+        )
+    }
+
+    // ============================================================
+    // TRENDING NOW
+    // Reuse the TMDB catalog KornDog already loaded. No extra
+    // network request is created here.
+    // ============================================================
+    val trendingMovies =
+        tmdbMovieShelves
+            .firstOrNull { it.title == "Trending Movies" }
+            ?.items
+            .orEmpty()
+
+    val trendingSeries =
+        tmdbSeriesShelves
+            .firstOrNull { it.title == "Trending Series" }
+            ?.items
+            .orEmpty()
+
+    val trendingItems =
+        (trendingMovies + trendingSeries)
+            .distinctBy { it.id.ifBlank { it.url } }
+            .filterNot(::isAdultHomeItem)
+
+    if (trendingItems.isNotEmpty()) {
+        shelves.add(
+            ContentShelf(
+                "Trending Now",
+                trendingItems
+            )
+        )
+    }
+
+    // ============================================================
+    // FAVORITES
+    // Merge Live, provider-backed VOD and Discover favorites.
+    // ============================================================
+    val favChannelIds =
+        FavoritesStore.getFavoriteChannelIds(this)
+
     val favoriteLive =
         liveChannels
             .filter { it.id in favChannelIds }
             .filterNot(::isAdultHomeItem)
 
-    // Films and Series share the VOD favorites store.
-    val favVodIds = FavoritesStore.getFavoriteSeriesIds(this)
+    val favVodIds =
+        FavoritesStore.getFavoriteSeriesIds(this)
+
     val providerFavorites =
         (seriesList + filmList)
             .filter { it.id in favVodIds }
@@ -1176,41 +1269,23 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     }
 
     // ============================================================
-    // CONTINUE WATCHING
-    // Secondary to Favorites. Jellyfin server state leads local
-    // resume state because it can reflect playback on other clients.
+    // NEXT UP
     // ============================================================
-    val localContinue = PlaybackPositionStore.getAllInProgress(this)
-    val serverContinue = jellyfinResumeItems
-    val serverIds = serverContinue.map { it.id }.toSet()
+    val nextUpItems =
+        jellyfinNextUpItems.filterNot(::isAdultHomeItem)
 
-    // Series whose previous episode was completed can still surface
-    // their next episode here.
-    val upNext = buildUpNextSeriesTiles().filterNot(::isAdultHomeItem)
-
-    val continueItems =
-        (serverContinue +
-            localContinue.filterNot { it.id in serverIds } +
-            upNext)
-            .distinctBy { it.id.ifBlank { it.url } }
-            .filterNot(::isAdultHomeItem)
-
-    if (continueItems.isNotEmpty()) {
+    if (nextUpItems.isNotEmpty()) {
         shelves.add(
             ContentShelf(
-                "Continue Watching",
-                continueItems
+                "Next Up",
+                nextUpItems
             )
         )
     }
 
-    // Jellyfin server-side next episode suggestions.
-    val nextUpItems = jellyfinNextUpItems.filterNot(::isAdultHomeItem)
-    if (nextUpItems.isNotEmpty()) {
-        shelves.add(ContentShelf("Next Up", nextUpItems))
-    }
-
-    // Recently played LIVE channels.
+    // ============================================================
+    // RECENTLY PLAYED
+    // ============================================================
     val recentItems =
         RecentlyPlayedStore.getRecentIds(this)
             .mapNotNull { id ->
@@ -1219,7 +1294,12 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
             .filterNot(::isAdultHomeItem)
 
     if (recentItems.isNotEmpty()) {
-        shelves.add(ContentShelf("Recently Played", recentItems))
+        shelves.add(
+            ContentShelf(
+                "Recently Played",
+                recentItems
+            )
+        )
     }
 
     return shelves.filter { it.title !in hidden }

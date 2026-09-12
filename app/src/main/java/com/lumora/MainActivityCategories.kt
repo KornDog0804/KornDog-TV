@@ -1384,6 +1384,9 @@ internal fun MainActivity.applyStatus() {
 // ── Tabs ───────────────────────────────────────
 
 internal fun MainActivity.setupTabs() {
+    // Discover's old top-nav slot is now KornDog Apps.
+    binding.tabDiscoverLabel.text = "Apps"
+
     binding.tabHome.setOnClickListener { selectHome() }
     binding.tabFavorites.setOnClickListener {
         showingHome = false
@@ -1405,7 +1408,7 @@ internal fun MainActivity.setupTabs() {
         selectTab(1)
     }
     binding.bottomNavSearch.setOnClickListener { showSearchDialog() }
-    binding.bottomNavDiscover.setOnClickListener { showingHome = false; selectDiscover() }
+    binding.bottomNavDiscover.setOnClickListener { showingHome = false; selectApps() }
     binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
 
@@ -1552,7 +1555,7 @@ internal fun MainActivity.setupTabs() {
     binding.tabCatchup.setOnClickListener { showingHome = false; selectCatchup() }
     binding.tabSeries.setOnClickListener { selectTab(1) }
     binding.tabFilms.setOnClickListener { selectTab(2) }
-    binding.tabDiscover.setOnClickListener { showingHome = false; selectDiscover() }
+    binding.tabDiscover.setOnClickListener { showingHome = false; selectApps() }
     binding.tabConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
     binding.tabDownloads.setOnClickListener { showingHome = false; selectDownloads() }
     setupDiscover()
@@ -1601,7 +1604,70 @@ internal fun MainActivity.updateTabStyles(selected: View) {
         binding.tabBar.post { binding.tabBar.smoothScrollTo((selected.left - 40).coerceAtLeast(0), 0) }
 }
 
+
+/**
+ * KornDog TV top navigation order.
+ *
+ * Keeps the existing real navigation views and their listeners intact.
+ * We only change their visual order inside the existing tab strip.
+ */
+internal fun MainActivity.applyKornDogTopNavOrder() {
+    val parent =
+        binding.tabHome.parent as? android.view.ViewGroup
+            ?: return
+
+    val ordered =
+        listOf(
+            binding.tabHome,
+            binding.tabLive,
+            binding.tabSeries,
+            binding.tabFilms,
+            binding.tabDiscover,
+            binding.tabFavorites,
+            binding.tabCatchup,
+            binding.tabDownloads
+        )
+
+    // All of these tabs already belong to the same navigation container.
+    // Moving them preserves their existing click/focus behavior.
+    ordered.forEach { tab ->
+        if (tab.parent === parent) {
+            parent.removeView(tab)
+        }
+    }
+
+    ordered.forEach { tab ->
+        parent.addView(tab)
+    }
+
+    // D-pad flow now follows the same order people see on screen.
+    binding.tabHome.nextFocusLeftId = android.view.View.NO_ID
+    binding.tabHome.nextFocusRightId = binding.tabLive.id
+
+    binding.tabLive.nextFocusLeftId = binding.tabHome.id
+    binding.tabLive.nextFocusRightId = binding.tabSeries.id
+
+    binding.tabSeries.nextFocusLeftId = binding.tabLive.id
+    binding.tabSeries.nextFocusRightId = binding.tabFilms.id
+
+    binding.tabFilms.nextFocusLeftId = binding.tabSeries.id
+    binding.tabFilms.nextFocusRightId = binding.tabDiscover.id
+
+    binding.tabDiscover.nextFocusLeftId = binding.tabFilms.id
+    binding.tabDiscover.nextFocusRightId = binding.tabFavorites.id
+
+    binding.tabFavorites.nextFocusLeftId = binding.tabDiscover.id
+    binding.tabFavorites.nextFocusRightId = binding.tabCatchup.id
+
+    binding.tabCatchup.nextFocusLeftId = binding.tabFavorites.id
+    binding.tabCatchup.nextFocusRightId = binding.tabDownloads.id
+
+    binding.tabDownloads.nextFocusLeftId = binding.tabCatchup.id
+}
+
 internal fun MainActivity.selectHome() {
+    applyKornDogTopNavOrder()
+
     activeSettingsOverlay?.dismiss()
     activeSearchOverlay?.dismiss()
     homeSeeAllShelf = null
@@ -1613,10 +1679,10 @@ internal fun MainActivity.selectHome() {
     binding.discoverContent.visibility = View.GONE
     binding.concertContent.visibility = View.GONE
     binding.contentRow.visibility = View.GONE
-    binding.homeDashboard.visibility = View.VISIBLE
-    // Home is now the external streaming-app hub only.
-    // Favorites / Continue Watching already live elsewhere.
-    binding.homeContent.visibility = View.GONE
+    binding.homeDashboard.visibility = View.GONE
+
+    // KornDog Home: real content shelves over the Tippy backdrop.
+    binding.homeContent.visibility = View.VISIBLE
     // Search on Home is only useful with something to search; with no enabled provider
     // updateTopChromeVisibility() keeps it hidden. selectHome used to force it visible
     // unconditionally, which is why it lingered on the empty first screen.

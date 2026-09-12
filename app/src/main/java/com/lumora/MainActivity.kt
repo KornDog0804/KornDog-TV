@@ -489,6 +489,7 @@ class MainActivity : AppCompatActivity() {
     // Home remains legacy UI for the moment, but is no longer the startup destination.
     internal var showingHome = false
     internal var homeSeeAllShelf: ContentShelf? = null
+    internal var concertSeeAllShelf: ContentShelf? = null
     internal var showingDownloads = false
     internal var showingDiscover = false
     // Favorites is a standalone catalog destination, not a fourth activeTab.
@@ -719,9 +720,16 @@ class MainActivity : AppCompatActivity() {
     internal val concertShelfAdapter = ShelfAdapter(
         onItemClick = { item -> playConcertItem(item) },
         onItemLongClick = { item -> toggleFavoriteVodItem(item) },
-        onSeeAllClick = { shelf -> showSeeAll(shelf) },
+        onSeeAllClick = { shelf -> showConcertSeeAll(shelf) },
         showPinButton = false
     )
+
+    internal val concertGridAdapter =
+        com.lumora.adapter.PosterGridAdapter(
+            onItemLongClick = { item -> toggleFavoriteVodItem(item) }
+        ) { item ->
+            playConcertItem(item)
+        }
 
     internal var concertShelves:
         List<com.lumora.model.ContentShelf> = emptyList()
@@ -1121,6 +1129,15 @@ class MainActivity : AppCompatActivity() {
         else if (isPlayerVisible && isPlayerSideMenuOpen()) { closeSideMenu() }
         else if (isPlayerVisible) { hidePlayer(); restoreSearchIfPending() }
         else if (isContentDetailVisible) { hideContentDetail(); restoreSearchIfPending() }
+
+        else if (concertSeeAllShelf != null) {
+            concertSeeAllShelf = null
+            selectConcertCorner()
+        }
+        else if (homeSeeAllShelf != null) {
+            homeSeeAllShelf = null
+            selectHome()
+        }
         // Home is no longer part of normal navigation. Back first returns the current
         // section to its top level; once already there, Back leaves the app.
         else if (!isAtSectionTop()) goToSectionTop()

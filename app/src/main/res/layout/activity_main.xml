@@ -1419,6 +1419,7 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
+            android:background="@drawable/bg_korndog_home_tippy"
             android:clipChildren="false"
             android:clipToPadding="false"
             android:paddingStart="20dp"

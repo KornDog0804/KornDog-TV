@@ -439,7 +439,51 @@ internal fun MainActivity.setupConcertCorner() {
         concertShelfAdapter
 }
 
+internal fun MainActivity.showConcertSeeAll(
+    shelf: com.lumora.model.ContentShelf
+) {
+    concertSeeAllShelf = shelf
+
+    showingHome = false
+    showingDownloads = false
+    showingDiscover = false
+    showingFavorites = false
+
+    hideCatchup()
+    releaseLivePreview()
+
+    binding.homeDashboard.visibility = View.GONE
+    binding.homeContent.visibility = View.GONE
+    binding.homeSearchBar.visibility = View.GONE
+    binding.discoverContent.visibility = View.GONE
+    binding.concertContent.visibility = View.GONE
+
+    binding.contentRow.visibility = View.VISIBLE
+    binding.liveRow.visibility = View.GONE
+    binding.filmsContent.visibility = View.GONE
+    binding.seriesContent.visibility = View.VISIBLE
+    binding.downloadsContent.visibility = View.GONE
+    binding.downloadsEmptyText.visibility = View.GONE
+
+    applySidebarVisibility(tabWantsSidebar = false)
+
+    setGridSpan(
+        binding.seriesContent,
+        concertGridAdapter,
+        R.id.tabConcerts
+    )
+
+    binding.seriesContent.adapter = concertGridAdapter
+    concertGridAdapter.replaceAll(shelf.items)
+    binding.seriesContent.scrollToPosition(0)
+
+    updateTabStyles(binding.tabConcerts)
+    applyStatus()
+}
+
 internal fun MainActivity.selectConcertCorner() {
+    concertSeeAllShelf = null
+
     activeSettingsOverlay?.dismiss()
     activeSearchOverlay?.dismiss()
 
