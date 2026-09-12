@@ -7,12 +7,22 @@ object KornDogFilePicker {
     )
 
     private val unwantedLanguage = Regex(
-        """\b(rus|russian|ukr|ukrainian|ita|italian|spa|spanish|latino|fre|fra|french|ger|deu|german|hin|hindi)\b""",
+        """\b(rus|russian|ukr|ukrainian|ita|italian|spa|spanish|latino|fre|fra|french|ger|deu|german|hin|hindi|jpn|japanese|kor|korean|chi|zho|chinese)\b""",
         RegexOption.IGNORE_CASE
     )
 
-    private val wantedLanguage = Regex(
-        """\b(eng|english|multi|multi[- .]?audio|dual[- .]?audio)\b""",
+    /*
+     * Explicit English is strong evidence.
+     * Multi/Dual Audio is only a ranking hint because it does not
+     * prove that one of the tracks is English.
+     */
+    private val englishLanguage = Regex(
+        """\b(eng|english)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val multiLanguage = Regex(
+        """\b(multi|multi[- .]?audio|dual[- .]?audio)\b""",
         RegexOption.IGNORE_CASE
     )
 
@@ -80,15 +90,39 @@ object KornDogFilePicker {
             score += 20_000
         }
 
-        if (wantedLanguage.containsMatchIn(cleanName)) {
-            score += 4_000
+        val explicitEnglish =
+            englishLanguage.containsMatchIn(cleanName)
+
+        val multiAudio =
+            multiLanguage.containsMatchIn(cleanName)
+
+        val explicitForeign =
+            unwantedLanguage.containsMatchIn(cleanName)
+
+        /*
+         * KornDog FenLite language ranking.
+         *
+         * Explicit English:
+         *     very strong preference
+         *
+         * Multi / Dual Audio:
+         *     useful hint only
+         *
+         * Explicit foreign language without English:
+         *     severe penalty
+         *
+         * Final proof comes from the actual Media3 audio tracks.
+         */
+        if (explicitEnglish) {
+            score += 8_000
         }
 
-        if (
-            unwantedLanguage.containsMatchIn(cleanName) &&
-            !wantedLanguage.containsMatchIn(cleanName)
-        ) {
-            score -= 12_000
+        if (multiAudio) {
+            score += 1_000
+        }
+
+        if (explicitForeign && !explicitEnglish) {
+            score -= 20_000
         }
 
         when {
