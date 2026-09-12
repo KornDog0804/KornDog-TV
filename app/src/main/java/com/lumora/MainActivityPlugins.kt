@@ -2576,46 +2576,109 @@ internal fun MainActivity.showStreamSearchDialog(
                     status.text =
                         "KornDog: ${nativeSources.size} native source(s)"
 
-                    nativeSources.forEach { source ->
+                    /*
+             * AUTO FAST PATH
+             *
+             * Native discovery may return hundreds of sources.
+             * Autoplay does not need hundreds of ranked Android rows.
+             *
+             * Normalize everything cheaply, rank once, keep only ten
+             * strong candidates, then enter the existing playback path.
+             *
+             * Manual Find Stream remains unlimited.
+             */
+            val nativeEntries =
+                nativeSources.mapNotNull { source ->
+                    val token =
+                        source.magnet
+                            ?: source.directUrl
+                            ?: source.infoHash
+                            ?: return@mapNotNull null
 
-                        val token =
-                            source.magnet
-                                ?: source.directUrl
-                                ?: source.infoHash
-                                ?: return@forEach
+                    StreamEntry(
+                        result = TorrentResult(
+                            title = source.title,
+                            token = token,
+                            seeders = null,
+                            size = null,
+                            quality = source.quality,
+                            source = source.provider,
+                            audio = null,
+                            language = source.language
+                        ),
 
-                        addResult(
-                            StreamEntry(
-                                result = TorrentResult(
-                                    title = source.title,
-                                    token = token,
-                                    seeders = null,
-                                    size = null,
-                                    quality = source.quality,
-                                    source = source.provider,
-                                    audio = null,
-                                    language = source.language
-                                ),
+                        resolver =
+                            when (source.type) {
+                                KornDogSourceType.TORRENT ->
+                                    "torrent"
 
-                                resolver =
-                                    when (source.type) {
-                                        KornDogSourceType.TORRENT ->
-                                            "torrent"
+                                KornDogSourceType.DIRECT ->
+                                    "direct"
+                            },
 
-                                        KornDogSourceType.DIRECT ->
-                                            "direct"
-                                    },
+                        headers = source.headers,
+                        provider = source.provider,
 
-                                headers = source.headers,
-                                provider = source.provider,
+                        magnetToken = source.magnet,
+                        infoHash = source.infoHash,
+                        fileIdx = source.fileIdx,
+                        directUrl = source.directUrl
+                    )
+                }
 
-                                magnetToken = source.magnet,
-                                infoHash = source.infoHash,
-                                fileIdx = source.fileIdx,
-                                directUrl = source.directUrl
-                            )
-                        )
-                    }
+            val entriesToAdd =
+                if (playbackIntent) {
+                    val ranked =
+                        nativeEntries
+                            .sortedByDescending { entry ->
+                                streamRank(entry)
+                            }
+
+                    /*
+                     * Preserve strong direct candidates because build 211
+                     * proved that lane can produce a correct verified episode.
+                     */
+                    val directSafety =
+                        ranked
+                            .filter { entry ->
+                                entry.resolver == "direct"
+                            }
+                            .take(2)
+
+                    /*
+                     * Eight strongest overall plus two direct safety slots.
+                     * Fill any duplicate holes from the ranked pool.
+                     */
+                    (ranked.take(8) + directSafety + ranked)
+                        .distinctBy { entry ->
+                            listOf(
+                                entry.result.token,
+                                entry.infoHash,
+                                entry.magnetToken,
+                                entry.directUrl,
+                                entry.debridProvider
+                            ).joinToString("|")
+                        }
+                        .take(10)
+                } else {
+                    nativeEntries
+                }
+
+            if (playbackIntent) {
+                android.util.Log.i(
+                    "KornDogAuto",
+                    "AUTO candidate pool " +
+                        "raw=${nativeSources.size} " +
+                        "normalized=${nativeEntries.size} " +
+                        "selected=${entriesToAdd.size} " +
+                        "direct=${entriesToAdd.count { it.resolver == "direct" }} " +
+                        "torrent=${entriesToAdd.count { it.resolver == "torrent" }}"
+                )
+            }
+
+            entriesToAdd.forEach { entry ->
+                addResult(entry)
+            }
 
                     android.util.Log.d(
                         "KornDogNative",
