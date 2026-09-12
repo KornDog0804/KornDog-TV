@@ -112,6 +112,25 @@ class PlayerManager(
     )
 
     /**
+     * Result of inspecting the actual audio tracks exposed by Media3.
+     *
+     * MATCH:
+     *     the requested language was positively identified.
+     *
+     * NO_MATCH:
+     *     audio tracks exist and every usable language tag is explicitly
+     *     something else, or the media contains no audio track at all.
+     *
+     * UNKNOWN:
+     *     audio exists, but its metadata does not prove what language it is.
+     */
+    enum class AudioLanguageResult {
+        MATCH,
+        NO_MATCH,
+        UNKNOWN
+    }
+
+    /**
      * Everything needed to replay the current item exactly as submitted.
      * Used for one targeted HLS retry when Media3 cannot infer a disguised
      * HLS stream from its URL.
@@ -406,6 +425,274 @@ class PlayerManager(
         // Same as the audio preference: covers a source that fired onTracksChanged during
         // prepare(), before this listener existed.
         listener.onTracksChanged(player.currentTracks)
+    }
+
+    /**
+     * Inspect the actual Media3 audio tracks for one playback attempt.
+     *
+     * This is intentionally one-shot and URI-locked. A later source must not
+     * inherit a decision made for the previous Find Stream candidate.
+     *
+     * If the requested language is found, explicitly select that track.
+     * UNKNOWN is kept separate from NO_MATCH because "und" does not prove
+     * that a track is foreign.
+     */
+    fun verifyAndSelectAudioLanguage(
+        language: String,
+        expectedUrl: String,
+        onResult: (AudioLanguageResult) -> Unit
+    ) {
+        val wanted = language
+            .lowercase()
+            .trim()
+
+        val iso3 = runCatching {
+            java.util.Locale(wanted).isO3Language
+        }.getOrNull().orEmpty()
+
+        val listener = object : Player.Listener {
+            private var decided = false
+
+            override fun onTracksChanged(tracks: Tracks) {
+                if (decided) return
+
+                /*
+                 * If another source replaced this one before track discovery
+                 * finished, silently retire this verifier.
+                 */
+                val currentUrl =
+                    player.currentMediaItem
+                        ?.localConfiguration
+                        ?.uri
+                        ?.toString()
+
+                if (
+                    currentUrl != null &&
+                    currentUrl != expectedUrl
+                ) {
+                    decided = true
+                    player.removeListener(this)
+                    return
+                }
+
+                /*
+                 * Empty groups means Media3 is still preparing.
+                 * Stay attached for the real track event.
+                 */
+                if (tracks.groups.isEmpty()) return
+
+                val audioGroups =
+                    tracks.groups.filter {
+                        it.type == C.TRACK_TYPE_AUDIO &&
+                            it.isSupported
+                    }
+
+                /*
+                 * Media3 can publish video groups before the audio renderer has
+                 * finished discovering its tracks. Zero audio groups here is
+                 * therefore not a verdict yet. READY is the final checkpoint.
+                 */
+                if (audioGroups.isEmpty()) return
+
+                var matchingGroup: Tracks.Group? = null
+                var matchingIndex = -1
+                var hasUnknownLanguage = false
+
+                val observed =
+                    mutableListOf<String>()
+
+                loop@ for (group in audioGroups) {
+                    for (i in 0 until group.length) {
+                        val format =
+                            group.getTrackFormat(i)
+
+                        val tag =
+                            format.language
+                                ?.lowercase()
+                                ?.trim()
+                                .orEmpty()
+
+                        val label =
+                            format.label
+                                ?.lowercase()
+                                ?.trim()
+                                .orEmpty()
+
+                        observed +=
+                            "tag=${tag.ifBlank { "unknown" }} " +
+                                "label=${label.ifBlank { "unknown" }}"
+
+                        val tagMatches =
+                            tag == wanted ||
+                                tag.startsWith("$wanted-") ||
+                                (
+                                    iso3.isNotEmpty() &&
+                                        tag == iso3
+                                )
+
+                        val labelMatches =
+                            when (wanted) {
+                                "en" ->
+                                    label.contains("english") ||
+                                        Regex(
+                                            """\beng\b""",
+                                            RegexOption.IGNORE_CASE
+                                        ).containsMatchIn(label)
+
+                                else ->
+                                    false
+                            }
+
+                        if (tagMatches || labelMatches) {
+                            matchingGroup = group
+                            matchingIndex = i
+                            break@loop
+                        }
+
+                        /*
+                         * These values do not prove a non-English language.
+                         * They therefore make the result UNKNOWN rather than
+                         * falsely condemning the source.
+                         */
+                        if (
+                            tag.isBlank() ||
+                            tag == "und" ||
+                            tag == "mul" ||
+                            tag == "zxx"
+                        ) {
+                            hasUnknownLanguage = true
+                        }
+                    }
+                }
+
+                if (
+                    matchingGroup != null &&
+                    matchingIndex >= 0
+                ) {
+                    decided = true
+                    player.removeListener(this)
+                    if (
+                        !matchingGroup.isTrackSelected(
+                            matchingIndex
+                        )
+                    ) {
+                        player.trackSelectionParameters =
+                            player.trackSelectionParameters
+                                .buildUpon()
+                                .clearOverridesOfType(
+                                    C.TRACK_TYPE_AUDIO
+                                )
+                                .setOverrideForType(
+                                    TrackSelectionOverride(
+                                        matchingGroup.mediaTrackGroup,
+                                        listOf(matchingIndex)
+                                    )
+                                )
+                                .build()
+                    }
+
+                    android.util.Log.i(
+                        "KornDogAudio",
+                        "Confirmed $wanted audio " +
+                            "tracks=${observed.joinToString(" | ")}"
+                    )
+
+                    onResult(
+                        AudioLanguageResult.MATCH
+                    )
+                    return
+                }
+
+                val result =
+                    if (hasUnknownLanguage) {
+                        AudioLanguageResult.UNKNOWN
+                    } else {
+                        AudioLanguageResult.NO_MATCH
+                    }
+
+                android.util.Log.w(
+                    "KornDogAudio",
+                    "Audio language rejected " +
+                        "wanted=$wanted " +
+                        "result=$result " +
+                        "tracks=${observed.joinToString(" | ")}"
+                )
+
+                /*
+                 * A non-matching track list may still be provisional while
+                 * Media3 is preparing. Only finalize rejection here if the
+                 * player has already reached READY.
+                 */
+                if (player.playbackState != Player.STATE_READY) {
+                    return
+                }
+
+                decided = true
+                player.removeListener(this)
+
+                onResult(result)
+            }
+
+            override fun onPlaybackStateChanged(state: Int) {
+                if (decided || state != Player.STATE_READY) return
+
+                val currentUrl =
+                    player.currentMediaItem
+                        ?.localConfiguration
+                        ?.uri
+                        ?.toString()
+
+                if (
+                    currentUrl != null &&
+                    currentUrl != expectedUrl
+                ) {
+                    decided = true
+                    player.removeListener(this)
+                    return
+                }
+
+                val tracks = player.currentTracks
+
+                val audioGroups =
+                    tracks.groups.filter {
+                        it.type == C.TRACK_TYPE_AUDIO &&
+                            it.isSupported
+                    }
+
+                if (audioGroups.isEmpty()) {
+                    decided = true
+                    player.removeListener(this)
+
+                    android.util.Log.w(
+                        "KornDogAudio",
+                        "READY with no supported audio tracks " +
+                            "url=$expectedUrl"
+                    )
+
+                    onResult(
+                        AudioLanguageResult.NO_MATCH
+                    )
+                    return
+                }
+
+                /*
+                 * Re-run the normal track evaluator now that READY makes this
+                 * track list authoritative. It will decide MATCH, NO_MATCH,
+                 * or UNKNOWN and remove this listener.
+                 */
+                onTracksChanged(tracks)
+            }
+        }
+
+        player.addListener(listener)
+
+        /*
+         * Handles sources whose track event arrived immediately during
+         * prepare(), before this listener was attached.
+         */
+        listener.onTracksChanged(
+            player.currentTracks
+        )
     }
 
     /** The user's audio language from Settings > General, defaulting to English. */

@@ -1062,6 +1062,81 @@ internal fun MainActivity.showPlayerFor(
                 audio = audio,
                 preferAudioLanguage = startVersion.mediaType != MediaType.LIVE
             )
+
+            /*
+             * Find Stream strict-English gate.
+             *
+             * Filename metadata only ranks candidates. This checks the real
+             * Media3 audio tracks after the selected source is prepared.
+             *
+             * Normal IPTV/Jellyfin/library playback is untouched. Only a
+             * freshly resolved Find Stream source has both
+             * pluginStreamAlreadyResolved and an armed search failover chain.
+             */
+            if (
+                pluginStreamAlreadyResolved &&
+                startVersion.mediaType != MediaType.LIVE &&
+                streamSearchFailover != null
+            ) {
+                playerManager.verifyAndSelectAudioLanguage(
+                    language = "en",
+                    expectedUrl = startVersion.url
+                ) { languageResult ->
+                    when (languageResult) {
+                        PlayerManager.AudioLanguageResult.MATCH -> {
+                            android.util.Log.i(
+                                "KornDogAudio",
+                                "Find Stream source passed strict English gate"
+                            )
+                        }
+
+                        PlayerManager.AudioLanguageResult.NO_MATCH,
+                        PlayerManager.AudioLanguageResult.UNKNOWN -> {
+                            val reason =
+                                if (
+                                    languageResult ==
+                                    PlayerManager.AudioLanguageResult.UNKNOWN
+                                ) {
+                                    "English audio could not be confirmed"
+                                } else {
+                                    "No English audio found"
+                                }
+
+                            android.util.Log.w(
+                                "KornDogAudio",
+                                "$reason; trying next Find Stream source"
+                            )
+
+                            /*
+                             * Stop this source before resolving the next one.
+                             * The verifier already removed itself, so stop()
+                             * cannot cause a second language verdict.
+                             */
+                            playerManager.stop()
+
+                            binding.bufferingSpinner.visibility =
+                                View.VISIBLE
+
+                            val fallbackStarted =
+                                streamSearchFailover?.invoke() == true
+
+                            if (!fallbackStarted) {
+                                streamSearchFailover = null
+
+                                binding.bufferingSpinner.visibility =
+                                    View.GONE
+
+                                Toast.makeText(
+                                    this@showPlayerFor,
+                                    "$reason in available sources",
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                        }
+                    }
+                }
+            }
+
             resumeFromMs?.let { playerManager.seekTo(it) }
         }
     }
