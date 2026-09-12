@@ -878,9 +878,74 @@ internal fun MainActivity.showStreamSearchDialog(
         )
     }
 
+    val dialogContent: View =
+        if (playbackIntent) {
+            FrameLayout(this).apply {
+                val backdrop =
+                    ImageView(this@showStreamSearchDialog).apply {
+                        scaleType = ImageView.ScaleType.CENTER_CROP
+                        alpha = 0.42f
+                    }
+
+                addView(
+                    backdrop,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                )
+
+                val dimLayer =
+                    View(this@showStreamSearchDialog).apply {
+                        setBackgroundColor(
+                            android.graphics.Color.argb(
+                                175,
+                                0,
+                                0,
+                                0
+                            )
+                        )
+                    }
+
+                addView(
+                    dimLayer,
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.MATCH_PARENT
+                    )
+                )
+
+                val cardParams =
+                    FrameLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    ).apply {
+                        gravity = android.view.Gravity.CENTER
+                        val margin = (24 * density).toInt()
+                        setMargins(
+                            margin,
+                            margin,
+                            margin,
+                            margin
+                        )
+                    }
+
+                addView(container, cardParams)
+
+                loadDetailImage(
+                    item.backdropUrl
+                        ?: item.posterUrl
+                        ?: item.logoUrl,
+                    backdrop
+                )
+            }
+        } else {
+            container
+        }
+
     val dialogBuilder =
         AlertDialog.Builder(this)
-            .setView(container)
+            .setView(dialogContent)
             .setNegativeButton("Cancel", null)
 
     if (!playbackIntent) {
