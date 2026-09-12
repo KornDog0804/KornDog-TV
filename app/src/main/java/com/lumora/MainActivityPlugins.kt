@@ -1640,24 +1640,68 @@ internal fun MainActivity.showStreamSearchDialog(
             return null
         }
 
-        val nativeMagnet =
+        /*
+         * Normalize every raw torrent identity into a magnet BEFORE deciding
+         * which resolver owns it.
+         *
+         * Some native/plugin providers return:
+         *   - a full magnet URI
+         *   - a bare 40-char hex infoHash
+         *   - a bare 32-char base32 infoHash
+         *   - text containing btih:<hash>
+         *
+         * All of those belong to KornDog debrid. They must never fall through
+         * to the old local TorrentEngine path just because the provider did
+         * not include the literal "magnet:" prefix.
+         */
+        fun normalizedTorrentMagnet(): String? {
             entry.magnetToken
-                ?: entry.infoHash?.takeIf { it.isNotBlank() }?.let { hash ->
-                    buildString {
+                ?.takeIf { it.isNotBlank() }
+                ?.let { return it }
+
+            entry.infoHash
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.let { hash ->
+                    return buildString {
                         append("magnet:?xt=urn:btih:")
                         append(hash)
-                        entry.fileIdx?.let { idx ->
-                            append("&so=")
-                            append(idx)
-                        }
                     }
                 }
-                ?: result.token.takeIf {
-                    it.startsWith(
-                        "magnet:",
-                        ignoreCase = true
-                    )
-                }
+
+            val token = result.token.trim()
+
+            if (token.startsWith("magnet:", ignoreCase = true)) {
+                return token
+            }
+
+            val bareHash =
+                Regex(
+                    """(?i)^(?:[a-f0-9]{40}|[a-z2-7]{32})$"""
+                )
+                    .matchEntire(token)
+                    ?.value
+
+            if (bareHash != null) {
+                return "magnet:?xt=urn:btih:$bareHash"
+            }
+
+            val embeddedHash =
+                Regex(
+                    """(?i)btih:([a-f0-9]{40}|[a-z2-7]{32})"""
+                )
+                    .find(token)
+                    ?.groupValues
+                    ?.getOrNull(1)
+
+            if (embeddedHash != null) {
+                return "magnet:?xt=urn:btih:$embeddedHash"
+            }
+
+            return null
+        }
+
+        val nativeMagnet = normalizedTorrentMagnet()
 
         /*
          * Smart KornDog debrid preflight.
@@ -1797,13 +1841,28 @@ internal fun MainActivity.showStreamSearchDialog(
                     }
 
                 "torrent" -> {
-                    resolveTorrentStream(
-                        result.token,
-                        effectiveSeason,
-                        effectiveEpisode
-                    ) { line ->
-                        runOnUiThread {
-                            status.text = line
+                    if (
+                        playbackIntent &&
+                        item.mediaType == MediaType.SERIES
+                    ) {
+                        android.util.Log.w(
+                            "KornDogResolver",
+                            "AUTO blocked legacy TorrentEngine because no " +
+                                "debrid-owned torrent identity was available"
+                        )
+
+                        ResolveResult.Failed(
+                            "KornDog · no debrid-owned torrent identity"
+                        )
+                    } else {
+                        resolveTorrentStream(
+                            result.token,
+                            effectiveSeason,
+                            effectiveEpisode
+                        ) { line ->
+                            runOnUiThread {
+                                status.text = line
+                            }
                         }
                     }
                 }
@@ -1815,16 +1874,31 @@ internal fun MainActivity.showStreamSearchDialog(
                                 "The source plugin is unavailable"
                             )
 
-                        plugin.resolvesNatively ->
-                            resolveTorrentStream(
-                                result.token,
-                                effectiveSeason,
-                                effectiveEpisode
-                            ) { line ->
-                                runOnUiThread {
-                                    status.text = line
+                        plugin.resolvesNatively -> {
+                            if (
+                                playbackIntent &&
+                                item.mediaType == MediaType.SERIES
+                            ) {
+                                android.util.Log.w(
+                                    "KornDogResolver",
+                                    "AUTO blocked native plugin TorrentEngine fallback"
+                                )
+
+                                ResolveResult.Failed(
+                                    "KornDog · provider returned no debrid-owned identity"
+                                )
+                            } else {
+                                resolveTorrentStream(
+                                    result.token,
+                                    effectiveSeason,
+                                    effectiveEpisode
+                                ) { line ->
+                                    runOnUiThread {
+                                        status.text = line
+                                    }
                                 }
                             }
+                        }
 
                         else ->
                             jsPluginEngine.resolve(
@@ -2296,7 +2370,15 @@ internal fun MainActivity.showStreamSearchDialog(
                                                   "magnet:",
                                                   ignoreCase = true
                                               )
-                                          }
+                                          },
+                                      infoHash =
+                                          result.token
+                                              .trim()
+                                              .takeIf {
+                                                  Regex(
+                                                      """(?i)^(?:[a-f0-9]{40}|[a-z2-7]{32})$"""
+                                                  ).matches(it)
+                                              }
                                   ),
                                 atFront
                             )
