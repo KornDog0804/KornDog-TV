@@ -29,6 +29,7 @@ import com.lumora.data.remote.torbox.TorBoxClient
 import com.lumora.data.remote.premiumize.PremiumizeClient
 import com.lumora.data.remote.realdebrid.RealDebridClient
 import com.lumora.data.remote.debrid.KornDogFilePicker
+import com.lumora.data.remote.debrid.KornDogChoiceBuilder
 import com.lumora.plugin.DiscoveredProvider
 import com.lumora.plugin.DiscoveryResult
 import com.lumora.plugin.ResolveResult
@@ -1004,17 +1005,48 @@ internal fun MainActivity.showStreamSearchDialog(
         // Debrid providers do NOT influence raw-source ranking.
         // KornDog chooses the backend after discovery.
 
-        // AIO is useful as an aggregator, but a magnet result avoids stale
-        // direct wrapper/session URLs and can be resolved by Lumora itself.
-        if ("aiostreams" in source) score += 1200
+        /*
+         * Native KornDog source identity wins.
+         *
+         * A raw infoHash / magnet lets KornDog resolve with the user's own
+         * TorBox, Premiumize or Real-Debrid account. Hosted direct wrappers
+         * are fallback material because they are frequently stale, uncached,
+         * session-bound or HTML/JSON resolver endpoints.
+         */
+        when {
+            !entry.infoHash.isNullOrBlank() -> {
+                score += 5000
+            }
 
-        // Ready HTTPS debrid/cache URLs are the fastest path into Media3.
-        // Magnets remain fully available, but they require another resolution
-        // hop before playback can begin.
-        if (entry.resolver == "direct") {
-            score += 1600
-        } else if (entry.resolver == "torrent") {
-            score += 500
+            !entry.magnetToken.isNullOrBlank() ||
+                entry.result.token.startsWith(
+                    "magnet:",
+                    ignoreCase = true
+                ) -> {
+                score += 4500
+            }
+
+            entry.resolver == "torrent" -> {
+                score += 4000
+            }
+
+            entry.resolver == "direct" -> {
+                score += 300
+            }
+        }
+
+        /*
+         * Do not rank provider brands. KornDog cares about the source itself,
+         * not which aggregator happened to return it.
+         *
+         * Hosted resolver results stay available as fallback, but should not
+         * outrank native torrent identity.
+         */
+        if (
+            "elfhosted" in source ||
+            "elf hosted" in source
+        ) {
+            score -= 2000
         }
 
         // Prefer normal English/multi-audio releases.
@@ -1051,12 +1083,7 @@ internal fun MainActivity.showStreamSearchDialog(
             "480p" in title -> score += 100
         }
 
-        // Useful source preferences without excluding anything.
-        when {
-            "torrentio" in source -> score += 250
-            "mediafusion" in source -> score += 150
-            "comet" in source -> score += 50
-        }
+        // Provider brand intentionally does not affect native ranking.
 
         return score
     }
@@ -1374,27 +1401,109 @@ internal fun MainActivity.showStreamSearchDialog(
                     )
                 }
 
+        /*
+         * Smart KornDog debrid preflight.
+         *
+         * Previously an unforced magnet tried TorBox, then Premiumize, then
+         * Real-Debrid sequentially. That could make one bad candidate consume
+         * several seconds before Find Stream moved on.
+         *
+         * KornDogChoiceBuilder already knows how to check TorBox and
+         * Premiumize cache state in parallel. Use that information here to
+         * choose ONE backend before resolution starts.
+         */
+        val smartDebridProvider =
+            nativeMagnet?.let { magnet ->
+
+                if (entry.debridProvider != null) {
+                    entry.debridProvider
+                } else {
+                    val torBoxKey =
+                        prefs.getString("torbox_api_key", "")
+                            ?.trim()
+                            .orEmpty()
+
+                    val premiumizeKey =
+                        prefs.getString("premiumize_api_key", "")
+                            ?.trim()
+                            .orEmpty()
+
+                    val torBox =
+                        torBoxKey
+                            .takeIf { it.isNotBlank() }
+                            ?.let(::TorBoxClient)
+
+                    val premiumize =
+                        premiumizeKey
+                            .takeIf { it.isNotBlank() }
+                            ?.let(::PremiumizeClient)
+
+                    status.text = "KornDog · checking fastest source…"
+
+                    val choices =
+                        KornDogChoiceBuilder.build(
+                            candidates =
+                                listOf(
+                                    KornDogChoiceBuilder.Candidate(
+                                        title = result.title,
+                                        magnet = magnet,
+                                        quality = result.quality,
+                                        source = result.source,
+                                        size = null,
+                                        season = effectiveSeason,
+                                        episode = effectiveEpisode
+                                    )
+                                ),
+                            torBox = torBox,
+                            premiumize = premiumize
+                        )
+
+                    choices.firstOrNull()?.let { choice ->
+                        android.util.Log.i(
+                            "KornDogResolver",
+                            "Preflight chose ${choice.providerLabel} " +
+                                "cached=${choice.cached} " +
+                                "score=${choice.score}"
+                        )
+
+                        when (choice.provider) {
+                            com.lumora.data.remote.debrid
+                                .KornDogResolvedChoice.Provider.TORBOX ->
+                                "torbox"
+
+                            com.lumora.data.remote.debrid
+                                .KornDogResolvedChoice.Provider.PREMIUMIZE ->
+                                "premiumize"
+
+                            com.lumora.data.remote.debrid
+                                .KornDogResolvedChoice.Provider.REAL_DEBRID ->
+                                "realdebrid"
+                        }
+                    }
+                }
+            }
+
         val nativeDebridResolved =
             nativeMagnet?.let { magnet ->
                 resolveWithKornDogDebrid(
                     magnet = magnet,
-                    forcedProvider = entry.debridProvider
+                    forcedProvider = smartDebridProvider
                 )
             }
 
         val resolved =
             if (
-                entry.debridProvider != null &&
+                smartDebridProvider != null &&
                 nativeMagnet != null
             ) {
                 nativeDebridResolved
                     ?: ResolveResult.Failed(
                         "KornDog · ${
-                            when (entry.debridProvider) {
+                            when (smartDebridProvider) {
                                 "torbox" -> "TorBox"
                                 "premiumize" -> "Premiumize"
                                 "realdebrid" -> "Real-Debrid"
-                                else -> entry.debridProvider
+                                else -> smartDebridProvider
                             }
                         } could not resolve this source"
                     )
