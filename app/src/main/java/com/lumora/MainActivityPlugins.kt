@@ -589,6 +589,21 @@ internal fun MainActivity.showStreamSearchDialog(
     val effectiveSeason = season ?: item.streamSearchSeason
     val effectiveEpisode = episode ?: item.episodeNum
 
+    /*
+     * Selecting a real series episode means PLAY.
+     *
+     * Manual source discovery can still exist for other cases, but once the
+     * user has selected SxxExx KornDog should search, rank, resolve and start
+     * the best usable source automatically.
+     */
+    val playbackIntent =
+        autoPlayBest ||
+            (
+                item.mediaType == MediaType.SERIES &&
+                    effectiveSeason != null &&
+                    effectiveEpisode != null
+            )
+
     data class StreamEntry(
         val result: TorrentResult,
         val resolver: String,
@@ -1690,7 +1705,7 @@ internal fun MainActivity.showStreamSearchDialog(
                         // Autoplay ran out of usable sources - fall back to letting the
                         // user browse the chooser manually instead of a bare toast with
                         // nothing else on screen.
-                        if (autoPlayBest) {
+                        if (playbackIntent) {
                             dialog.show()
                         } else {
                             dialog.dismiss()
@@ -1946,9 +1961,14 @@ internal fun MainActivity.showStreamSearchDialog(
             )
         }
 
-        status.text = "${results.size} result(s)"
+        status.text =
+            if (playbackIntent) {
+                "Found ${results.size} source(s) · still searching…"
+            } else {
+                "${results.size} result(s)"
+            }
 
-        if (!autoPlayBest && !initialStreamFocusClaimed) {
+        if (!playbackIntent && !initialStreamFocusClaimed) {
             initialStreamFocusClaimed = true
 
             row.post {
@@ -1957,18 +1977,13 @@ internal fun MainActivity.showStreamSearchDialog(
             }
         }
 
-        // Playback intent: arm a short decision window off the FIRST result that
-        // lands, not the last. This gives late/slow addons ~1.5s to beat whatever's
-        // currently ranked #1 without making the user wait for the full 200-400
-        // result sweep across every addon.
-        if (autoPlayBest && !autoPlayCommitted && autoPlayDecisionJob == null) {
-            autoPlayDecisionJob = scope.launch {
-                delay(1500L)
-                if (!autoPlayCommitted) {
-                    results.firstOrNull()?.let { commitAutoPlay(it) }
-                }
-            }
-        }
+        /*
+         * Do not autoplay while discovery is still running.
+         *
+         * KornDog waits for the complete candidate set, lets streamRank()
+         * establish the final order, then commits to results.first() after
+         * discovery finishes.
+         */
     }
 
     val searchJob = scope.launch {
@@ -2364,17 +2379,21 @@ internal fun MainActivity.showStreamSearchDialog(
         // fallback for a search that finished before that 1.5s window elapsed, or
         // found nothing at all.
         //
-        // Manual Find Stream keeps autoPlayBest=false and still shows the full
+        // Manual Find Stream keeps playbackIntent=false and still shows the full
         // chooser exactly as before.
-        if (autoPlayBest) {
+        if (playbackIntent) {
             if (!autoPlayCommitted) {
                 if (results.isNotEmpty()) {
+                    status.text =
+                        "Found ${results.size} source(s) · choosing best…"
+
                     commitAutoPlay(results.first())
                 } else {
-                    status.text = "No streams found"
+                    status.text = "No playable sources found"
                     dialog.show()
                 }
             }
+
             return@launch
         }
 
@@ -2409,12 +2428,15 @@ internal fun MainActivity.showStreamSearchDialog(
     }
 
     // Manual Find Stream shows the chooser immediately, same as before.
-    // Playback intent (autoPlayBest) keeps it hidden unless/until autoplay
+    // Playback intent (playbackIntent) keeps it hidden unless/until autoplay
     // has exhausted its options - see commitAutoPlay's Failed branch and the
     // no-results fallback above.
-    if (!autoPlayBest) {
-        dialog.show()
-    }
+    /*
+     * Keep search progress visible for both browse and playback intent.
+     * A 20-30 second discovery feels intentional when KornDog reports what
+     * it is doing instead of hiding the work.
+     */
+    dialog.show()
 }
 
 // ── Plugins ────────────────────────────────────
