@@ -666,9 +666,9 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
 
     itemAdapter = EpisodeAdapter(
         onEpisodeClick = { chosen ->
-            // User-initiated play - see playItem for why the suppression flag is cleared here.
+            // Keep the show detail visible while KornDog searches.
+            // Successful playback will close the detail screen later.
             skipResumePrompt = false
-            hideContentDetail()
             // Anime items have no direct stream URL — route through plugin.
             if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
                 val plugin = enabledStreamSearchPlugin(item)
@@ -709,7 +709,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                         item,
                         season = seasonNum,
                         episode = chosen.episodeNum,
-                        autoPlayBest = false
+                        autoPlayBest = true
                     )
                 }
             } else {
@@ -842,9 +842,9 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
         // refreshes (label/target changed) must NOT steal focus - the user is on a check.
         if (refocus) playButton.requestFocus()
         playButton.setOnClickListener {
-            // User-initiated play - see playItem for why the suppression flag is cleared here.
+            // Keep detail visible during KornDog resolution.
+            // Playback success owns the transition into the player.
             skipResumePrompt = false
-            hideContentDetail()
             // Anime items route through the plugin instead of direct playback.
             if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
                 val plugin = enabledStreamSearchPlugin(item)
