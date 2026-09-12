@@ -21,6 +21,10 @@ import com.lumora.model.IptvProviderConfig
 import com.lumora.data.IptvProviderStore
 import com.lumora.data.remote.stremio.StremioAddonClient
 import com.lumora.data.remote.stremio.StremioAddonStore
+import com.lumora.data.remote.korndog.KornDogSearchRequest
+import com.lumora.data.remote.korndog.KornDogSourceRegistry
+import com.lumora.data.remote.korndog.KornDogSourceType
+import com.lumora.data.remote.korndog.KornDogStremioProvider
 import com.lumora.data.remote.torbox.TorBoxClient
 import com.lumora.data.remote.premiumize.PremiumizeClient
 import com.lumora.data.remote.realdebrid.RealDebridClient
@@ -589,7 +593,14 @@ internal fun MainActivity.showStreamSearchDialog(
         val resolver: String,
         val headers: Map<String, String> = emptyMap(),
         val provider: String? = null,
+
+        // Native KornDog source identity.
         val magnetToken: String? = null,
+        val infoHash: String? = null,
+        val fileIdx: Int? = null,
+        val directUrl: String? = null,
+
+        // Optional forced native debrid backend.
         val debridProvider: String? = null
     )
 
@@ -1346,6 +1357,16 @@ internal fun MainActivity.showStreamSearchDialog(
 
         val nativeMagnet =
             entry.magnetToken
+                ?: entry.infoHash?.takeIf { it.isNotBlank() }?.let { hash ->
+                    buildString {
+                        append("magnet:?xt=urn:btih:")
+                        append(hash)
+                        entry.fileIdx?.let { idx ->
+                            append("&so=")
+                            append(idx)
+                        }
+                    }
+                }
                 ?: result.token.takeIf {
                     it.startsWith(
                         "magnet:",
@@ -1385,7 +1406,7 @@ internal fun MainActivity.showStreamSearchDialog(
 
                         val direct =
                             com.lumora.data.remote.debrid.KornDogUrlResolver.resolve(
-                                url = result.token,
+                                url = entry.directUrl ?: result.token,
                                 headers = entry.headers
                             )
 
@@ -1962,6 +1983,115 @@ internal fun MainActivity.showStreamSearchDialog(
 
                     else -> return@launch
                 }
+
+                // ---------------------------------------------------------
+                // KornDog native source discovery.
+                //
+                // Reuse the standard Stremio-compatible transport, but map
+                // responses immediately into KornDogSource. From this point
+                // forward KornDog owns source identity and playback routing.
+                //
+                // The legacy Stremio block below remains as a fallback while
+                // we validate the native path on real titles.
+                // ---------------------------------------------------------
+
+                val nativeProviders =
+                    addons.map { addon ->
+                        KornDogStremioProvider(
+                            id = addon.manifestUrl,
+                            displayName = addon.name,
+                            manifestUrl = addon.manifestUrl
+                        )
+                    }
+
+                val nativeRegistry =
+                    KornDogSourceRegistry(
+                        providers = nativeProviders
+                    )
+
+                val nativeSources =
+                    runCatching {
+                        nativeRegistry.search(
+                            KornDogSearchRequest(
+                                title = item.name,
+                                imdbId = imdbId,
+                                tmdbId = tmdb.second,
+                                year = item.year?.toIntOrNull(),
+                                season = effectiveSeason,
+                                episode = effectiveEpisode
+                            )
+                        )
+                    }.getOrElse { error ->
+                        android.util.Log.e(
+                            "KornDogNative",
+                            "Native source discovery failed",
+                            error
+                        )
+                        emptyList()
+                    }
+
+                if (nativeSources.isNotEmpty()) {
+                    status.text =
+                        "KornDog: ${nativeSources.size} native source(s)"
+
+                    nativeSources.forEach { source ->
+
+                        val token =
+                            source.magnet
+                                ?: source.directUrl
+                                ?: source.infoHash
+                                ?: return@forEach
+
+                        addResult(
+                            StreamEntry(
+                                result = TorrentResult(
+                                    title = source.title,
+                                    token = token,
+                                    seeders = null,
+                                    size = null,
+                                    quality = source.quality,
+                                    source = source.provider,
+                                    audio = null,
+                                    language = source.language
+                                ),
+
+                                resolver =
+                                    when (source.type) {
+                                        KornDogSourceType.TORRENT ->
+                                            "torrent"
+
+                                        KornDogSourceType.DIRECT ->
+                                            "direct"
+                                    },
+
+                                headers = source.headers,
+                                provider = source.provider,
+
+                                magnetToken = source.magnet,
+                                infoHash = source.infoHash,
+                                fileIdx = source.fileIdx,
+                                directUrl = source.directUrl
+                            )
+                        )
+                    }
+
+                    android.util.Log.d(
+                        "KornDogNative",
+                        "Native discovery handled " +
+                            "${nativeSources.size} source(s) " +
+                            "for ${item.name}"
+                    )
+
+                    // Native discovery succeeded. Do not also add the same
+                    // sources through the legacy Stremio presentation path.
+                    return@launch
+                }
+
+                android.util.Log.d(
+                    "KornDogNative",
+                    "Native discovery returned no sources; " +
+                        "falling back to legacy path"
+                )
 
                 val seenStreamKeys = mutableSetOf<String>()
 

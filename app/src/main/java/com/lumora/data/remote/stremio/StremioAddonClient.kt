@@ -1,5 +1,8 @@
 package com.lumora.data.remote.stremio
 
+import com.lumora.data.remote.korndog.KornDogSource
+import com.lumora.data.remote.korndog.KornDogSourceType
+
 import com.lumora.plugin.TorrentResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -23,6 +26,8 @@ data class StremioStream(
     val title: String,
     val url: String? = null,
     val magnet: String? = null,
+    val infoHash: String? = null,
+    val fileIdx: Int? = null,
     val source: String? = null,
     val description: String? = null,
     val filename: String? = null,
@@ -322,6 +327,8 @@ class StremioAddonClient {
                             title = title,
                             url = directUrl,
                             magnet = magnet,
+                            infoHash = infoHash,
+                            fileIdx = fileIdx,
                             source = manifest.name,
                             description = description,
                             filename = filename,
@@ -399,6 +406,40 @@ class StremioAddonClient {
             }
         }
     }
+
+    fun toKornDogSources(
+        manifest: StremioAddonManifest,
+        streams: List<StremioStream>
+    ): List<KornDogSource> =
+        streams.mapNotNull { stream ->
+            val type =
+                when {
+                    !stream.magnet.isNullOrBlank() ->
+                        KornDogSourceType.TORRENT
+
+                    !stream.url.isNullOrBlank() ->
+                        KornDogSourceType.DIRECT
+
+                    else ->
+                        return@mapNotNull null
+                }
+
+            KornDogSource(
+                title = stream.filename ?: stream.title,
+                type = type,
+                infoHash = stream.infoHash,
+                magnet = stream.magnet,
+                fileIdx = stream.fileIdx,
+                directUrl = stream.url,
+                headers = stream.requestHeaders,
+                provider = manifest.name,
+                quality = qualityFrom(stream.title),
+                language = stream.audioLanguage
+            )
+        }
+        .distinctBy {
+            it.stableIdentity
+        }
 
     fun torrentResults(
         streams: List<StremioStream>
