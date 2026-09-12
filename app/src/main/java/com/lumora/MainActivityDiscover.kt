@@ -1166,7 +1166,6 @@ internal fun MainActivity.fetchUpNextSeries(seriesIds: List<String>) {
 
 internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
     val shelves = mutableListOf<ContentShelf>()
-    val hidden = getHiddenHomeShelves()
 
     // ============================================================
     // TRENDING NOW
@@ -1234,7 +1233,7 @@ internal fun MainActivity.buildHomeShelves(): List<ContentShelf> {
         )
     }
 
-    return shelves.filter { it.title !in hidden }
+    return shelves
 }
 
 /** Series-only Continue Watching for the Series tab - same merge as the Home shelf

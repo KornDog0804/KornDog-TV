@@ -2128,6 +2128,21 @@
         android:background="@color/surface"
         android:visibility="gone">
 
+        <!-- Full-screen cinematic artwork for the selected title. -->
+        <ImageView
+            android:id="@+id/detailHeroBackdrop"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:importantForAccessibility="no"
+            android:scaleType="centerCrop" />
+
+        <!-- Readability layer over the hero artwork. -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@drawable/bg_detail_cinematic_overlay"
+            android:importantForAccessibility="no" />
+
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"

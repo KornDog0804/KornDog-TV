@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Overall dim so white UI remains readable. -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#52000000" />
+        </shape>
+    </item>
+
+    <!-- Stronger left-side shade for title, metadata and controls. -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="0"
+                android:startColor="#D9000000"
+                android:centerColor="#85000000"
+                android:endColor="#22000000" />
+        </shape>
+    </item>
+
+    <!-- Bottom fade so episodes and controls remain legible. -->
+    <item>
+        <shape android:shape="rectangle">
+            <gradient
+                android:angle="90"
+                android:startColor="#D9000000"
+                android:centerColor="#44000000"
+                android:endColor="#00000000" />
+        </shape>
+    </item>
+
+</layer-list>

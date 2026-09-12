@@ -485,6 +485,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
     applyStatus()
 
     val backdrop = binding.detailBackdrop
+    val heroBackdrop = binding.detailHeroBackdrop
     val titleText = binding.detailTitle
     val metaText = binding.detailMeta
     val plotText = binding.detailPlot
@@ -508,6 +509,7 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
     // These views are reused across opens now (no longer a fresh dialog each time) -
     // reset everything a previous item may have left behind before showing new data.
     backdrop.setImageDrawable(null)
+    heroBackdrop.setImageDrawable(null)
     plotText.visibility = View.GONE
     castText.visibility = View.GONE
     plotLabel.visibility = View.GONE
@@ -555,6 +557,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
     ).joinToString("  ·  ")
     itemsList.layoutManager = LinearLayoutManager(this)
     loadDetailImage(item.posterUrl ?: item.logoUrl, backdrop)
+
+    // Full-screen detail art is independent from the compact poster.
+    loadDetailImage(
+        item.backdropUrl ?: item.posterUrl ?: item.logoUrl,
+        heroBackdrop
+    )
+
     wireFindStreamButton(item)
     wireTrailerButton(item)
 
@@ -767,7 +776,9 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             castText.visibility = View.VISIBLE
             castLabel.visibility = View.VISIBLE
         }
-        if (!details.backdropUrl.isNullOrBlank()) loadDetailImage(details.backdropUrl, backdrop)
+        if (!details.backdropUrl.isNullOrBlank()) {
+            loadDetailImage(details.backdropUrl, heroBackdrop)
+        }
     }
 
     fun showSeason(seasons: List<Pair<String, List<Channel>>>, index: Int) {
