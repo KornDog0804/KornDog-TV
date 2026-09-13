@@ -169,7 +169,7 @@ internal fun MainActivity.enterLiveMultiScreen() {
     showingLiveMultiScreen = true
 
     binding.liveGuideColumn.visibility = View.GONE
-    findViewById<View>(R.id.liveMultiScreen).visibility = View.VISIBLE
+    findViewById<View>(R.id.liveMultiScreenInclude).visibility = View.VISIBLE
 
     val panes = listOf<View>(
         findViewById(R.id.liveMultiPane0),
@@ -294,7 +294,7 @@ internal fun MainActivity.exitLiveMultiScreen(
 
     releaseLiveMultiPlayers()
 
-    findViewById<View>(R.id.liveMultiScreen).visibility = View.GONE
+    findViewById<View>(R.id.liveMultiScreenInclude).visibility = View.GONE
     binding.liveGuideColumn.visibility = View.VISIBLE
 
     val remembered = lastFocusedLiveChannel
