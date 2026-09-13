@@ -1,0 +1,108 @@
+package com.lumora.data.remote.debrid
+
+object KornDogFilePicker {
+
+    private val videoExtensions = setOf(
+        "mkv", "mp4", "m4v", "avi", "mov", "webm", "ts"
+    )
+
+    private val unwantedLanguage = Regex(
+        """\b(rus|russian|ukr|ukrainian|ita|italian|spa|spanish|latino|fre|fra|french|ger|deu|german|hin|hindi)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val wantedLanguage = Regex(
+        """\b(eng|english|multi|multi[- .]?audio|dual[- .]?audio)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    private val junk = Regex(
+        """\b(sample|trailer|featurette|extras?|preview)\b""",
+        RegexOption.IGNORE_CASE
+    )
+
+    fun score(
+        name: String,
+        size: Long,
+        season: Int?,
+        episode: Int?
+    ): Int {
+        val lower = name.lowercase()
+        val ext = lower.substringAfterLast('.', "")
+
+        if (ext !in videoExtensions) {
+            return Int.MIN_VALUE
+        }
+
+        if (junk.containsMatchIn(lower)) {
+            return Int.MIN_VALUE
+        }
+
+        var score = 0
+
+        if (season != null && episode != null) {
+            val exact = Regex(
+                """(?i)\bS0?${season}E0?${episode}\b"""
+            )
+
+            val alternate = Regex(
+                """(?i)\b${season}x0?${episode}\b"""
+            )
+
+            if (
+                exact.containsMatchIn(name) ||
+                alternate.containsMatchIn(name)
+            ) {
+                score += 20_000
+            } else {
+                score -= 15_000
+            }
+        }
+
+        if (wantedLanguage.containsMatchIn(name)) {
+            score += 4_000
+        }
+
+        if (
+            unwantedLanguage.containsMatchIn(name) &&
+            !wantedLanguage.containsMatchIn(name)
+        ) {
+            score -= 12_000
+        }
+
+        when {
+            "1080p" in lower -> score += 1_000
+            "2160p" in lower || "4k" in lower -> score += 900
+            "720p" in lower -> score += 600
+        }
+
+        if (size > 0L) {
+            score += (size / 100_000_000L)
+                .coerceAtMost(500L)
+                .toInt()
+        }
+
+        return score
+    }
+
+    fun <T> choose(
+        items: List<T>,
+        season: Int?,
+        episode: Int?,
+        name: (T) -> String,
+        size: (T) -> Long
+    ): T? {
+        return items
+            .map { item ->
+                item to score(
+                    name(item),
+                    size(item),
+                    season,
+                    episode
+                )
+            }
+            .filter { it.second > Int.MIN_VALUE }
+            .maxByOrNull { it.second }
+            ?.first
+    }
+}

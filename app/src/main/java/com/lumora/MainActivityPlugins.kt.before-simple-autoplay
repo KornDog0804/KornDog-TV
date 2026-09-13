@@ -241,11 +241,7 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
         if (item.mediaType == MediaType.SERIES) {
             showSeriesEpisodePicker(plugin, item)
         } else {
-            showStreamSearchDialog(
-                plugin,
-                item,
-                autoPlayBest = true
-            )
+            showStreamSearchDialog(plugin, item)
         }
     }
 }
@@ -592,13 +588,6 @@ internal fun MainActivity.showStreamSearchDialog(
     // the persisted stream-search identity still does.
     val effectiveSeason = season ?: item.streamSearchSeason
     val effectiveEpisode = episode ?: item.episodeNum
-
-    fun episodeTrace(message: String) {
-        runCatching {
-            java.io.File("/sdcard/Download/streamidentity.log")
-                .appendText("${System.currentTimeMillis()}: $message\n")
-        }
-    }
 
     /*
      * Selecting a real series episode means PLAY.
@@ -1485,11 +1474,6 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=TorBox requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.name}"
-                        )
-
                         status.text =
                             "KornDog · TorBox · ${selected.name}"
 
@@ -1546,11 +1530,6 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=Premiumize requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
-                        )
-
                         status.text =
                             "KornDog · Premiumize · ${selected.path}"
 
@@ -1619,11 +1598,6 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=RealDebrid requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
-                        )
-
                         status.text =
                             "KornDog · Real-Debrid · ${selected.path}"
 
@@ -1810,14 +1784,6 @@ internal fun MainActivity.showStreamSearchDialog(
                     }
                 }
             }
-
-        episodeTrace(
-            "ENTRY name=${item.name} requested=S${effectiveSeason}E${effectiveEpisode} " +
-                "provider=${entry.provider} resolver=${entry.resolver} " +
-                "fileIdx=${entry.fileIdx} hasInfoHash=${!entry.infoHash.isNullOrBlank()} " +
-                "hasMagnet=${!entry.magnetToken.isNullOrBlank()} " +
-                "hasDirect=${!entry.directUrl.isNullOrBlank()}"
-        )
 
         val nativeDebridResolved =
             nativeMagnet?.let { magnet ->
@@ -2095,7 +2061,7 @@ internal fun MainActivity.showStreamSearchDialog(
             playbackIntent &&
             item.mediaType == MediaType.SERIES
         ) {
-            val hasTorrentIdentity =
+            val hasRawTorrentIdentity =
                 !entry.infoHash.isNullOrBlank() ||
                     !entry.magnetToken.isNullOrBlank() ||
                     entry.result.token.startsWith(
@@ -2103,50 +2069,10 @@ internal fun MainActivity.showStreamSearchDialog(
                         ignoreCase = true
                     )
 
-            val directLooksPlayable =
-                !entry.directUrl.isNullOrBlank() ||
-                    (
-                        entry.resolver == "direct" &&
-                            (
-                                entry.result.token.startsWith(
-                                    "https://",
-                                    ignoreCase = true
-                                ) ||
-                                entry.result.token.startsWith(
-                                    "http://",
-                                    ignoreCase = true
-                                )
-                            )
-                    )
-
-            val directMatchesRequestedEpisode =
-                effectiveSeason == null ||
-                    effectiveEpisode == null ||
-                    com.lumora.data.remote.debrid.KornDogFilePicker.isExactEpisode(
-                        entry.result.title,
-                        effectiveSeason,
-                        effectiveEpisode
-                    )
-
-            val hasDirectIdentity =
-                directLooksPlayable && directMatchesRequestedEpisode
-
-            if (directLooksPlayable && !directMatchesRequestedEpisode) {
+            if (!hasRawTorrentIdentity) {
                 android.util.Log.d(
                     "KornDogNative",
-                    "AUTO rejected direct candidate wrong episode " +
-                        "requested=S${effectiveSeason}E${effectiveEpisode} " +
-                        "title=${entry.result.title}"
-                )
-            }
-
-            val hasPlayableIdentity =
-                hasTorrentIdentity || hasDirectIdentity
-
-            if (!hasPlayableIdentity) {
-                android.util.Log.d(
-                    "KornDogNative",
-                    "AUTO rejected source with no usable identity " +
+                    "AUTO rejected non-debrid source " +
                         "provider=${entry.provider} " +
                         "resolver=${entry.resolver}"
                 )
@@ -2598,8 +2524,27 @@ internal fun MainActivity.showStreamSearchDialog(
                  */
                 val nativeSources =
                     nativeSourcesRaw.filter { source ->
-                        source.hasTorrentIdentity ||
-                            source.hasDirectIdentity
+
+                        val provider =
+                            source.provider.lowercase()
+
+                        val hostedWrapper =
+                            "elfhosted" in provider ||
+                                "elf hosted" in provider
+
+                        when {
+                            source.hasTorrentIdentity ->
+                                true
+
+                            hostedWrapper ->
+                                false
+
+                            source.hasDirectIdentity ->
+                                true
+
+                            else ->
+                                false
+                        }
                     }
 
                 android.util.Log.d(
@@ -2766,8 +2711,7 @@ internal fun MainActivity.showStreamSearchDialog(
                                             },
                                         headers = stream.requestHeaders,
                                     provider = manifest.name,
-                                    magnetToken = stream.magnet,
-                                    directUrl = stream.url
+                                    magnetToken = stream.magnet
                                     )
                                 )
                             }

@@ -487,12 +487,18 @@ class PlayerManager(
                             it.isSupported
                     }
 
-                /*
-                 * Media3 can publish video groups before the audio renderer has
-                 * finished discovering its tracks. Zero audio groups here is
-                 * therefore not a verdict yet. READY is the final checkpoint.
-                 */
-                if (audioGroups.isEmpty()) return
+                if (audioGroups.isEmpty()) {
+                    decided = true
+                    player.removeListener(this)
+
+                    android.util.Log.w(
+                        "KornDogAudio",
+                        "No supported audio tracks url=$expectedUrl"
+                    )
+
+                    onResult(AudioLanguageResult.NO_MATCH)
+                    return
+                }
 
                 var matchingGroup: Tracks.Group? = null
                 var matchingIndex = -1
@@ -565,12 +571,13 @@ class PlayerManager(
                     }
                 }
 
+                decided = true
+                player.removeListener(this)
+
                 if (
                     matchingGroup != null &&
                     matchingIndex >= 0
                 ) {
-                    decided = true
-                    player.removeListener(this)
                     if (
                         !matchingGroup.isTrackSelected(
                             matchingIndex
@@ -618,69 +625,7 @@ class PlayerManager(
                         "tracks=${observed.joinToString(" | ")}"
                 )
 
-                /*
-                 * A non-matching track list may still be provisional while
-                 * Media3 is preparing. Only finalize rejection here if the
-                 * player has already reached READY.
-                 */
-                if (player.playbackState != Player.STATE_READY) {
-                    return
-                }
-
-                decided = true
-                player.removeListener(this)
-
                 onResult(result)
-            }
-
-            override fun onPlaybackStateChanged(state: Int) {
-                if (decided || state != Player.STATE_READY) return
-
-                val currentUrl =
-                    player.currentMediaItem
-                        ?.localConfiguration
-                        ?.uri
-                        ?.toString()
-
-                if (
-                    currentUrl != null &&
-                    currentUrl != expectedUrl
-                ) {
-                    decided = true
-                    player.removeListener(this)
-                    return
-                }
-
-                val tracks = player.currentTracks
-
-                val audioGroups =
-                    tracks.groups.filter {
-                        it.type == C.TRACK_TYPE_AUDIO &&
-                            it.isSupported
-                    }
-
-                if (audioGroups.isEmpty()) {
-                    decided = true
-                    player.removeListener(this)
-
-                    android.util.Log.w(
-                        "KornDogAudio",
-                        "READY with no supported audio tracks " +
-                            "url=$expectedUrl"
-                    )
-
-                    onResult(
-                        AudioLanguageResult.NO_MATCH
-                    )
-                    return
-                }
-
-                /*
-                 * Re-run the normal track evaluator now that READY makes this
-                 * track list authoritative. It will decide MATCH, NO_MATCH,
-                 * or UNKNOWN and remove this listener.
-                 */
-                onTracksChanged(tracks)
             }
         }
 

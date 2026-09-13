@@ -21,15 +21,7 @@ import com.lumora.model.IptvProviderConfig
 import com.lumora.data.IptvProviderStore
 import com.lumora.data.remote.stremio.StremioAddonClient
 import com.lumora.data.remote.stremio.StremioAddonStore
-import com.lumora.data.remote.korndog.KornDogSearchRequest
-import com.lumora.data.remote.korndog.KornDogSourceRegistry
-import com.lumora.data.remote.korndog.KornDogSourceType
-import com.lumora.data.remote.korndog.KornDogStremioProvider
 import com.lumora.data.remote.torbox.TorBoxClient
-import com.lumora.data.remote.premiumize.PremiumizeClient
-import com.lumora.data.remote.realdebrid.RealDebridClient
-import com.lumora.data.remote.debrid.KornDogFilePicker
-import com.lumora.data.remote.debrid.KornDogChoiceBuilder
 import com.lumora.plugin.DiscoveredProvider
 import com.lumora.plugin.DiscoveryResult
 import com.lumora.plugin.ResolveResult
@@ -241,11 +233,7 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
         if (item.mediaType == MediaType.SERIES) {
             showSeriesEpisodePicker(plugin, item)
         } else {
-            showStreamSearchDialog(
-                plugin,
-                item,
-                autoPlayBest = true
-            )
+            showStreamSearchDialog(plugin, item)
         }
     }
 }
@@ -593,42 +581,12 @@ internal fun MainActivity.showStreamSearchDialog(
     val effectiveSeason = season ?: item.streamSearchSeason
     val effectiveEpisode = episode ?: item.episodeNum
 
-    fun episodeTrace(message: String) {
-        runCatching {
-            java.io.File("/sdcard/Download/streamidentity.log")
-                .appendText("${System.currentTimeMillis()}: $message\n")
-        }
-    }
-
-    /*
-     * Selecting a real series episode means PLAY.
-     *
-     * Manual source discovery can still exist for other cases, but once the
-     * user has selected SxxExx KornDog should search, rank, resolve and start
-     * the best usable source automatically.
-     */
-    /*
-     * Playback intent is explicit.
-     *
-     * FIND STREAM passes autoPlayBest=true.
-     * Normal episode rows pass false and keep the manual chooser.
-     */
-    val playbackIntent = autoPlayBest
-
     data class StreamEntry(
         val result: TorrentResult,
         val resolver: String,
         val headers: Map<String, String> = emptyMap(),
         val provider: String? = null,
-
-        // Native KornDog source identity.
-        val magnetToken: String? = null,
-        val infoHash: String? = null,
-        val fileIdx: Int? = null,
-        val directUrl: String? = null,
-
-        // Optional forced native debrid backend.
-        val debridProvider: String? = null
+        val magnetToken: String? = null
     )
 
     val epTag =
@@ -638,229 +596,21 @@ internal fun MainActivity.showStreamSearchDialog(
             ""
         }
 
-    val density = resources.displayMetrics.density
-
     val container = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-
-        val horizontalPad =
-            ((if (playbackIntent) 28 else 16) * density).toInt()
-
-        val verticalPad =
-            ((if (playbackIntent) 24 else 16) * density).toInt()
-
-        setPadding(
-            horizontalPad,
-            verticalPad,
-            horizontalPad,
-            verticalPad
-        )
-
-        if (playbackIntent) {
-            background =
-                android.graphics.drawable.GradientDrawable().apply {
-                    setColor(
-                        android.graphics.Color.rgb(
-                            22,
-                            25,
-                            32
-                        )
-                    )
-                    cornerRadius = 22f * density
-
-                    setStroke(
-                        (1 * density).toInt(),
-                        android.graphics.Color.rgb(
-                            57,
-                            66,
-                            82
-                        )
-                    )
-                }
-        }
+        val pad =
+            (16 * resources.displayMetrics.density).toInt()
+        setPadding(pad, pad, pad, pad)
     }
-
-    val loaderBrand =
-        TextView(this).apply {
-            text = "KORNDOG TV"
-            textSize = 13f
-            setTextColor(
-                android.graphics.Color.rgb(
-                    82,
-                    160,
-                    255
-                )
-            )
-            setTypeface(
-                typeface,
-                android.graphics.Typeface.BOLD
-            )
-            visibility =
-                if (playbackIntent) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
-
-    val loaderTitle =
-        TextView(this).apply {
-            text =
-                if (playbackIntent) {
-                    "Finding your stream"
-                } else {
-                    ""
-                }
-
-            textSize = 24f
-            setTextColor(android.graphics.Color.WHITE)
-            setTypeface(
-                typeface,
-                android.graphics.Typeface.BOLD
-            )
-
-            setPadding(
-                0,
-                (5 * density).toInt(),
-                0,
-                0
-            )
-
-            visibility =
-                if (playbackIntent) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
-
-    val loaderMedia =
-        TextView(this).apply {
-            text =
-                buildString {
-                    append(item.name)
-
-                    if (
-                        effectiveSeason != null &&
-                        effectiveEpisode != null
-                    ) {
-                        append("\n")
-                        append(
-                            "S%02d  •  E%02d".format(
-                                effectiveSeason,
-                                effectiveEpisode
-                            )
-                        )
-                    }
-                }
-
-            textSize = 16f
-
-            setTextColor(
-                android.graphics.Color.rgb(
-                    205,
-                    211,
-                    223
-                )
-            )
-
-            setPadding(
-                0,
-                (15 * density).toInt(),
-                0,
-                (18 * density).toInt()
-            )
-
-            visibility =
-                if (playbackIntent) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
-
-    val progressRow =
-        LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = android.view.Gravity.CENTER_VERTICAL
-
-            visibility =
-                if (playbackIntent) {
-                    View.VISIBLE
-                } else {
-                    View.GONE
-                }
-        }
-
-    val loaderProgress =
-        ProgressBar(this).apply {
-            isIndeterminate = true
-        }
-
-    progressRow.addView(
-        loaderProgress,
-        LinearLayout.LayoutParams(
-            (32 * density).toInt(),
-            (32 * density).toInt()
-        )
-    )
 
     val status = TextView(this).apply {
-        text =
-            if (playbackIntent) {
-                "Searching sources…"
-            } else {
-                "Searching…"
-            }
-
-        textSize =
-            if (playbackIntent) {
-                16f
-            } else {
-                14f
-            }
-
+        text = "Searching…"
         setTextColor(
-            if (playbackIntent) {
-                android.graphics.Color.rgb(
-                    225,
-                    229,
-                    237
-                )
-            } else {
-                ContextCompat.getColor(
-                    this@showStreamSearchDialog,
-                    R.color.text_secondary
-                )
-            }
-        )
-
-        if (playbackIntent) {
-            setPadding(
-                (14 * density).toInt(),
-                0,
-                0,
-                0
-            )
-        }
-    }
-
-    if (playbackIntent) {
-        progressRow.addView(
-            status,
-            LinearLayout.LayoutParams(
-                0,
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                1f
+            ContextCompat.getColor(
+                this@showStreamSearchDialog,
+                R.color.text_secondary
             )
         )
-
-        container.addView(loaderBrand)
-        container.addView(loaderTitle)
-        container.addView(loaderMedia)
-        container.addView(progressRow)
-    } else {
-        container.addView(status)
     }
 
     val resultsHost = LinearLayout(this).apply {
@@ -874,52 +624,21 @@ internal fun MainActivity.showStreamSearchDialog(
         addView(resultsHost)
     }
 
-    if (!playbackIntent) {
-        container.addView(
-            scroll,
-            LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                0,
-                1f
-            )
+    container.addView(status)
+    container.addView(
+        scroll,
+        LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            0,
+            1f
         )
-    }
+    )
 
-    val dialogBuilder =
-        AlertDialog.Builder(this)
-            .setView(container)
-            .setNegativeButton("Cancel", null)
-
-    if (!playbackIntent) {
-        dialogBuilder.setTitle(
-            "Find Stream — ${item.name}$epTag"
-        )
-    }
-
-    val dialog = dialogBuilder.create()
-
-    dialog.setOnShowListener {
-        if (playbackIntent) {
-            dialog.window?.setBackgroundDrawable(
-                android.graphics.drawable.ColorDrawable(
-                    android.graphics.Color.TRANSPARENT
-                )
-            )
-
-            dialog.getButton(
-                AlertDialog.BUTTON_NEGATIVE
-            )?.apply {
-                text = "CANCEL"
-                setTextColor(
-                    android.graphics.Color.rgb(
-                        82,
-                        160,
-                        255
-                    )
-                )
-            }
-        }
-    }
+    val dialog = AlertDialog.Builder(this)
+        .setTitle("Find Stream — ${item.name}$epTag")
+        .setView(container)
+        .setNegativeButton("Cancel", null)
+        .create()
 
     val pluginSource =
         plugin?.let { pluginScriptManager.readSource(it) }
@@ -940,12 +659,6 @@ internal fun MainActivity.showStreamSearchDialog(
         val source = entry.result.source.orEmpty().lowercase()
 
         return when {
-            entry.resolver == "torrent" ||
-                entry.resolver == "plugin" ||
-                entry.magnetToken != null ||
-                entry.result.token.startsWith("magnet:", ignoreCase = true) ->
-                "Torrents"
-
             "cauldron" in provider ||
                 "cauldron" in source ->
                 "Cauldron"
@@ -955,6 +668,9 @@ internal fun MainActivity.showStreamSearchDialog(
                 "aiostreams" in source ||
                 "aio streams" in source ->
                 "AIOStreams"
+
+            entry.resolver == "plugin" ->
+                "Torrents"
 
             else ->
                 "Other"
@@ -1052,9 +768,7 @@ internal fun MainActivity.showStreamSearchDialog(
         sourceFilterRow.addView(btn)
     }
 
-    if (!playbackIntent) {
-        container.addView(sourceFilterRow, 1)
-    }
+    container.addView(sourceFilterRow, 1)
 
     listOf("All", "4K", "1080p", "720p").forEach { label ->
         val btn = TextView(this@showStreamSearchDialog).apply {
@@ -1080,170 +794,7 @@ internal fun MainActivity.showStreamSearchDialog(
         qualityFilterRow.addView(btn)
     }
 
-    if (!playbackIntent) {
-        container.addView(qualityFilterRow)
-    }
-
-    /*
-     * Explicit Android TV focus map.
-     *
-     * Do not leave navigation between source tabs, stream rows and quality
-     * filters to FocusFinder. The chooser changes dynamically while addons
-     * are returning results, which makes default DPAD navigation unreliable.
-     */
-    fun firstVisibleStreamRow(): View? {
-        for (i in 0 until resultsHost.childCount) {
-            val child = resultsHost.getChildAt(i)
-
-            if (
-                child.visibility == View.VISIBLE &&
-                child.isFocusable
-            ) {
-                return child
-            }
-        }
-
-        return null
-    }
-
-    fun lastVisibleStreamRow(): View? {
-        for (i in resultsHost.childCount - 1 downTo 0) {
-            val child = resultsHost.getChildAt(i)
-
-            if (
-                child.visibility == View.VISIBLE &&
-                child.isFocusable
-            ) {
-                return child
-            }
-        }
-
-        return null
-    }
-
-    fun currentSourceButton(): View? {
-        for (i in 0 until sourceFilterRow.childCount) {
-            val child = sourceFilterRow.getChildAt(i)
-            val label = (child as? TextView)?.text?.toString()
-
-            if (label == currentSourceLane) {
-                return child
-            }
-        }
-
-        return sourceFilterRow.getChildAt(0)
-    }
-
-    fun currentQualityButton(): View? {
-        for (i in 0 until qualityFilterRow.childCount) {
-            val child = qualityFilterRow.getChildAt(i)
-            val label = (child as? TextView)?.text?.toString()
-
-            if (label == currentQualityFilter) {
-                return child
-            }
-        }
-
-        return qualityFilterRow.getChildAt(0)
-    }
-
-    /*
-     * Source lane:
-     *
-     * LEFT/RIGHT = AIOStreams <-> Cauldron <-> Torrents <-> All
-     * DOWN       = first visible stream
-     */
-    for (i in 0 until sourceFilterRow.childCount) {
-        val button = sourceFilterRow.getChildAt(i)
-
-        button.setOnKeyListener { _, keyCode, event ->
-            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
-                return@setOnKeyListener false
-            }
-
-            when (keyCode) {
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    val target =
-                        sourceFilterRow.getChildAt(
-                            (i - 1).coerceAtLeast(0)
-                        )
-
-                    target.requestFocus()
-                    true
-                }
-
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    val target =
-                        sourceFilterRow.getChildAt(
-                            (i + 1).coerceAtMost(
-                                sourceFilterRow.childCount - 1
-                            )
-                        )
-
-                    target.requestFocus()
-                    true
-                }
-
-                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    firstVisibleStreamRow()?.let {
-                        it.requestFocus()
-                        true
-                    } ?: false
-                }
-
-                else -> false
-            }
-        }
-    }
-
-    /*
-     * Quality lane:
-     *
-     * LEFT/RIGHT = All <-> 4K <-> 1080p <-> 720p
-     * UP         = last visible stream
-     */
-    for (i in 0 until qualityFilterRow.childCount) {
-        val button = qualityFilterRow.getChildAt(i)
-
-        button.setOnKeyListener { _, keyCode, event ->
-            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
-                return@setOnKeyListener false
-            }
-
-            when (keyCode) {
-                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    val target =
-                        qualityFilterRow.getChildAt(
-                            (i - 1).coerceAtLeast(0)
-                        )
-
-                    target.requestFocus()
-                    true
-                }
-
-                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
-                    val target =
-                        qualityFilterRow.getChildAt(
-                            (i + 1).coerceAtMost(
-                                qualityFilterRow.childCount - 1
-                            )
-                        )
-
-                    target.requestFocus()
-                    true
-                }
-
-                android.view.KeyEvent.KEYCODE_DPAD_UP -> {
-                    lastVisibleStreamRow()?.let {
-                        it.requestFocus()
-                        true
-                    } ?: false
-                }
-
-                else -> false
-            }
-        }
-    }
+    container.addView(qualityFilterRow)
 
     fun stableId(entry: StreamEntry): String {
         val hash = entry.result.token.hashCode()
@@ -1271,51 +822,23 @@ internal fun MainActivity.showStreamSearchDialog(
 
         // Debrid/cache hints. Real-Debrid is currently the most reliable
         // path on this install, followed by TorBox and Premiumize.
-        // Debrid providers do NOT influence raw-source ranking.
-        // KornDog chooses the backend after discovery.
-
-        /*
-         * Native KornDog source identity wins.
-         *
-         * A raw infoHash / magnet lets KornDog resolve with the user's own
-         * TorBox, Premiumize or Real-Debrid account. Hosted direct wrappers
-         * are fallback material because they are frequently stale, uncached,
-         * session-bound or HTML/JSON resolver endpoints.
-         */
         when {
-            !entry.infoHash.isNullOrBlank() -> {
-                score += 5000
-            }
-
-            !entry.magnetToken.isNullOrBlank() ||
-                entry.result.token.startsWith(
-                    "magnet:",
-                    ignoreCase = true
-                ) -> {
-                score += 4500
-            }
-
-            entry.resolver == "torrent" -> {
-                score += 4000
-            }
-
-            entry.resolver == "direct" -> {
-                score += 300
-            }
+            "[rd" in title || "real-debrid" in title -> score += 10000
+            "[tb" in title || "torbox" in title -> score += 9000
+            "[pm" in title || "premiumize" in title -> score += 8000
         }
 
-        /*
-         * Do not rank provider brands. KornDog cares about the source itself,
-         * not which aggregator happened to return it.
-         *
-         * Hosted resolver results stay available as fallback, but should not
-         * outrank native torrent identity.
-         */
-        if (
-            "elfhosted" in source ||
-            "elf hosted" in source
-        ) {
-            score -= 2000
+        // AIO is useful as an aggregator, but a magnet result avoids stale
+        // direct wrapper/session URLs and can be resolved by Lumora itself.
+        if ("aiostreams" in source) score += 1200
+
+        // Ready HTTPS debrid/cache URLs are the fastest path into Media3.
+        // Magnets remain fully available, but they require another resolution
+        // hop before playback can begin.
+        if (entry.resolver == "direct") {
+            score += 1600
+        } else if (entry.resolver == "torrent") {
+            score += 500
         }
 
         // Prefer normal English/multi-audio releases.
@@ -1352,7 +875,13 @@ internal fun MainActivity.showStreamSearchDialog(
             "480p" in title -> score += 100
         }
 
-        // Provider brand intentionally does not affect native ranking.
+        // Useful source preferences without excluding anything.
+        when {
+            "elfcache" in title -> score += 350
+            "torrentio" in source -> score += 250
+            "mediafusion" in source -> score += 150
+            "comet" in source -> score += 50
+        }
 
         return score
     }
@@ -1406,497 +935,22 @@ internal fun MainActivity.showStreamSearchDialog(
                 } ?: emptyList()
             }
 
-            /*
-         * KornDog native debrid resolver.
-         *
-         * Discovery can come from AIOStreams, Cauldron, or torrent plugins.
-         * If a real magnet exists, KornDog owns the debrid resolution.
-         */
-        suspend fun resolveWithKornDogDebrid(
-            magnet: String,
-            forcedProvider: String? = null
-        ): ResolveResult? {
-
-            val torBoxKey =
-                prefs.getString("torbox_api_key", "")
-                    ?.trim()
-                    .orEmpty()
-
-            val premiumizeKey =
-                prefs.getString("premiumize_api_key", "")
-                    ?.trim()
-                    .orEmpty()
-
-            val realDebridKey =
-                prefs.getString("realdebrid_api_key", "")
-                    ?.trim()
-                    .orEmpty()
-
-            /*
-             * 1. TORBOX
-             */
-            if (
-                (forcedProvider == null || forcedProvider == "torbox") &&
-                torBoxKey.isNotBlank()
-            ) {
-                try {
-                    status.text = "KornDog · trying TorBox…"
-
-                    val torBox = TorBoxClient(torBoxKey)
-
-                    val created =
-                        withContext(Dispatchers.IO) {
-                            torBox.createTorrent(magnet)
-                        }
-
-                    val ready =
-                        withContext(Dispatchers.IO) {
-                            torBox.waitUntilReady(created.id) { torrentState ->
-                                runOnUiThread {
-                                    val pct =
-                                        torrentState.progress?.let {
-                                            if (it <= 1.0) {
-                                                (it * 100).toInt()
-                                            } else {
-                                                it.toInt()
-                                            }
-                                        }
-
-                                    status.text =
-                                        if (pct != null) {
-                                            "KornDog · TorBox $pct%"
-                                        } else {
-                                            "KornDog · TorBox ${
-                                                torrentState.downloadState
-                                                    ?: "working"
-                                            }"
-                                        }
-                                }
-                            }
-                        }
-
-                    val selected =
-                        KornDogFilePicker.choose(
-                            items = ready.files,
-                            season = effectiveSeason,
-                            episode = effectiveEpisode,
-                            name = { it.name },
-                            size = { it.size ?: 0L }
-                        )
-
-                    if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=TorBox requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.name}"
-                        )
-
-                        status.text =
-                            "KornDog · TorBox · ${selected.name}"
-
-                        val playableUrl =
-                            withContext(Dispatchers.IO) {
-                                torBox.requestDownloadUrl(
-                                    torrentId = ready.id,
-                                    fileId = selected.id
-                                )
-                            }
-
-                        return ResolveResult.Ready(
-                            url = playableUrl,
-                            headers = emptyMap()
-                        )
-                    }
-
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "TorBox returned no matching playable file"
-                    )
-                } catch (e: Exception) {
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "TorBox failed",
-                        e
-                    )
-                }
-            }
-
-            /*
-             * 2. PREMIUMIZE
-             */
-            if (
-                (forcedProvider == null || forcedProvider == "premiumize") &&
-                premiumizeKey.isNotBlank()
-            ) {
-                try {
-                    status.text = "KornDog · trying Premiumize…"
-
-                    val premiumize =
-                        PremiumizeClient(premiumizeKey)
-
-                    val files =
-                        premiumize.directDownload(magnet)
-
-                    val selected =
-                        KornDogFilePicker.choose(
-                            items = files,
-                            season = effectiveSeason,
-                            episode = effectiveEpisode,
-                            name = { it.path },
-                            size = { it.size }
-                        )
-
-                    if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=Premiumize requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
-                        )
-
-                        status.text =
-                            "KornDog · Premiumize · ${selected.path}"
-
-                        return ResolveResult.Ready(
-                            url = selected.link,
-                            headers = emptyMap()
-                        )
-                    }
-
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "Premiumize returned no matching playable file"
-                    )
-                } catch (e: Exception) {
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "Premiumize failed",
-                        e
-                    )
-                }
-            }
-
-            /*
-             * 3. REAL-DEBRID
-             */
-            if (
-                (forcedProvider == null || forcedProvider == "realdebrid") &&
-                realDebridKey.isNotBlank()
-            ) {
-                try {
-                    status.text = "KornDog · trying Real-Debrid…"
-
-                    val realDebrid =
-                        RealDebridClient(realDebridKey)
-
-                    val torrentId =
-                        realDebrid.addMagnet(magnet)
-
-                    /*
-                     * RD may need a moment before its file list appears.
-                     */
-                    var info =
-                        realDebrid.getTorrentInfo(torrentId)
-
-                    var fileListAttempts = 0
-
-                    while (
-                        info.files.isEmpty() &&
-                        fileListAttempts < 10
-                    ) {
-                        delay(500)
-
-                        info =
-                            realDebrid.getTorrentInfo(torrentId)
-
-                        fileListAttempts++
-                    }
-
-                    val selected =
-                        KornDogFilePicker.choose(
-                            items = info.files,
-                            season = effectiveSeason,
-                            episode = effectiveEpisode,
-                            name = { it.path },
-                            size = { it.bytes }
-                        )
-
-                    if (selected != null) {
-                        episodeTrace(
-                            "PICKED provider=RealDebrid requested=S${effectiveSeason}E${effectiveEpisode} " +
-                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
-                        )
-
-                        status.text =
-                            "KornDog · Real-Debrid · ${selected.path}"
-
-                        realDebrid.selectFiles(
-                            torrentId,
-                            listOf(selected.id)
-                        )
-
-                        val ready =
-                            realDebrid.waitForLinks(torrentId)
-
-                        val restricted =
-                            ready.links.firstOrNull()
-                                ?: throw IllegalStateException(
-                                    "Real-Debrid returned no link for selected file"
-                                )
-
-                        val playableUrl =
-                            realDebrid.unrestrict(restricted)
-
-                        return ResolveResult.Ready(
-                            url = playableUrl,
-                            headers = emptyMap()
-                        )
-                    }
-
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "Real-Debrid returned no matching playable file"
-                    )
-                } catch (e: Exception) {
-                    android.util.Log.w(
-                        "KornDogResolver",
-                        "Real-Debrid failed",
-                        e
-                    )
-                }
-            }
-
-            return null
-        }
-
-        /*
-         * Normalize every raw torrent identity into a magnet BEFORE deciding
-         * which resolver owns it.
-         *
-         * Some native/plugin providers return:
-         *   - a full magnet URI
-         *   - a bare 40-char hex infoHash
-         *   - a bare 32-char base32 infoHash
-         *   - text containing btih:<hash>
-         *
-         * All of those belong to KornDog debrid. They must never fall through
-         * to the old local TorrentEngine path just because the provider did
-         * not include the literal "magnet:" prefix.
-         */
-        fun normalizedTorrentMagnet(): String? {
-            entry.magnetToken
-                ?.takeIf { it.isNotBlank() }
-                ?.let { return it }
-
-            entry.infoHash
-                ?.trim()
-                ?.takeIf { it.isNotBlank() }
-                ?.let { hash ->
-                    return buildString {
-                        append("magnet:?xt=urn:btih:")
-                        append(hash)
-                    }
-                }
-
-            val token = result.token.trim()
-
-            if (token.startsWith("magnet:", ignoreCase = true)) {
-                return token
-            }
-
-            val bareHash =
-                Regex(
-                    """(?i)^(?:[a-f0-9]{40}|[a-z2-7]{32})$"""
-                )
-                    .matchEntire(token)
-                    ?.value
-
-            if (bareHash != null) {
-                return "magnet:?xt=urn:btih:$bareHash"
-            }
-
-            val embeddedHash =
-                Regex(
-                    """(?i)btih:([a-f0-9]{40}|[a-z2-7]{32})"""
-                )
-                    .find(token)
-                    ?.groupValues
-                    ?.getOrNull(1)
-
-            if (embeddedHash != null) {
-                return "magnet:?xt=urn:btih:$embeddedHash"
-            }
-
-            return null
-        }
-
-        val nativeMagnet = normalizedTorrentMagnet()
-
-        /*
-         * Smart KornDog debrid preflight.
-         *
-         * Previously an unforced magnet tried TorBox, then Premiumize, then
-         * Real-Debrid sequentially. That could make one bad candidate consume
-         * several seconds before Find Stream moved on.
-         *
-         * KornDogChoiceBuilder already knows how to check TorBox and
-         * Premiumize cache state in parallel. Use that information here to
-         * choose ONE backend before resolution starts.
-         */
-        val smartDebridProvider =
-            nativeMagnet?.let { magnet ->
-
-                if (entry.debridProvider != null) {
-                    entry.debridProvider
-                } else {
-                    val torBoxKey =
-                        prefs.getString("torbox_api_key", "")
-                            ?.trim()
-                            .orEmpty()
-
-                    val premiumizeKey =
-                        prefs.getString("premiumize_api_key", "")
-                            ?.trim()
-                            .orEmpty()
-
-                    val torBox =
-                        torBoxKey
-                            .takeIf { it.isNotBlank() }
-                            ?.let(::TorBoxClient)
-
-                    val premiumize =
-                        premiumizeKey
-                            .takeIf { it.isNotBlank() }
-                            ?.let(::PremiumizeClient)
-
-                    status.text = "KornDog · checking fastest source…"
-
-                    val choices =
-                        KornDogChoiceBuilder.build(
-                            candidates =
-                                listOf(
-                                    KornDogChoiceBuilder.Candidate(
-                                        title = result.title,
-                                        magnet = magnet,
-                                        quality = result.quality,
-                                        source = result.source,
-                                        size = null,
-                                        season = effectiveSeason,
-                                        episode = effectiveEpisode
-                                    )
-                                ),
-                            torBox = torBox,
-                            premiumize = premiumize
-                        )
-
-                    choices.firstOrNull()?.let { choice ->
-                        android.util.Log.i(
-                            "KornDogResolver",
-                            "Preflight chose ${choice.providerLabel} " +
-                                "cached=${choice.cached} " +
-                                "score=${choice.score}"
-                        )
-
-                        when (choice.provider) {
-                            com.lumora.data.remote.debrid
-                                .KornDogResolvedChoice.Provider.TORBOX ->
-                                "torbox"
-
-                            com.lumora.data.remote.debrid
-                                .KornDogResolvedChoice.Provider.PREMIUMIZE ->
-                                "premiumize"
-
-                            com.lumora.data.remote.debrid
-                                .KornDogResolvedChoice.Provider.REAL_DEBRID ->
-                                "realdebrid"
-                        }
-                    }
-                }
-            }
-
-        episodeTrace(
-            "ENTRY name=${item.name} requested=S${effectiveSeason}E${effectiveEpisode} " +
-                "provider=${entry.provider} resolver=${entry.resolver} " +
-                "fileIdx=${entry.fileIdx} hasInfoHash=${!entry.infoHash.isNullOrBlank()} " +
-                "hasMagnet=${!entry.magnetToken.isNullOrBlank()} " +
-                "hasDirect=${!entry.directUrl.isNullOrBlank()}"
-        )
-
-        val nativeDebridResolved =
-            nativeMagnet?.let { magnet ->
-                resolveWithKornDogDebrid(
-                    magnet = magnet,
-                    forcedProvider = smartDebridProvider
-                )
-            }
-
-        val resolved =
-            if (
-                smartDebridProvider != null &&
-                nativeMagnet != null
-            ) {
-                nativeDebridResolved
-                    ?: ResolveResult.Failed(
-                        "KornDog · ${
-                            when (smartDebridProvider) {
-                                "torbox" -> "TorBox"
-                                "premiumize" -> "Premiumize"
-                                "realdebrid" -> "Real-Debrid"
-                                else -> smartDebridProvider
-                            }
-                        } could not resolve this source"
-                    )
-            } else {
-                nativeDebridResolved
-                    ?: when (entry.resolver) {
+            val resolved = when (entry.resolver) {
                 "direct" -> {
-                        status.text = "KornDog · resolving direct stream…"
-
-                        val direct =
-                            com.lumora.data.remote.debrid.KornDogUrlResolver.resolve(
-                                url = entry.directUrl ?: result.token,
-                                headers = entry.headers
-                            )
-
-                        if (direct != null) {
-                            status.text =
-                                if (direct.redirected) {
-                                    "KornDog · direct stream verified · redirected"
-                                } else {
-                                    "KornDog · direct stream verified"
-                                }
-
-                            ResolveResult.Ready(
-                                url = direct.url,
-                                headers = direct.headers
-                            )
-                        } else {
-                            ResolveResult.Failed(
-                                "KornDog · direct source was not playable"
-                            )
-                        }
-                    }
+                    ResolveResult.Ready(
+                        url = result.token,
+                        headers = entry.headers
+                    )
+                }
 
                 "torrent" -> {
-                    if (
-                        playbackIntent &&
-                        item.mediaType == MediaType.SERIES
-                    ) {
-                        android.util.Log.w(
-                            "KornDogResolver",
-                            "AUTO blocked legacy TorrentEngine because no " +
-                                "debrid-owned torrent identity was available"
-                        )
-
-                        ResolveResult.Failed(
-                            "KornDog · no debrid-owned torrent identity"
-                        )
-                    } else {
-                        resolveTorrentStream(
-                            result.token,
-                            effectiveSeason,
-                            effectiveEpisode
-                        ) { line ->
-                            runOnUiThread {
-                                status.text = line
-                            }
+                    resolveTorrentStream(
+                        result.token,
+                        effectiveSeason,
+                        effectiveEpisode
+                    ) { line ->
+                        runOnUiThread {
+                            status.text = line
                         }
                     }
                 }
@@ -1908,31 +962,16 @@ internal fun MainActivity.showStreamSearchDialog(
                                 "The source plugin is unavailable"
                             )
 
-                        plugin.resolvesNatively -> {
-                            if (
-                                playbackIntent &&
-                                item.mediaType == MediaType.SERIES
-                            ) {
-                                android.util.Log.w(
-                                    "KornDogResolver",
-                                    "AUTO blocked native plugin TorrentEngine fallback"
-                                )
-
-                                ResolveResult.Failed(
-                                    "KornDog · provider returned no debrid-owned identity"
-                                )
-                            } else {
-                                resolveTorrentStream(
-                                    result.token,
-                                    effectiveSeason,
-                                    effectiveEpisode
-                                ) { line ->
-                                    runOnUiThread {
-                                        status.text = line
-                                    }
+                        plugin.resolvesNatively ->
+                            resolveTorrentStream(
+                                result.token,
+                                effectiveSeason,
+                                effectiveEpisode
+                            ) { line ->
+                                runOnUiThread {
+                                    status.text = line
                                 }
                             }
-                        }
 
                         else ->
                             jsPluginEngine.resolve(
@@ -1945,9 +984,7 @@ internal fun MainActivity.showStreamSearchDialog(
                 }
             }
 
-            }
-
-        when (resolved) {
+            when (resolved) {
                 is ResolveResult.Ready -> {
                     // Find Stream resolves asynchronously. Preserve the episode
                     // chain across the second showPlayerFor() handoff.
@@ -2056,7 +1093,7 @@ internal fun MainActivity.showStreamSearchDialog(
                         // Autoplay ran out of usable sources - fall back to letting the
                         // user browse the chooser manually instead of a bare toast with
                         // nothing else on screen.
-                        if (playbackIntent) {
+                        if (autoPlayBest) {
                             dialog.show()
                         } else {
                             dialog.dismiss()
@@ -2082,82 +1119,8 @@ internal fun MainActivity.showStreamSearchDialog(
         entry: StreamEntry,
         atFront: Boolean = false
     ) {
-        /*
-         * Automatic series playback is debrid-owned.
-         *
-         * A series episode selected through FIND STREAM must never fall
-         * through hosted direct wrappers. Those are exactly what allowed a
-         * request for S02E22 to eventually play unrelated media.
-         *
-         * Manual mode still exposes direct candidates for inspection.
-         */
-        if (
-            playbackIntent &&
-            item.mediaType == MediaType.SERIES
-        ) {
-            val hasTorrentIdentity =
-                !entry.infoHash.isNullOrBlank() ||
-                    !entry.magnetToken.isNullOrBlank() ||
-                    entry.result.token.startsWith(
-                        "magnet:",
-                        ignoreCase = true
-                    )
-
-            val directLooksPlayable =
-                !entry.directUrl.isNullOrBlank() ||
-                    (
-                        entry.resolver == "direct" &&
-                            (
-                                entry.result.token.startsWith(
-                                    "https://",
-                                    ignoreCase = true
-                                ) ||
-                                entry.result.token.startsWith(
-                                    "http://",
-                                    ignoreCase = true
-                                )
-                            )
-                    )
-
-            val directMatchesRequestedEpisode =
-                effectiveSeason == null ||
-                    effectiveEpisode == null ||
-                    com.lumora.data.remote.debrid.KornDogFilePicker.isExactEpisode(
-                        entry.result.title,
-                        effectiveSeason,
-                        effectiveEpisode
-                    )
-
-            val hasDirectIdentity =
-                directLooksPlayable && directMatchesRequestedEpisode
-
-            if (directLooksPlayable && !directMatchesRequestedEpisode) {
-                android.util.Log.d(
-                    "KornDogNative",
-                    "AUTO rejected direct candidate wrong episode " +
-                        "requested=S${effectiveSeason}E${effectiveEpisode} " +
-                        "title=${entry.result.title}"
-                )
-            }
-
-            val hasPlayableIdentity =
-                hasTorrentIdentity || hasDirectIdentity
-
-            if (!hasPlayableIdentity) {
-                android.util.Log.d(
-                    "KornDogNative",
-                    "AUTO rejected source with no usable identity " +
-                        "provider=${entry.provider} " +
-                        "resolver=${entry.resolver}"
-                )
-
-                return
-            }
-        }
-
         if (results.any {
-                it.result.token == entry.result.token &&
-                    it.debridProvider == entry.debridProvider
+                it.result.token == entry.result.token
             }
         ) {
             return
@@ -2312,11 +1275,8 @@ internal fun MainActivity.showStreamSearchDialog(
             .joinToString("  ·  ")
 
         row.setOnKeyListener { _, keyCode, event ->
-            if (event.action != android.view.KeyEvent.ACTION_DOWN) {
-                return@setOnKeyListener false
-            }
-
             if (
+                event.action == android.view.KeyEvent.ACTION_DOWN &&
                 keyCode in listOf(
                     android.view.KeyEvent.KEYCODE_DPAD_UP,
                     android.view.KeyEvent.KEYCODE_DPAD_DOWN,
@@ -2326,55 +1286,180 @@ internal fun MainActivity.showStreamSearchDialog(
             ) {
                 manualStreamUserMoved = true
             }
-
-            when (keyCode) {
-                android.view.KeyEvent.KEYCODE_DPAD_UP -> {
-                    if (row === firstVisibleStreamRow()) {
-                        currentSourceButton()?.let {
-                            it.requestFocus()
-                            true
-                        } ?: false
-                    } else {
-                        false
-                    }
-                }
-
-                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    if (row === lastVisibleStreamRow()) {
-                        currentQualityButton()?.let {
-                            it.requestFocus()
-                            true
-                        } ?: false
-                    } else {
-                        false
-                    }
-                }
-
-                else -> false
-            }
+            false
         }
 
-        row.isClickable = true
-        row.isFocusable = true
-        row.isFocusableInTouchMode = true
-
         row.setOnClickListener {
-            status.text = "KornDog · opening selected source…"
             playResult(entry)
         }
 
-        /*
-         * One TV focus target per source.
-         *
-         * Every result row already routes through playResult(entry), which
-         * now owns both KornDog direct-URL and native debrid resolution.
-         *
-         * Do not add a nested "PLAY WITH KORNDOG" button here. Nested
-         * focusable controls inside a focusable stream row make Android TV
-         * DPAD navigation ambiguous.
-         */
+        val torBoxMagnet =
+            entry.magnetToken
+                ?: entry.result.token.takeIf {
+                    it.startsWith(
+                        "magnet:",
+                        ignoreCase = true
+                    )
+                }
 
+        if (torBoxMagnet != null) {
+            val torBoxButton = Button(this).apply {
+                text = "PLAY WITH TORBOX"
+                isAllCaps = false
+                isFocusable = true
 
+                setOnClickListener {
+                    val apiKey =
+                        prefs.getString("torbox_api_key", "")
+                            ?.trim()
+                            .orEmpty()
+
+                    if (apiKey.isBlank()) {
+                        Toast.makeText(
+                            this@showStreamSearchDialog,
+                            "Add your TorBox API key in Settings → General",
+                            Toast.LENGTH_LONG
+                        ).show()
+                        return@setOnClickListener
+                    }
+
+                    isEnabled = false
+                    text = "SENDING TO TORBOX…"
+
+                    val magnet = torBoxMagnet
+                    val torBox = TorBoxClient(apiKey)
+
+                    scope.launch {
+                        try {
+                            status.text = "Adding source to TorBox…"
+
+                            val created = withContext(Dispatchers.IO) {
+                                torBox.createTorrent(magnet)
+                            }
+
+                            text = "QUEUED"
+
+                            val ready = torBox.waitUntilReady(
+                                created.id
+                            ) { torrentState ->
+                                runOnUiThread {
+                                    val pct =
+                                        torrentState.progress
+                                            ?.let {
+                                                if (it <= 1.0) {
+                                                    (it * 100).toInt()
+                                                } else {
+                                                    it.toInt()
+                                                }
+                                            }
+
+                                    text =
+                                        if (pct != null) {
+                                            "TORBOX $pct%"
+                                        } else {
+                                            "TORBOX ${torrentState.downloadState ?: "WORKING"}"
+                                        }
+
+                                    status.text =
+                                        "TorBox: ${
+                                            torrentState.downloadState
+                                                ?: "working"
+                                        }"
+                                }
+                            }
+
+                            val selected =
+                                chooseTorBoxVideoFile(
+                                    ready.files,
+                                    effectiveSeason,
+                                    effectiveEpisode
+                                )
+                                    ?: throw IllegalStateException(
+                                        "No playable video file found"
+                                    )
+
+                            status.text =
+                                "TorBox ready · ${selected.name}"
+
+                            val playableUrl =
+                                withContext(Dispatchers.IO) {
+                                    torBox.requestDownloadUrl(
+                                        torrentId = ready.id,
+                                        fileId = selected.id
+                                    )
+                                }
+
+                            val episodeQueueSnapshot =
+                                currentEpisodeQueue
+                            val episodeQueueIndexSnapshot =
+                                currentEpisodeQueueIndex
+                            val seriesContextSnapshot =
+                                currentSeriesVersionContext
+
+                            dialog.dismiss()
+                            hideContentDetail()
+
+                            showPlayerFor(
+                                Channel(
+                                    id = stableId(entry) + ":torbox",
+                                    name = item.name + epTag,
+                                    url = playableUrl,
+                                    posterUrl = item.posterUrl,
+                                    logoUrl = item.logoUrl,
+                                    group = item.group,
+                                    categoryName = item.categoryName,
+                                    mediaType = item.mediaType,
+                                    episodeNum = effectiveEpisode,
+                                    streamSearchItemId = item.id,
+                                    streamSearchSeason = effectiveSeason
+                                ),
+                                pluginStreamAlreadyResolved = true
+                            )
+
+                            if (
+                                episodeQueueIndexSnapshot >= 0 &&
+                                episodeQueueSnapshot.isNotEmpty()
+                            ) {
+                                currentEpisodeQueue =
+                                    episodeQueueSnapshot
+                                currentEpisodeQueueIndex =
+                                    episodeQueueIndexSnapshot
+                                currentSeriesVersionContext =
+                                    seriesContextSnapshot
+                            }
+
+                        } catch (e: Exception) {
+                            android.util.Log.e(
+                                "TorBox",
+                                "TorBox playback failed",
+                                e
+                            )
+
+                            text = "PLAY WITH TORBOX"
+                            isEnabled = true
+
+                            Toast.makeText(
+                                this@showStreamSearchDialog,
+                                e.message ?: "TorBox failed",
+                                Toast.LENGTH_LONG
+                            ).show()
+
+                            status.text = "TorBox failed"
+                        }
+                    }
+                }
+            }
+
+            (row as ViewGroup).addView(
+                torBoxButton,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = 8
+                }
+            )
+        }
 
         if (atFront) {
             resultsHost.addView(row, 0)
@@ -2385,14 +1470,9 @@ internal fun MainActivity.showStreamSearchDialog(
             )
         }
 
-        status.text =
-            if (playbackIntent) {
-                "Found ${results.size} source(s) · still searching…"
-            } else {
-                "${results.size} result(s)"
-            }
+        status.text = "${results.size} result(s)"
 
-        if (!playbackIntent && !initialStreamFocusClaimed) {
+        if (!autoPlayBest && !initialStreamFocusClaimed) {
             initialStreamFocusClaimed = true
 
             row.post {
@@ -2401,13 +1481,18 @@ internal fun MainActivity.showStreamSearchDialog(
             }
         }
 
-        /*
-         * Do not autoplay while discovery is still running.
-         *
-         * KornDog waits for the complete candidate set, lets streamRank()
-         * establish the final order, then commits to results.first() after
-         * discovery finishes.
-         */
+        // Playback intent: arm a short decision window off the FIRST result that
+        // lands, not the last. This gives late/slow addons ~1.5s to beat whatever's
+        // currently ranked #1 without making the user wait for the full 200-400
+        // result sweep across every addon.
+        if (autoPlayBest && !autoPlayCommitted && autoPlayDecisionJob == null) {
+            autoPlayDecisionJob = scope.launch {
+                delay(1500L)
+                if (!autoPlayCommitted) {
+                    results.firstOrNull()?.let { commitAutoPlay(it) }
+                }
+            }
+        }
     }
 
     val searchJob = scope.launch {
@@ -2444,15 +1529,7 @@ internal fun MainActivity.showStreamSearchDialog(
                                                   "magnet:",
                                                   ignoreCase = true
                                               )
-                                          },
-                                      infoHash =
-                                          result.token
-                                              .trim()
-                                              .takeIf {
-                                                  Regex(
-                                                      """(?i)^(?:[a-f0-9]{40}|[a-z2-7]{32})$"""
-                                                  ).matches(it)
-                                              }
+                                          }
                                   ),
                                 atFront
                             )
@@ -2540,152 +1617,6 @@ internal fun MainActivity.showStreamSearchDialog(
                     else -> return@launch
                 }
 
-                // ---------------------------------------------------------
-                // KornDog native source discovery.
-                //
-                // Reuse the standard Stremio-compatible transport, but map
-                // responses immediately into KornDogSource. From this point
-                // forward KornDog owns source identity and playback routing.
-                //
-                // The legacy Stremio block below remains as a fallback while
-                // we validate the native path on real titles.
-                // ---------------------------------------------------------
-
-                val nativeProviders =
-                    addons.map { addon ->
-                        KornDogStremioProvider(
-                            id = addon.manifestUrl,
-                            displayName = addon.name,
-                            manifestUrl = addon.manifestUrl
-                        )
-                    }
-
-                val nativeRegistry =
-                    KornDogSourceRegistry(
-                        providers = nativeProviders
-                    )
-
-                val nativeSourcesRaw =
-                    runCatching {
-                        nativeRegistry.search(
-                            KornDogSearchRequest(
-                                title = item.name,
-                                imdbId = imdbId,
-                                tmdbId = tmdb.second,
-                                year = item.year?.toIntOrNull(),
-                                season = effectiveSeason,
-                                episode = effectiveEpisode
-                            )
-                        )
-                    }.getOrElse { error ->
-                        android.util.Log.e(
-                            "KornDogNative",
-                            "Native source discovery failed",
-                            error
-                        )
-                        emptyList()
-                    }
-
-                /*
-                 * Native KornDog mode only accepts source identities it can
-                 * own directly.
-                 *
-                 * Raw torrent identity is preferred because KornDog can hand
-                 * it straight to the user's configured debrid services.
-                 *
-                 * Hosted resolver wrappers such as ElfHosted remain outside
-                 * the native path.
-                 */
-                val nativeSources =
-                    nativeSourcesRaw.filter { source ->
-                        source.hasTorrentIdentity ||
-                            source.hasDirectIdentity
-                    }
-
-                android.util.Log.d(
-                    "KornDogNative",
-                    "Native filtering raw=${nativeSourcesRaw.size} " +
-                        "kept=${nativeSources.size}"
-                )
-
-                if (
-                    nativeSourcesRaw.isNotEmpty() &&
-                    nativeSources.isEmpty()
-                ) {
-                    status.text =
-                        "KornDog · no native source identities"
-
-                    android.util.Log.d(
-                        "KornDogNative",
-                        "All returned sources were hosted wrappers"
-                    )
-
-                    return@launch
-                }
-
-                if (nativeSources.isNotEmpty()) {
-                    status.text =
-                        "KornDog: ${nativeSources.size} native source(s)"
-
-                    nativeSources.forEach { source ->
-
-                        val token =
-                            source.magnet
-                                ?: source.directUrl
-                                ?: source.infoHash
-                                ?: return@forEach
-
-                        addResult(
-                            StreamEntry(
-                                result = TorrentResult(
-                                    title = source.title,
-                                    token = token,
-                                    seeders = null,
-                                    size = null,
-                                    quality = source.quality,
-                                    source = source.provider,
-                                    audio = null,
-                                    language = source.language
-                                ),
-
-                                resolver =
-                                    when (source.type) {
-                                        KornDogSourceType.TORRENT ->
-                                            "torrent"
-
-                                        KornDogSourceType.DIRECT ->
-                                            "direct"
-                                    },
-
-                                headers = source.headers,
-                                provider = source.provider,
-
-                                magnetToken = source.magnet,
-                                infoHash = source.infoHash,
-                                fileIdx = source.fileIdx,
-                                directUrl = source.directUrl
-                            )
-                        )
-                    }
-
-                    android.util.Log.d(
-                        "KornDogNative",
-                        "Native discovery handled " +
-                            "${nativeSources.size} source(s) " +
-                            "for ${item.name}"
-                    )
-
-                    // Native discovery succeeded. Do not also add the same
-                    // sources through the legacy Stremio presentation path.
-                    return@launch
-                }
-
-                android.util.Log.d(
-                    "KornDogNative",
-                    "Native discovery returned no sources; " +
-                        "falling back to legacy path"
-                )
-
                 val seenStreamKeys = mutableSetOf<String>()
 
                 coroutineScope {
@@ -2722,26 +1653,17 @@ internal fun MainActivity.showStreamSearchDialog(
 
                             addonStreams.forEach { stream ->
                                 val key =
-                                    stream.magnet
-                                        ?: stream.url
+                                    stream.url
+                                        ?: stream.magnet
                                         ?: stream.title
 
                                 if (!seenStreamKeys.add(key)) {
                                     return@forEach
                                 }
-                                /*
-                                 * Do not reject a direct candidate because of
-                                 * provider branding alone.
-                                 *
-                                 * KornDogUrlResolver now decides whether the URL
-                                 * resolves to real media or merely an HTML/JSON
-                                 * wrapper.
-                                 */
-
 
                                 val token =
-                                    stream.magnet
-                                        ?: stream.url
+                                    stream.url
+                                        ?: stream.magnet
                                         ?: return@forEach
 
                                 addResult(
@@ -2759,15 +1681,14 @@ internal fun MainActivity.showStreamSearchDialog(
                                             audio = null
                                         ),
                                         resolver =
-                                            if (stream.magnet != null) {
-                                                "torrent"
-                                            } else {
+                                            if (stream.url != null) {
                                                 "direct"
+                                            } else {
+                                                "torrent"
                                             },
                                         headers = stream.requestHeaders,
                                     provider = manifest.name,
-                                    magnetToken = stream.magnet,
-                                    directUrl = stream.url
+                                    magnetToken = stream.magnet
                                     )
                                 )
                             }
@@ -2777,37 +1698,23 @@ internal fun MainActivity.showStreamSearchDialog(
             }
         }
 
-        
-        /*
-         * Manual Find Stream stays interactive.
-         *
-         * Discovery only finds candidates here. KornDog resolves the selected
-         * source later inside playResult(entry), so browsing never waits for
-         * URL verification, redirect probing, or debrid cache checks.
-         */
-
-
         // Episode-row and Series Play/Resume requests are intent to PLAY, not intent
         // to browse hundreds of sources. If the decision-window timer in addResult()
         // already committed to a source, do nothing further here - this is only the
         // fallback for a search that finished before that 1.5s window elapsed, or
         // found nothing at all.
         //
-        // Manual Find Stream keeps playbackIntent=false and still shows the full
+        // Manual Find Stream keeps autoPlayBest=false and still shows the full
         // chooser exactly as before.
-        if (playbackIntent) {
+        if (autoPlayBest) {
             if (!autoPlayCommitted) {
                 if (results.isNotEmpty()) {
-                    status.text =
-                        "Found ${results.size} source(s) · choosing best…"
-
                     commitAutoPlay(results.first())
                 } else {
-                    status.text = "No playable sources found"
+                    status.text = "No streams found"
                     dialog.show()
                 }
             }
-
             return@launch
         }
 
@@ -2842,15 +1749,12 @@ internal fun MainActivity.showStreamSearchDialog(
     }
 
     // Manual Find Stream shows the chooser immediately, same as before.
-    // Playback intent (playbackIntent) keeps it hidden unless/until autoplay
+    // Playback intent (autoPlayBest) keeps it hidden unless/until autoplay
     // has exhausted its options - see commitAutoPlay's Failed branch and the
     // no-results fallback above.
-    /*
-     * Keep search progress visible for both browse and playback intent.
-     * A 20-30 second discovery feels intentional when KornDog reports what
-     * it is doing instead of hiding the work.
-     */
-    dialog.show()
+    if (!autoPlayBest) {
+        dialog.show()
+    }
 }
 
 // ── Plugins ────────────────────────────────────

@@ -565,12 +565,13 @@ class PlayerManager(
                     }
                 }
 
+                decided = true
+                player.removeListener(this)
+
                 if (
                     matchingGroup != null &&
                     matchingIndex >= 0
                 ) {
-                    decided = true
-                    player.removeListener(this)
                     if (
                         !matchingGroup.isTrackSelected(
                             matchingIndex
@@ -626,9 +627,6 @@ class PlayerManager(
                 if (player.playbackState != Player.STATE_READY) {
                     return
                 }
-
-                decided = true
-                player.removeListener(this)
 
                 onResult(result)
             }
