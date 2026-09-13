@@ -593,6 +593,13 @@ internal fun MainActivity.showStreamSearchDialog(
     val effectiveSeason = season ?: item.streamSearchSeason
     val effectiveEpisode = episode ?: item.episodeNum
 
+    fun episodeTrace(message: String) {
+        runCatching {
+            java.io.File("/sdcard/Download/streamidentity.log")
+                .appendText("${System.currentTimeMillis()}: $message\n")
+        }
+    }
+
     /*
      * Selecting a real series episode means PLAY.
      *
@@ -1478,6 +1485,11 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
+                        episodeTrace(
+                            "PICKED provider=TorBox requested=S${effectiveSeason}E${effectiveEpisode} " +
+                                "entryFileIdx=${entry.fileIdx} file=${selected.name}"
+                        )
+
                         status.text =
                             "KornDog · TorBox · ${selected.name}"
 
@@ -1534,6 +1546,11 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
+                        episodeTrace(
+                            "PICKED provider=Premiumize requested=S${effectiveSeason}E${effectiveEpisode} " +
+                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
+                        )
+
                         status.text =
                             "KornDog · Premiumize · ${selected.path}"
 
@@ -1602,6 +1619,11 @@ internal fun MainActivity.showStreamSearchDialog(
                         )
 
                     if (selected != null) {
+                        episodeTrace(
+                            "PICKED provider=RealDebrid requested=S${effectiveSeason}E${effectiveEpisode} " +
+                                "entryFileIdx=${entry.fileIdx} file=${selected.path}"
+                        )
+
                         status.text =
                             "KornDog · Real-Debrid · ${selected.path}"
 
@@ -1788,6 +1810,14 @@ internal fun MainActivity.showStreamSearchDialog(
                     }
                 }
             }
+
+        episodeTrace(
+            "ENTRY name=${item.name} requested=S${effectiveSeason}E${effectiveEpisode} " +
+                "provider=${entry.provider} resolver=${entry.resolver} " +
+                "fileIdx=${entry.fileIdx} hasInfoHash=${!entry.infoHash.isNullOrBlank()} " +
+                "hasMagnet=${!entry.magnetToken.isNullOrBlank()} " +
+                "hasDirect=${!entry.directUrl.isNullOrBlank()}"
+        )
 
         val nativeDebridResolved =
             nativeMagnet?.let { magnet ->
