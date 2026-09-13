@@ -878,74 +878,9 @@ internal fun MainActivity.showStreamSearchDialog(
         )
     }
 
-    val dialogContent: View =
-        if (playbackIntent) {
-            FrameLayout(this).apply {
-                val backdrop =
-                    ImageView(this@showStreamSearchDialog).apply {
-                        scaleType = ImageView.ScaleType.CENTER_CROP
-                        alpha = 0.42f
-                    }
-
-                addView(
-                    backdrop,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                )
-
-                val dimLayer =
-                    View(this@showStreamSearchDialog).apply {
-                        setBackgroundColor(
-                            android.graphics.Color.argb(
-                                175,
-                                0,
-                                0,
-                                0
-                            )
-                        )
-                    }
-
-                addView(
-                    dimLayer,
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.MATCH_PARENT
-                    )
-                )
-
-                val cardParams =
-                    FrameLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT,
-                        ViewGroup.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        gravity = android.view.Gravity.CENTER
-                        val margin = (24 * density).toInt()
-                        setMargins(
-                            margin,
-                            margin,
-                            margin,
-                            margin
-                        )
-                    }
-
-                addView(container, cardParams)
-
-                loadDetailImage(
-                    item.backdropUrl
-                        ?: item.posterUrl
-                        ?: item.logoUrl,
-                    backdrop
-                )
-            }
-        } else {
-            container
-        }
-
     val dialogBuilder =
         AlertDialog.Builder(this)
-            .setView(dialogContent)
+            .setView(container)
             .setNegativeButton("Cancel", null)
 
     if (!playbackIntent) {
@@ -2641,250 +2576,46 @@ internal fun MainActivity.showStreamSearchDialog(
                     status.text =
                         "KornDog: ${nativeSources.size} native source(s)"
 
-                    /*
-             * AUTO FAST PATH
-             *
-             * Native discovery may return hundreds of sources.
-             * Autoplay does not need hundreds of ranked Android rows.
-             *
-             * Normalize everything cheaply, rank once, keep only ten
-             * strong candidates, then enter the existing playback path.
-             *
-             * Manual Find Stream remains unlimited.
-             */
-            /*
-             * KORNDOG STRICT SERIES IDENTITY GATE
-             *
-             * Native discovery is intentionally broad, but playback is not.
-             * Before ranking/autoplay, require the requested S/E to appear in
-             * the actual candidate title/filename.
-             *
-             * Also protect franchise families such as:
-             *   Law & Order
-             *   Law & Order SVU
-             *   Law & Order CI
-             *   Law & Order UK
-             *
-             * If the requested title itself appears before the episode marker,
-             * only harmless numeric/season text may sit between them.
-             */
-            fun nativeSeriesIdentityMatches(candidateTitle: String): Boolean {
-                if (!playbackIntent || item.mediaType != MediaType.SERIES) {
-                    return true
-                }
+                    nativeSources.forEach { source ->
 
-                val wantedSeason = effectiveSeason ?: return true
-                val wantedEpisode = effectiveEpisode ?: return true
+                        val token =
+                            source.magnet
+                                ?: source.directUrl
+                                ?: source.infoHash
+                                ?: return@forEach
 
-                fun normalizeIdentity(value: String): String =
-                    value
-                        .lowercase()
-                        .replace("&", " and ")
-                        .replace(Regex("""[^a-z0-9]+"""), " ")
-                        .trim()
-                        .replace(Regex("""\s+"""), " ")
+                        addResult(
+                            StreamEntry(
+                                result = TorrentResult(
+                                    title = source.title,
+                                    token = token,
+                                    seeders = null,
+                                    size = null,
+                                    quality = source.quality,
+                                    source = source.provider,
+                                    audio = null,
+                                    language = source.language
+                                ),
 
-                val candidate = normalizeIdentity(candidateTitle)
+                                resolver =
+                                    when (source.type) {
+                                        KornDogSourceType.TORRENT ->
+                                            "torrent"
 
-                val episodePattern = Regex(
-                    """\b(?:s0?$wantedSeason"""+
-                    """e0?$wantedEpisode|0?$wantedSeason"""+
-                    """x0?$wantedEpisode)\b"""
-                )
+                                        KornDogSourceType.DIRECT ->
+                                            "direct"
+                                    },
 
-                val episodeMatch = episodePattern.find(candidate)
-                    ?: return false
+                                headers = source.headers,
+                                provider = source.provider,
 
-                val requestedTitle = normalizeIdentity(item.name)
-
-                if (requestedTitle.isBlank()) {
-                    return true
-                }
-
-                /*
-                 * Use the last occurrence before SxxExx so folder paths such as
-                 * "Law & Order Season 6/Law & Order S06E15..." work naturally.
-                 */
-                val beforeEpisode =
-                    candidate.substring(0, episodeMatch.range.first)
-
-                val titleStart =
-                    beforeEpisode.lastIndexOf(requestedTitle)
-
-                /*
-                 * Some legitimate releases use abbreviations such as LAO.
-                 * Exact S/E is still mandatory, but don't throw those away
-                 * solely because the full series title is absent.
-                 */
-                if (titleStart < 0) {
-                    return true
-                }
-
-                val bridge =
-                    beforeEpisode
-                        .substring(titleStart + requestedTitle.length)
-                        .trim()
-
-                if (bridge.isBlank()) {
-                    return true
-                }
-
-                val allowedBridgeWords =
-                    setOf(
-                        "season",
-                        "series",
-                        "complete"
-                    )
-
-                val safeBridge =
-                    bridge
-                        .split(' ')
-                        .filter(String::isNotBlank)
-                        .all { token ->
-                            token.all(Char::isDigit) ||
-                                token in allowedBridgeWords
-                        }
-
-                return safeBridge
-            }
-
-            val nativeEntries =
-                nativeSources.mapNotNull { source ->
-
-                    if (!nativeSeriesIdentityMatches(source.title)) {
-                        android.util.Log.w(
-                            "KornDogIdentity",
-                            "Rejected wrong series/episode candidate: " +
-                                "\"${source.title}\" " +
-                                "wanted=${item.name} " +
-                                "S${effectiveSeason}E${effectiveEpisode}"
+                                magnetToken = source.magnet,
+                                infoHash = source.infoHash,
+                                fileIdx = source.fileIdx,
+                                directUrl = source.directUrl
+                            )
                         )
-                        return@mapNotNull null
                     }
-                    val token =
-                        source.magnet
-                            ?: source.directUrl
-                            ?: source.infoHash
-                            ?: return@mapNotNull null
-
-                    if (
-                        playbackIntent &&
-                        item.mediaType == MediaType.SERIES &&
-                        source.type == KornDogSourceType.DIRECT &&
-                        source.fileIdx == null
-                    ) {
-                        val wantedSeason = effectiveSeason
-                        val wantedEpisode = effectiveEpisode
-
-                        if (wantedSeason != null && wantedEpisode != null) {
-                            val normalized = source.title.lowercase()
-
-                            val exactEpisode =
-                                Regex(
-                                    """\\b(?:s0?$wantedSeason""" +
-                                        """e0?$wantedEpisode|0?$wantedSeason""" +
-                                        """x0?$wantedEpisode)\\b""",
-                                    RegexOption.IGNORE_CASE
-                                ).containsMatchIn(normalized)
-
-                            if (!exactEpisode) {
-                                android.util.Log.w(
-                                    "KornDogIdentity",
-                                    "Rejected ambiguous direct series source: " +
-                                        "\"${source.title}\" " +
-                                        "wanted=${item.name} " +
-                                        "S${wantedSeason}E${wantedEpisode} " +
-                                        "fileIdx=${source.fileIdx}"
-                                )
-                                return@mapNotNull null
-                            }
-                        }
-                    }
-
-                    StreamEntry(
-                        result = TorrentResult(
-                            title = source.title,
-                            token = token,
-                            seeders = null,
-                            size = null,
-                            quality = source.quality,
-                            source = source.provider,
-                            audio = null,
-                            language = source.language
-                        ),
-
-                        resolver =
-                            when (source.type) {
-                                KornDogSourceType.TORRENT ->
-                                    "torrent"
-
-                                KornDogSourceType.DIRECT ->
-                                    "direct"
-                            },
-
-                        headers = source.headers,
-                        provider = source.provider,
-
-                        magnetToken = source.magnet,
-                        infoHash = source.infoHash,
-                        fileIdx = source.fileIdx,
-                        directUrl = source.directUrl
-                    )
-                }
-
-            val entriesToAdd =
-                if (playbackIntent) {
-                    val ranked =
-                        nativeEntries
-                            .sortedByDescending { entry ->
-                                streamRank(entry)
-                            }
-
-                    /*
-                     * Preserve strong direct candidates because build 211
-                     * proved that lane can produce a correct verified episode.
-                     */
-                    val directSafety =
-                        ranked
-                            .filter { entry ->
-                                entry.resolver == "direct"
-                            }
-                            .take(2)
-
-                    /*
-                     * Eight strongest overall plus two direct safety slots.
-                     * Fill any duplicate holes from the ranked pool.
-                     */
-                    (ranked.take(8) + directSafety + ranked)
-                        .distinctBy { entry ->
-                            listOf(
-                                entry.result.token,
-                                entry.infoHash,
-                                entry.magnetToken,
-                                entry.directUrl,
-                                entry.debridProvider
-                            ).joinToString("|")
-                        }
-                        .take(10)
-                } else {
-                    nativeEntries
-                }
-
-            if (playbackIntent) {
-                android.util.Log.i(
-                    "KornDogAuto",
-                    "AUTO candidate pool " +
-                        "raw=${nativeSources.size} " +
-                        "normalized=${nativeEntries.size} " +
-                        "selected=${entriesToAdd.size} " +
-                        "direct=${entriesToAdd.count { it.resolver == "direct" }} " +
-                        "torrent=${entriesToAdd.count { it.resolver == "torrent" }}"
-                )
-            }
-
-            entriesToAdd.forEach { entry ->
-                addResult(entry)
-            }
 
                     android.util.Log.d(
                         "KornDogNative",
