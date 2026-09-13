@@ -245,15 +245,13 @@ class PlayerManager(
             .setTrackTypeDisabled(C.TRACK_TYPE_TEXT, !subtitlesEnabled)
             .clearOverridesOfType(C.TRACK_TYPE_TEXT)
             .apply {
-                if (preferAudioLanguage) {
-                    val wanted = preferredAudioLanguage()
-                    // Both code forms, since sources tag the same language either way.
-                    val iso3 = runCatching { java.util.Locale(wanted).isO3Language }.getOrNull().orEmpty()
-                    if (iso3.isNotEmpty() && iso3 != wanted) setPreferredAudioLanguages(wanted, iso3)
-                    else setPreferredAudioLanguages(wanted)
-                } else {
-                    setPreferredAudioLanguages()
-                }
+                // Let Media3 choose the playable audio track.
+                // Some Onn devices expose VOD audio tracks as supported but produce
+                // silence when we force a language-specific override.
+                //
+                // Live TV already works without an audio-language override, so VOD
+                // now uses the same safe selection behavior.
+                setPreferredAudioLanguages()
             }
             .build()
 
@@ -299,9 +297,10 @@ class PlayerManager(
         // buffering the opening seconds and throwing that away on a seek.
         if (startPositionMs > 0) player.seekTo(startPositionMs)
         player.prepare()
-        if (audio != null) {
-            attachOneShotAudioPreference(audio)
-        }
+        // Do not force a dub/sub audio-track override here.
+        // Media3's normal decoder-compatible selection is safer across TV devices.
+        // The source's audio hint is still preserved in lastPlayRequest.
+
         // Subtitles off still means "no wall of subtitles on an English film" - not "lose the
         // translation of the one Russian scene". Forced English tracks are exactly that
         // narrow case, so they're allowed back in.
