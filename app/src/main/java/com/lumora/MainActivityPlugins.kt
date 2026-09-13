@@ -2767,6 +2767,40 @@ internal fun MainActivity.showStreamSearchDialog(
                             ?: source.infoHash
                             ?: return@mapNotNull null
 
+                    if (
+                        playbackIntent &&
+                        item.mediaType == MediaType.SERIES &&
+                        source.type == KornDogSourceType.DIRECT &&
+                        source.fileIdx == null
+                    ) {
+                        val wantedSeason = effectiveSeason
+                        val wantedEpisode = effectiveEpisode
+
+                        if (wantedSeason != null && wantedEpisode != null) {
+                            val normalized = source.title.lowercase()
+
+                            val exactEpisode =
+                                Regex(
+                                    """\\b(?:s0?$wantedSeason""" +
+                                        """e0?$wantedEpisode|0?$wantedSeason""" +
+                                        """x0?$wantedEpisode)\\b""",
+                                    RegexOption.IGNORE_CASE
+                                ).containsMatchIn(normalized)
+
+                            if (!exactEpisode) {
+                                android.util.Log.w(
+                                    "KornDogIdentity",
+                                    "Rejected ambiguous direct series source: " +
+                                        "\"${source.title}\" " +
+                                        "wanted=${item.name} " +
+                                        "S${wantedSeason}E${wantedEpisode} " +
+                                        "fileIdx=${source.fileIdx}"
+                                )
+                                return@mapNotNull null
+                            }
+                        }
+                    }
+
                     StreamEntry(
                         result = TorrentResult(
                             title = source.title,
