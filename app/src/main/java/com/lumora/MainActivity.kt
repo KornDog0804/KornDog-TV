@@ -336,6 +336,13 @@ class MainActivity : AppCompatActivity() {
     internal var previewVersionGroup: List<Channel> = emptyList()
     internal var previewVersionIndex = 0
     internal var previewBlackFrameStreak = 0
+
+internal var showingLiveMultiScreen = false
+internal var liveMultiActiveIndex = 0
+internal var liveMultiChannels: List<Channel> = emptyList()
+internal val liveMultiPlayers =
+    MutableList<PlayerManager?>(4) { null }
+
     internal val previewBlackFrameCheckRunnable = Runnable { checkForPreviewBlackFrame() }
 
     internal var allChannels = listOf<Channel>()
@@ -1477,6 +1484,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun dispatchKeyEvent(event: android.view.KeyEvent): Boolean {
+        if (
+            showingLiveMultiScreen &&
+            event.action == android.view.KeyEvent.ACTION_DOWN &&
+            event.keyCode == android.view.KeyEvent.KEYCODE_BACK
+        ) {
+            exitLiveMultiScreen(restoreGuide = true)
+            return true
+        }
+
+        if (showingLiveMultiScreen) {
+            return super.dispatchKeyEvent(event)
+        }
+
         if (handleLiveTvFocusNavigation(event)) return true
         // Real-keyboard typing while search is open. The query field is deliberately not
         // focusable (see dialog_search.xml), so nothing else would receive these.

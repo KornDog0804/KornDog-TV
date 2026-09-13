@@ -135,6 +135,206 @@ internal fun MainActivity.pruneStoredEpg() {
 
 // ── Live TV inline preview ──────────────────────
 
+
+internal fun MainActivity.enterLiveMultiScreen() {
+    if (!isLivePaneActuallyVisible()) return
+
+    val available = liveAdapter.currentList
+
+    if (available.isEmpty()) {
+        android.widget.Toast.makeText(
+            this,
+            "No Live channels available",
+            android.widget.Toast.LENGTH_SHORT
+        ).show()
+        return
+    }
+
+    releaseLivePreview()
+
+    val rememberedIndex =
+        lastFocusedLiveChannel
+            ?.let { remembered ->
+                available.indexOfFirst { it.id == remembered.id }
+            }
+            ?.takeIf { it >= 0 }
+            ?: 0
+
+    liveMultiChannels =
+        (0 until minOf(4, available.size)).map { offset ->
+            available[(rememberedIndex + offset) % available.size]
+        }
+
+    liveMultiActiveIndex = 0
+    showingLiveMultiScreen = true
+
+    binding.liveGuideColumn.visibility = View.GONE
+    findViewById<View>(R.id.liveMultiScreen).visibility = View.VISIBLE
+
+    val panes = listOf<View>(
+        findViewById(R.id.liveMultiPane0),
+        findViewById(R.id.liveMultiPane1),
+        findViewById(R.id.liveMultiPane2),
+        findViewById(R.id.liveMultiPane3)
+    )
+
+    val surfaces = listOf<android.view.TextureView>(
+        findViewById(R.id.liveMultiSurface0),
+        findViewById(R.id.liveMultiSurface1),
+        findViewById(R.id.liveMultiSurface2),
+        findViewById(R.id.liveMultiSurface3)
+    )
+
+    val names = listOf<android.widget.TextView>(
+        findViewById(R.id.liveMultiName0),
+        findViewById(R.id.liveMultiName1),
+        findViewById(R.id.liveMultiName2),
+        findViewById(R.id.liveMultiName3)
+    )
+
+    panes.forEachIndexed { index, pane ->
+        val channel = liveMultiChannels.getOrNull(index)
+
+        pane.visibility =
+            if (channel != null) View.VISIBLE else View.INVISIBLE
+
+        pane.setOnClickListener {
+            onLiveMultiPaneOk(index)
+        }
+
+        if (channel != null) {
+            names[index].text = channel.name
+
+            val manager = PlayerManager(this)
+
+            manager.setTextureView(surfaces[index])
+            manager.setVolume(
+                if (index == liveMultiActiveIndex) 1f else 0f
+            )
+
+            liveMultiPlayers[index] = manager
+
+            mainHandler.postDelayed(
+                {
+                    if (
+                        showingLiveMultiScreen &&
+                        liveMultiPlayers.getOrNull(index) === manager
+                    ) {
+                        val selectedVersion =
+                            liveVersions[channel.id]
+                                ?.firstOrNull { !isStreamDead(it) }
+                                ?: channel
+
+                        manager.playUrl(
+                            selectedVersion.url,
+                            selectedVersion.streamUserAgent
+                        )
+                    }
+                },
+                index * 250L
+            )
+        }
+    }
+
+    panes.firstOrNull {
+        it.visibility == View.VISIBLE
+    }?.requestFocus()
+}
+
+
+internal fun MainActivity.updateLiveMultiAudioState() {
+    liveMultiPlayers.forEachIndexed { index, manager ->
+        manager?.setVolume(
+            if (index == liveMultiActiveIndex) 1f else 0f
+        )
+    }
+}
+
+
+internal fun MainActivity.onLiveMultiPaneOk(index: Int) {
+    val channel =
+        liveMultiChannels.getOrNull(index)
+            ?: return
+
+    if (index != liveMultiActiveIndex) {
+        liveMultiActiveIndex = index
+        lastFocusedLiveChannel = channel
+        updateLiveMultiAudioState()
+        return
+    }
+
+    lastFocusedLiveChannel = channel
+
+    exitLiveMultiScreen(
+        restoreGuide = false
+    )
+
+    playItem(channel)
+}
+
+
+internal fun MainActivity.releaseLiveMultiPlayers() {
+    liveMultiPlayers.forEachIndexed { index, manager ->
+        runCatching {
+            manager?.stop()
+            manager?.release()
+        }
+
+        liveMultiPlayers[index] = null
+    }
+}
+
+
+internal fun MainActivity.exitLiveMultiScreen(
+    restoreGuide: Boolean
+) {
+    if (!showingLiveMultiScreen) return
+
+    showingLiveMultiScreen = false
+
+    releaseLiveMultiPlayers()
+
+    findViewById<View>(R.id.liveMultiScreen).visibility = View.GONE
+    binding.liveGuideColumn.visibility = View.VISIBLE
+
+    val remembered = lastFocusedLiveChannel
+
+    liveMultiChannels = emptyList()
+    liveMultiActiveIndex = 0
+
+    if (!restoreGuide) return
+
+    showLivePreviewPane()
+
+    if (remembered != null) {
+        val index =
+            liveAdapter.currentList.indexOfFirst {
+                it.id == remembered.id
+            }
+
+        if (index >= 0) {
+            binding.liveContent.scrollToPosition(index)
+
+            binding.liveContent.post {
+                val focusGuide = {
+                    (binding.liveContent
+                        .findViewHolderForAdapterPosition(index)
+                        as? LiveGuideAdapter.RowViewHolder)
+                        ?.requestChannelFocus()
+                }
+
+                focusGuide()
+                binding.liveContent.post {
+                    focusGuide()
+                }
+            }
+
+            requestPreviewLoad(remembered)
+        }
+    }
+}
+
+
 internal fun MainActivity.ensurePreviewPlayer(): PlayerManager {
     previewPlayerManager?.let { return it }
     val manager = PlayerManager(this)

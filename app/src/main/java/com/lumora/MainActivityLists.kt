@@ -1179,6 +1179,53 @@ internal fun MainActivity.setupToolbar() {
     binding.btnSearch.setOnClickListener { showSearchDialog() }
     binding.emptyQrPair.setOnClickListener { showProviderSettings() }
     binding.homeSearchBar.setOnClickListener { showSearchDialog() }
+    binding.btnLiveMultiScreen.setOnClickListener {
+        enterLiveMultiScreen()
+    }
+
+    binding.btnLiveFavorites.setOnClickListener {
+        selectFavorites()
+    }
+
+    binding.btnLiveRecent.setOnClickListener {
+        val recentIds =
+            com.lumora.cache.RecentlyPlayedStore.getRecentIds(this)
+
+        val recentChannel =
+            recentIds.firstNotNullOfOrNull { recentId ->
+                liveAdapter.currentList.firstOrNull { it.id == recentId }
+            }
+
+        if (recentChannel != null) {
+            lastFocusedLiveChannel = recentChannel
+
+            val index =
+                liveAdapter.currentList.indexOfFirst {
+                    it.id == recentChannel.id
+                }
+
+            if (index >= 0) {
+                binding.liveContent.scrollToPosition(index)
+            }
+
+            requestPreviewLoad(recentChannel)
+        } else {
+            android.widget.Toast.makeText(
+                this,
+                "No recent Live channels yet",
+                android.widget.Toast.LENGTH_SHORT
+            ).show()
+        }
+    }
+
+    binding.btnLiveSearch.setOnClickListener {
+        showSearchDialog()
+    }
+
+    binding.btnLiveRefresh.setOnClickListener {
+        reloadCurrentProvider()
+    }
+
     // Phone-only re-expand affordance for a collapsed category rail: restores the
     // sidebar (persisted pref flips back), then refocuses the row the user had selected
     // so the D-pad doesn't land them at the rail's top with their category nowhere.

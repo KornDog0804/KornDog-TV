@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/liveMultiScreen"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:layout_margin="18dp"
+    android:elevation="24dp"
+    android:orientation="vertical"
+    android:visibility="gone">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/liveMultiPane0"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_live_multi_pane"
+            android:clickable="true"
+            android:focusable="true"
+            android:nextFocusRight="@id/liveMultiPane1"
+            android:nextFocusDown="@id/liveMultiPane2">
+
+            <TextureView
+                android:id="@+id/liveMultiSurface0"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/liveMultiName0"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#CC05080D"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:padding="10dp"
+                android:text="Screen 1"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/liveMultiPane1"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_live_multi_pane"
+            android:clickable="true"
+            android:focusable="true"
+            android:nextFocusLeft="@id/liveMultiPane0"
+            android:nextFocusDown="@id/liveMultiPane3">
+
+            <TextureView
+                android:id="@+id/liveMultiSurface1"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/liveMultiName1"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#CC05080D"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:padding="10dp"
+                android:text="Screen 2"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:orientation="horizontal">
+
+        <FrameLayout
+            android:id="@+id/liveMultiPane2"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_live_multi_pane"
+            android:clickable="true"
+            android:focusable="true"
+            android:nextFocusUp="@id/liveMultiPane0"
+            android:nextFocusRight="@id/liveMultiPane3">
+
+            <TextureView
+                android:id="@+id/liveMultiSurface2"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/liveMultiName2"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#CC05080D"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:padding="10dp"
+                android:text="Screen 3"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </FrameLayout>
+
+        <FrameLayout
+            android:id="@+id/liveMultiPane3"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:layout_margin="5dp"
+            android:background="@drawable/bg_live_multi_pane"
+            android:clickable="true"
+            android:focusable="true"
+            android:nextFocusUp="@id/liveMultiPane1"
+            android:nextFocusLeft="@id/liveMultiPane2">
+
+            <TextureView
+                android:id="@+id/liveMultiSurface3"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent" />
+
+            <TextView
+                android:id="@+id/liveMultiName3"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:background="#CC05080D"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:padding="10dp"
+                android:text="Screen 4"
+                android:textColor="@color/text_primary"
+                android:textSize="18sp" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+</LinearLayout>
