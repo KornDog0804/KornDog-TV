@@ -485,19 +485,17 @@ class MainActivity : AppCompatActivity() {
      *  geometrically nearest, which can be a different season entirely. */
     internal var selectedSeasonChip: View? = null
     internal var activeTab = 0
-    // Mobile now launches directly into Live TV.
-    // Home remains legacy UI for the moment, but is no longer the startup destination.
-    internal var showingHome = false
+    // KornDog TV always starts on the canonical Tippy Home screen.
+    // activeTab remains reserved for the Live / Series / Movies catalog contract.
+    internal var showingHome = true
     internal var homeSeeAllShelf: ContentShelf? = null
     internal var concertSeeAllShelf: ContentShelf? = null
     internal var showingDownloads = false
     internal var showingDiscover = false
     // Favorites is a standalone catalog destination, not a fourth activeTab.
     // activeTab remains reserved for Live / Series / Movies.
-    // Favorites is the default visible destination on cold start.
-    // activeTab remains 0 so the existing Live / Series / Movies 0..2 contract
-    // stays untouched internally.
-    internal var showingFavorites = true
+    // Cold start belongs to Tippy Home; Favorites is entered only when selected.
+    internal var showingFavorites = false
     /** Catch Up is a pane of its own rather than a fourth catalogue tab: it browses the
      *  same live channels through a different axis (time), and every tab-indexed path
      *  (activeTab 0/1/2, its prefs, its category rail) would otherwise need a fourth case

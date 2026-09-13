@@ -197,6 +197,7 @@ internal fun MainActivity.refreshFavoritesTab() {
  * 0/1/2 contract is deeply shared by Live / Series / Movies.
  */
 internal fun MainActivity.selectFavorites() {
+    applyKornDogTopNavOrder()
     hideCatchup()
     activeSettingsOverlay?.dismiss()
     activeSearchOverlay?.dismiss()

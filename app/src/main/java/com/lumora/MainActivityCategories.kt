@@ -1681,6 +1681,7 @@ internal fun MainActivity.selectHome() {
     showingHome = true
     showingDownloads = false
     showingDiscover = false
+    showingFavorites = false
     hideCatchup()
     releaseLivePreview()
     binding.discoverContent.visibility = View.GONE
