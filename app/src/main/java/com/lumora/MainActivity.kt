@@ -1365,9 +1365,17 @@ internal val liveMultiPlayers =
                         val count = categoryAdapter.itemCount
                         val target = (position + step).coerceIn(0, (count - 1).coerceAtLeast(0))
 
-                        // At the edge, consume the press instead of allowing FocusFinder
-                        // to escape sideways into the guide or toolbar.
-                        if (target == position) return true
+                        // At the top edge, deliberately climb into the Live command strip.
+                        // Keep DOWN clamped at the bottom so focus cannot leak sideways.
+                        if (target == position) {
+                            if (
+                                event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP &&
+                                position == 0
+                            ) {
+                                findViewById<View>(R.id.btnLiveMultiScreen)?.requestFocus()
+                            }
+                            return true
+                        }
 
                         binding.categorySidebar.scrollToPosition(target)
                         binding.categorySidebar.post {
@@ -1435,7 +1443,15 @@ internal val liveMultiPlayers =
                         val count = liveAdapter.itemCount
                         val target = (position + step).coerceIn(0, (count - 1).coerceAtLeast(0))
 
-                        if (target == position) return true
+                        if (target == position) {
+                            if (
+                                event.keyCode == android.view.KeyEvent.KEYCODE_DPAD_UP &&
+                                position == 0
+                            ) {
+                                findViewById<View>(R.id.btnLiveMultiScreen)?.requestFocus()
+                            }
+                            return true
+                        }
 
                         binding.liveContent.scrollToPosition(target)
                         binding.liveContent.post {
