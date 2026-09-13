@@ -2103,31 +2103,27 @@ internal fun MainActivity.showStreamSearchDialog(
                         ignoreCase = true
                     )
 
-            val hasDirectIdentity =
-                !entry.directUrl.isNullOrBlank() ||
-                    (
-                        entry.resolver == "direct" &&
-                            (
-                                entry.result.token.startsWith(
-                                    "https://",
-                                    ignoreCase = true
-                                ) ||
-                                entry.result.token.startsWith(
-                                    "http://",
-                                    ignoreCase = true
-                                )
-                            )
-                    )
-
-            val hasPlayableIdentity =
-                hasTorrentIdentity || hasDirectIdentity
-
-            if (!hasPlayableIdentity) {
+            /*
+             * Series autoplay is KornDog-debrid owned.
+             *
+             * Hosted/direct-only candidates may still appear in the manual
+             * chooser, but AUTO must have torrent identity so KornDog can
+             * preserve the exact episode and resolve it through the user's
+             * configured debrid services.
+             */
+            if (!hasTorrentIdentity) {
                 android.util.Log.d(
                     "KornDogNative",
-                    "AUTO rejected source with no usable identity " +
+                    "AUTO rejected direct-only series source " +
                         "provider=${entry.provider} " +
-                        "resolver=${entry.resolver}"
+                        "resolver=${entry.resolver} " +
+                        "episode=S${effectiveSeason}E${effectiveEpisode}"
+                )
+
+                episodeTrace(
+                    "REJECT direct-only provider=${entry.provider} " +
+                        "resolver=${entry.resolver} " +
+                        "requested=S${effectiveSeason}E${effectiveEpisode}"
                 )
 
                 return
