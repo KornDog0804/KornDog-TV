@@ -596,7 +596,8 @@ internal fun MainActivity.startDiscoverStreamSearch(item: Channel) {
         // Let the ranked source engine choose the best candidate automatically.
         showStreamSearchDialog(
             plugin,
-            item
+            item,
+            autoPlayBest = true
         )
     }
 }
@@ -621,7 +622,14 @@ internal fun MainActivity.normalizeMatchTitle(title: String): String =
 /** Fetches the show's seasons from TMDB, then lets the user pick season → episode to search. */
 internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: Channel) {
     val tvId = item.id.substringAfterLast(':').toIntOrNull()
-    if (tvId == null) { showStreamSearchDialog(plugin, item); return }
+    if (tvId == null) {
+        showStreamSearchDialog(
+            plugin,
+            item,
+            autoPlayBest = true
+        )
+        return
+    }
     val loading = AlertDialog.Builder(this)
         .setTitle(item.name)
         .setMessage("Loading episodes…")
@@ -633,7 +641,11 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
         loading.dismiss()
         if (seasons.isEmpty()) {
             // No season data - fall back to searching the title as a whole.
-            showStreamSearchDialog(plugin, item)
+            showStreamSearchDialog(
+                plugin,
+                item,
+                autoPlayBest = true
+            )
             return@launch
         }
         val seasonLabels = seasons.map { "${it.name} (${it.episodeCount} eps)" }.toTypedArray()
