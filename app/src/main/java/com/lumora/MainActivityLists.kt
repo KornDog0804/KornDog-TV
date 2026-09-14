@@ -678,61 +678,43 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             // Keep the show detail visible while KornDog searches.
             // Successful playback will close the detail screen later.
             skipResumePrompt = false
-            // Anime items have no direct stream URL — route through plugin.
-            if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
-                val plugin = enabledStreamSearchPlugin(item)
-                if (plugin != null) {
-                    val queue = itemAdapter.currentList
-                    currentEpisodeQueue = queue
-                    currentEpisodeQueueIndex = queue.indexOf(chosen)
-                    currentSeriesVersionContext =
-                        item to (seriesGroup ?: listOf(item))
-                    detailReturnItem = item
-                    detailReturnGroup = seriesGroup
+            // Every VOD episode enters the same KornDog pipeline.
+            val chosenSeasonPair =
+                detailSeasons.firstOrNull { (_, eps) ->
+                    eps.any { it.id == chosen.id }
+                }
 
-                    showStreamSearchDialog(
-                        plugin,
-                        item,
-                        season = null,
-                        episode = chosen.episodeNum,
-                        autoPlayBest = true
-                    )
+            val chosenSeason =
+                if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
+                    null
+                } else {
+                    chosenSeasonPair
+                        ?.first
+                        ?.let { Regex("""\d+""").find(it)?.value }
+                        ?.toIntOrNull()
                 }
-            } else if (chosen.url.isBlank()) {
-                // TMDB-sourced Series/Movie episodes carry no direct url - resolve
-                // through Find Stream (Stremio addons) same as anime, but with season known.
-                val seasonPair = detailSeasons.firstOrNull { (_, eps) -> eps.any { it.id == chosen.id } }
-                val seasonNum = seasonPair?.first?.let { Regex("""\d+""").find(it)?.value }?.toIntOrNull()
-                val plugin = enabledStreamSearchPlugin(item)
-                if (plugin != null) {
-                    val queue = itemAdapter.currentList
-                    currentEpisodeQueue = queue
-                    currentEpisodeQueueIndex = queue.indexOf(chosen)
-                    currentSeriesVersionContext =
-                        item to (seriesGroup ?: listOf(item))
-                    detailReturnItem = item
-                    detailReturnGroup = seriesGroup
 
-                    showStreamSearchDialog(
-                        plugin,
-                        item,
-                        season = seasonNum,
-                        episode = chosen.episodeNum,
-                        autoPlayBest = true
-                    )
-                }
-            } else {
-                currentIndex = if (isSeries) -1 else filmList.indexOf(item)
-                val queue = if (isSeries) itemAdapter.currentList else emptyList()
-                showPlayerFor(chosen)
-                detailReturnItem = item
-                detailReturnGroup = seriesGroup
-                if (isSeries) {
-                    currentEpisodeQueue = queue
-                    currentEpisodeQueueIndex = queue.indexOf(chosen)
-                    currentSeriesVersionContext = item to (seriesGroup ?: listOf(item))
-                }
+            currentIndex =
+                if (isSeries) -1 else filmList.indexOf(item)
+
+            if (isSeries) {
+                val queue = itemAdapter.currentList
+
+                currentEpisodeQueue = queue
+                currentEpisodeQueueIndex = queue.indexOf(chosen)
+                currentSeriesVersionContext =
+                    item to (seriesGroup ?: listOf(item))
             }
+
+            detailReturnItem = item
+            detailReturnGroup = seriesGroup
+
+            playWithKornDog(
+                target = chosen,
+                catalogItem = item,
+                season = chosenSeason,
+                episode = chosen.episodeNum
+            )
         },
         showDownloadButton = !isTv,
         onDownloadClick = { episode -> downloadItem(episode) },
@@ -856,49 +838,30 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
             // Keep detail visible during KornDog resolution.
             // Playback success owns the transition into the player.
             skipResumePrompt = false
-            // Anime items route through the plugin instead of direct playback.
-            if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
-                val plugin = enabledStreamSearchPlugin(item)
-                if (plugin != null) {
-                    showStreamSearchDialog(
-                        plugin,
-                        item,
-                        season = null,
-                        episode = target.episodeNum,
-                        autoPlayBest = true
-                    )
-                }
-            } else if (target.url.isBlank()) {
-                // TMDB-sourced Series/Movie episodes carry no direct url - resolve
-                // through Find Stream (Stremio addons) same as anime, but with season known.
-                val plugin = enabledStreamSearchPlugin(item)
-                runCatching {
-                    java.io.File("/sdcard/Download/playbutton.log")
-                        .appendText(
-                            "${System.currentTimeMillis()}: PLAY-BUTTON blank-url branch. " +
-                            "plugin=${plugin?.id} seasonNum=$seasonNum episode=${target.episodeNum} itemId=${item.id}\n"
-                        )
-                }
-                if (plugin != null) {
-                    showStreamSearchDialog(
-                        plugin,
-                        item,
-                        season = seasonNum?.toIntOrNull(),
-                        episode = target.episodeNum,
-                        autoPlayBest = true
-                    )
-                }
-            } else {
-                currentIndex = -1
-                // Full cross-season chain behind the chosen episode, so it keeps
-                // auto-advancing through the whole show, not just the current season.
-                showPlayerFor(target)
-                detailReturnItem = item
-                detailReturnGroup = seriesGroup
-                currentEpisodeQueue = ordered
-                currentEpisodeQueueIndex = ordered.indexOf(target)
-                currentSeriesVersionContext = item to (seriesGroup ?: listOf(item))
-            }
+            // Every Series Play / Resume uses the same KornDog VOD pipeline.
+            currentIndex = -1
+
+            // Preserve the complete cross-season queue so autoplay and
+            // manual Next / Previous stay attached to this series.
+            currentEpisodeQueue = ordered
+            currentEpisodeQueueIndex = ordered.indexOf(target)
+            currentSeriesVersionContext =
+                item to (seriesGroup ?: listOf(item))
+
+            detailReturnItem = item
+            detailReturnGroup = seriesGroup
+
+            playWithKornDog(
+                target = target,
+                catalogItem = item,
+                season =
+                    if (item.id.startsWith(AnimeCatalogClient.ID_PREFIX)) {
+                        null
+                    } else {
+                        seasonNum?.toIntOrNull()
+                    },
+                episode = target.episodeNum
+            )
         }
     }
 
@@ -1020,7 +983,10 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                     skipResumePrompt = false
                     hideContentDetail()
                     currentIndex = filmList.indexOf(item)
-                    showPlayerFor(versions.first())
+                    playWithKornDog(
+                        target = versions.first(),
+                        catalogItem = item
+                    )
                     detailReturnItem = item
                     detailReturnGroup = versionGroup
                 }
@@ -1039,7 +1005,10 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
                         chip.setOnClickListener {
                             hideContentDetail()
                             currentIndex = filmList.indexOf(item)
-                            showPlayerFor(version)
+                            playWithKornDog(
+                                target = version,
+                                catalogItem = item
+                            )
                             detailReturnItem = item
                             detailReturnGroup = versionGroup
                         }

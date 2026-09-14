@@ -13,6 +13,7 @@ import com.lumora.player.PlayerManager
 import com.lumora.data.local.entity.EpgProgramEntity
 import kotlinx.coroutines.*
 import java.util.Locale
+import com.lumora.model.MediaType
 
 // ── EPG resolution, live preview pane, numeric entry, Up Next & controls overlay ──
 //
@@ -624,9 +625,18 @@ internal fun MainActivity.executeUpNextAdvance() {
     val idx = currentEpisodeQueueIndex
     currentEpisodeQueue = emptyList()
     currentEpisodeQueueIndex = -1
-    skipResumePrompt = true
-    showPlayerFor(nextEp)
-    // Restore the queue so Next/Prev work for subsequent episodes
+    val seriesItem =
+        currentSeriesVersionContext?.first ?: nextEp
+
+    playWithKornDog(
+        target = nextEp,
+        catalogItem = seriesItem,
+        season = nextEp.streamSearchSeason,
+        episode = nextEp.episodeNum,
+        suppressResumePrompt = true
+    )
+
+    // Restore the queue so Next/Prev work for subsequent episodes.
     currentEpisodeQueue = queue
     currentEpisodeQueueIndex = idx + 1
 }
@@ -716,7 +726,17 @@ internal fun MainActivity.navigateChannel(dir: Int) {
     if (currentEpisodeQueueIndex >= 0 && episodeQueue.isNotEmpty()) {
         val idx = currentEpisodeQueueIndex + dir
         if (idx in episodeQueue.indices) {
-            showPlayerFor(episodeQueue[idx])
+            val episode = episodeQueue[idx]
+            val seriesItem =
+                currentSeriesVersionContext?.first ?: episode
+
+            playWithKornDog(
+                target = episode,
+                catalogItem = seriesItem,
+                season = episode.streamSearchSeason,
+                episode = episode.episodeNum
+            )
+
             currentEpisodeQueue = episodeQueue
             currentEpisodeQueueIndex = idx
         } else {
@@ -726,8 +746,27 @@ internal fun MainActivity.navigateChannel(dir: Int) {
     }
     val list = when (activeTab) { 0 -> liveChannels; 1 -> seriesList; 2 -> filmList; else -> liveChannels }
     val idx = currentIndex + dir
-    if (idx in list.indices) { currentIndex = idx; showPlayerFor(list[idx]) }
-    else { Toast.makeText(this, if (dir < 0) "First" else "Last", Toast.LENGTH_SHORT).show() }
+
+    if (idx in list.indices) {
+        currentIndex = idx
+        val next = list[idx]
+
+        when (next.mediaType) {
+            MediaType.MOVIE,
+            MediaType.SERIES -> playWithKornDog(
+                target = next,
+                catalogItem = next
+            )
+
+            else -> showPlayerFor(next)
+        }
+    } else {
+        Toast.makeText(
+            this,
+            if (dir < 0) "First" else "Last",
+            Toast.LENGTH_SHORT
+        ).show()
+    }
 }
 
 internal fun MainActivity.showControls() {

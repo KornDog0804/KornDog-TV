@@ -583,8 +583,18 @@ internal fun MainActivity.setupPlayerControls() {
                 val queue = currentEpisodeQueue
                 val nextIdx = currentEpisodeQueueIndex + 1
                 if (nextIdx in queue.indices) {
-                    skipResumePrompt = true
-                    showPlayerFor(queue[nextIdx])
+                    val nextEpisode = queue[nextIdx]
+                    val seriesItem =
+                        currentSeriesVersionContext?.first ?: nextEpisode
+
+                    playWithKornDog(
+                        target = nextEpisode,
+                        catalogItem = seriesItem,
+                        season = nextEpisode.streamSearchSeason,
+                        episode = nextEpisode.episodeNum,
+                        suppressResumePrompt = true
+                    )
+
                     currentEpisodeQueue = queue
                     currentEpisodeQueueIndex = nextIdx
                 }

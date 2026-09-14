@@ -592,12 +592,10 @@ internal fun MainActivity.startDiscoverStreamSearch(item: Channel) {
     if (item.mediaType == MediaType.SERIES) {
         showSeriesEpisodePicker(plugin, item)
     } else {
-        // Discover movie playback is intent to PLAY.
-        // Let the ranked source engine choose the best candidate automatically.
-        showStreamSearchDialog(
-            plugin,
-            item,
-            autoPlayBest = true
+                // Discover movie playback uses the canonical KornDog VOD path.
+        playWithKornDog(
+            target = item,
+            catalogItem = item
         )
     }
 }
@@ -623,10 +621,9 @@ internal fun MainActivity.normalizeMatchTitle(title: String): String =
 internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: Channel) {
     val tvId = item.id.substringAfterLast(':').toIntOrNull()
     if (tvId == null) {
-        showStreamSearchDialog(
-            plugin,
-            item,
-            autoPlayBest = true
+        playWithKornDog(
+            target = item,
+            catalogItem = item
         )
         return
     }
@@ -640,11 +637,10 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
         val seasons = tmdbClient.tvSeasons(tvId)
         loading.dismiss()
         if (seasons.isEmpty()) {
-            // No season data - fall back to searching the title as a whole.
-            showStreamSearchDialog(
-                plugin,
-                item,
-                autoPlayBest = true
+            // No season metadata, but still stay on canonical KornDog playback.
+            playWithKornDog(
+                target = item,
+                catalogItem = item
             )
             return@launch
         }
@@ -752,12 +748,11 @@ internal fun MainActivity.showSeriesEpisodePicker(plugin: PluginScript?, item: C
                             setOnClickListener {
                                 episodeDialog.dismiss()
 
-                                showStreamSearchDialog(
-                                    plugin,
-                                    item,
+                                playWithKornDog(
+                                    target = item,
+                                    catalogItem = item,
                                     season = season.number,
-                                    episode = episodeNumber,
-                                    autoPlayBest = true
+                                    episode = episodeNumber
                                 )
                             }
                         }
@@ -888,30 +883,15 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
         MediaType.MOVIE -> {
             currentIndex = filmList.indexOf(channel)
 
-            if (channel.streamSearchItemId != null) {
-                scope.launch {
-                    val playable = refreshSavedStreamSearch(channel)
-                    if (playable != null) {
-                        showPlayerFor(
-                        playable,
-                        pluginStreamAlreadyResolved = true
-                    )
-                    } else {
-                        Toast.makeText(
-                            this@onHomeItemClick,
-                            "Couldn't refresh this stream. Use Find Stream again.",
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
-            } else {
-                showPlayerFor(channel)
-            }
+            playWithKornDog(
+                target = channel,
+                catalogItem = channel
+            )
 
-            // Back out to the film's own poster, same as playing it from its detail page.
-            // Not for plugin/stream-search resolved entries: their ids are playback identities,
-            // not stable catalog items.
-            if (channel.pluginToken == null && channel.streamSearchItemId == null) {
+            if (
+                channel.pluginToken == null &&
+                channel.streamSearchItemId == null
+            ) {
                 detailReturnItem = channel
             }
         }
@@ -924,9 +904,15 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                 val index = upNextQueue.indexOfFirst {
                     it.id.ifBlank { it.url } == channel.id.ifBlank { channel.url }
                 }
-                showPlayerFor(channel)
                 currentEpisodeQueue = upNextQueue
                 currentEpisodeQueueIndex = if (index >= 0) index else 0
+
+                playWithKornDog(
+                    target = channel,
+                    catalogItem = channel,
+                    season = channel.streamSearchSeason,
+                    episode = channel.episodeNum
+                )
                 return
             }
             // An episode tile (Continue Watching) carries an episode number; clicking it
@@ -953,10 +939,16 @@ internal fun MainActivity.onHomeItemClick(channel: Channel) {
                         }
 
                     if (playable != null) {
-                        showPlayerFor(
-                        playable,
-                        pluginStreamAlreadyResolved = true
-                    )
+                        playWithKornDog(
+                            target = playable,
+                            catalogItem = channel,
+                            season =
+                                channel.streamSearchSeason
+                                    ?: playable.streamSearchSeason,
+                            episode =
+                                channel.episodeNum
+                                    ?: playable.episodeNum
+                        )
 
                         // IPTV episode snapshots can rebuild an auto-advance queue.
                         if (playable.streamSearchItemId == null) {

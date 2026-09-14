@@ -241,10 +241,9 @@ internal fun MainActivity.wireFindStreamButton(item: Channel) {
         if (item.mediaType == MediaType.SERIES) {
             showSeriesEpisodePicker(plugin, item)
         } else {
-            showStreamSearchDialog(
-                plugin,
-                item,
-                autoPlayBest = true
+            playWithKornDog(
+                target = item,
+                catalogItem = item
             )
         }
     }
@@ -577,6 +576,98 @@ internal suspend fun MainActivity.stremioSubtitlesFor(
                     .lowercase()
             }
     }
+}
+
+
+/**
+ * Canonical KornDog VOD playback entrance.
+ *
+ * Every normal Movie / Series playback action should eventually enter here:
+ * Home, Movies, Series, Search, Favorites, Continue Watching, Up Next,
+ * Resume, episode rows and auto-advance.
+ *
+ * Live TV and Concert Corner remain on their existing playback paths.
+ *
+ * This intentionally reuses the existing KornDog ranked search/autoplay
+ * engine instead of creating another resolver.
+ */
+internal fun MainActivity.playWithKornDog(
+    target: Channel,
+    catalogItem: Channel = target,
+    season: Int? = null,
+    episode: Int? = target.episodeNum,
+    suppressResumePrompt: Boolean = false
+) {
+    // Live is deliberately NOT part of unified VOD playback.
+    if (target.mediaType == MediaType.LIVE) {
+        showPlayerFor(target)
+        return
+    }
+
+    skipResumePrompt = suppressResumePrompt
+
+    /*
+     * Series episode Channels often contain the episode title rather than the
+     * series title. Prefer the active series context when available so search
+     * remains anchored to the actual show.
+     */
+    val searchItem =
+        if (target.mediaType == MediaType.SERIES) {
+            currentSeriesVersionContext?.first ?: catalogItem
+        } else {
+            catalogItem
+        }
+
+    val effectiveSeason =
+        season
+            ?: target.streamSearchSeason
+            ?: searchItem.streamSearchSeason
+
+    val effectiveEpisode =
+        episode
+            ?: target.episodeNum
+            ?: searchItem.episodeNum
+
+    val plugin = enabledStreamSearchPlugin(searchItem)
+    val hasStremio = StremioAddonStore.load(prefs).any { it.enabled }
+
+    /*
+     * A normal VOD request should use the same KornDog resolver regardless of
+     * which screen launched it. If no discovery backend exists, preserve an
+     * already-resolved direct stream rather than breaking playback.
+     */
+    if (plugin == null && !hasStremio) {
+        if (target.url.isNotBlank()) {
+            android.util.Log.d(
+                "KornDogUnified",
+                "No discovery backend; using existing resolved direct VOD"
+            )
+            showPlayerFor(
+                target,
+                pluginStreamAlreadyResolved = true
+            )
+        } else {
+            Toast.makeText(
+                this,
+                "No KornDog stream source is enabled.",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        return
+    }
+
+    android.util.Log.d(
+        "KornDogUnified",
+        "PLAY ${searchItem.name} season=$effectiveSeason episode=$effectiveEpisode"
+    )
+
+    showStreamSearchDialog(
+        plugin = plugin,
+        item = searchItem,
+        season = effectiveSeason,
+        episode = effectiveEpisode,
+        autoPlayBest = true
+    )
 }
 
 internal fun MainActivity.showStreamSearchDialog(
@@ -1393,11 +1484,11 @@ internal fun MainActivity.showStreamSearchDialog(
 
         scope.launch {
             // Sidecar subtitle discovery runs beside stream resolution instead
-            // of after it. A slow subtitle addon gets a very small budget and
-            // cannot add several seconds to video startup. Embedded/resolver
-            // subtitles remain untouched.
+            // of after it. Two seconds is enough for normal addon/network latency
+            // without allowing subtitle lookup to stall KornDog playback.
+            // Embedded/resolver subtitles remain available regardless.
             val addonSubtitlesDeferred = async {
-                withTimeoutOrNull(350L) {
+                withTimeoutOrNull(2_000L) {
                     stremioSubtitlesFor(
                         item = item,
                         season = effectiveSeason,
@@ -1974,7 +2065,30 @@ internal fun MainActivity.showStreamSearchDialog(
                     // resolving. If the addon was slow it already timed out,
                     // so playback is never stuck waiting on subtitle discovery.
                     val addonSubtitles = addonSubtitlesDeferred.await()
-                    val mergedSubtitles =
+                    fun subtitleIsEnglish(
+                        subtitle: com.lumora.plugin.PluginSubtitle
+                    ): Boolean {
+                        val language =
+                            subtitle.language
+                                ?.trim()
+                                ?.lowercase()
+                                .orEmpty()
+
+                        val label =
+                            subtitle.label
+                                ?.trim()
+                                ?.lowercase()
+                                .orEmpty()
+
+                        return language == "en" ||
+                            language == "eng" ||
+                            language.startsWith("en-") ||
+                            language.startsWith("en_") ||
+                            language == "english" ||
+                            Regex("""\benglish\b""").containsMatchIn(label)
+                    }
+
+                    val distinctSubtitles =
                         (resolved.subtitles + addonSubtitles)
                             .distinctBy {
                                 it.url
@@ -1982,6 +2096,42 @@ internal fun MainActivity.showStreamSearchDialog(
                                     .substringBefore('#')
                                     .lowercase()
                             }
+
+                    val englishFirst =
+                        distinctSubtitles.sortedWith(
+                            compareByDescending<com.lumora.plugin.PluginSubtitle> {
+                                subtitleIsEnglish(it)
+                            }.thenByDescending {
+                                it.isDefault
+                            }
+                        )
+
+                    val alreadyHasDefault =
+                        englishFirst.any { it.isDefault }
+
+                    var englishDefaultAssigned = false
+
+                    val mergedSubtitles =
+                        englishFirst.map { subtitle ->
+                            if (
+                                !alreadyHasDefault &&
+                                !englishDefaultAssigned &&
+                                subtitleIsEnglish(subtitle)
+                            ) {
+                                englishDefaultAssigned = true
+                                subtitle.copy(isDefault = true)
+                            } else {
+                                subtitle
+                            }
+                        }
+
+                    android.util.Log.d(
+                        "KornDogSubtitles",
+                        "merged=${mergedSubtitles.size} " +
+                            "english=${mergedSubtitles.count(::subtitleIsEnglish)} " +
+                            "addon=${addonSubtitles.size} " +
+                            "resolved=${resolved.subtitles.size}"
+                    )
 
                     showPlayerFor(
                         Channel(
