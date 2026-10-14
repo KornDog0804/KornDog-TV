@@ -46,8 +46,8 @@ class ConcertCatalogClient(
                         val section = root.optJSONObject(index) ?: continue
                         val title = section.optString("title").trim()
 
-                        // Music only. Monster Jam and Drag Racing are deliberately excluded.
-                        if (title !in ALLOWED_SECTIONS) continue
+                        // Same folders as the Concert Corner website: music plus Monster Jam and Drag Racing.
+                        if (!isAllowedSection(cleanSectionTitle(title))) continue
 
                         val items = mutableListOf<Channel>()
                         collectPlayableItems(
@@ -186,6 +186,12 @@ class ConcertCatalogClient(
         }
     }
 
+    private fun isAllowedSection(clean: String): Boolean =
+        clean in ALLOWED_SECTIONS ||
+            clean.startsWith("Monster Jam", ignoreCase = true) ||
+            clean.contains("Drag Racing", ignoreCase = true) ||
+            clean.contains("NHRA", ignoreCase = true)
+
     private fun cleanSectionTitle(title: String): String =
         title.replace(
             Regex("^[^A-Za-z0-9]+\\s*"),
@@ -222,10 +228,10 @@ class ConcertCatalogClient(
             "https://raw.githubusercontent.com/KornDog0804/Unplugged-channel-/main/episodes.json"
 
         private val ALLOWED_SECTIONS = setOf(
-            "📺 MTV Unplugged",
-            "🎙 Tiny Desk",
-            "🎛 Stitched Streams / Full Sessions",
-            "🎤 Live Concerts"
+            "MTV Unplugged",
+            "Tiny Desk",
+            "Stitched Streams / Full Sessions",
+            "Live Concerts"
         )
 
         private val PLAYABLE_MODES = setOf(

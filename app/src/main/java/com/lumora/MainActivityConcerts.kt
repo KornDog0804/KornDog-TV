@@ -11,6 +11,25 @@ internal fun MainActivity.playConcertItem(item: Channel) {
         ?.takeIf { it.isNotEmpty() }
         ?: listOf(item)
 
+    // A whole YouTube playlist (Monster Jam 2026) can't run in the embedded player; the YouTube app plays it, with Premium.
+    val playlistUrl = sourceQueue.firstOrNull { it.url.contains("youtube.com/playlist") }?.url
+    if (playlistUrl != null) {
+        val uri = android.net.Uri.parse(playlistUrl)
+        try {
+            startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, uri)
+                    .setPackage("com.google.android.youtube")
+            )
+        } catch (ignored: Exception) {
+            try {
+                startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri))
+            } catch (ignored: Exception) {
+                android.widget.Toast.makeText(this, "That playlist could not be opened.", android.widget.Toast.LENGTH_LONG).show()
+            }
+        }
+        return
+    }
+
     val playableQueue = sourceQueue.mapNotNull { track ->
         youtubeVideoId(track.url)?.let { key ->
             track to key
