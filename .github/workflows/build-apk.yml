@@ -31,11 +31,16 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        continue-on-error: true  # runner images already ship the SDK; this action failed on Node 24
 
       - name: Install Android SDK 36
         run: |
-          yes | sdkmanager --licenses >/dev/null || true
-          sdkmanager             "platforms;android-36"             "build-tools;36.0.0"             "platform-tools"
+          SDK_ROOT="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          SDKM="$(command -v sdkmanager || true)"
+          if [ -z "$SDKM" ]; then SDKM="$SDK_ROOT/cmdline-tools/latest/bin/sdkmanager"; fi
+          export ANDROID_HOME="$SDK_ROOT" ANDROID_SDK_ROOT="$SDK_ROOT"
+          yes | "$SDKM" --sdk_root="$SDK_ROOT" --licenses >/dev/null || true
+          "$SDKM" --sdk_root="$SDK_ROOT" "platforms;android-36" "build-tools;36.0.0" "platform-tools"
 
       - name: Make Gradle executable
         run: chmod +x gradlew
