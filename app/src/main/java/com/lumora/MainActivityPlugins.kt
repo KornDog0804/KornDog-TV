@@ -1275,7 +1275,8 @@ internal fun MainActivity.showStreamSearchDialog(
         // KornDog chooses the backend after discovery.
 
         /*
-         * Native KornDog source identity wins.
+         * Direct playable links win; raw torrents (magnet/infoHash) are
+         * last-resort fallback. Failover walks results in this order.
          *
          * A raw infoHash / magnet lets KornDog resolve with the user's own
          * TorBox, Premiumize or Real-Debrid account. Hosted direct wrappers
@@ -1284,7 +1285,7 @@ internal fun MainActivity.showStreamSearchDialog(
          */
         when {
             !entry.infoHash.isNullOrBlank() -> {
-                score += 5000
+                score += 1500
             }
 
             !entry.magnetToken.isNullOrBlank() ||
@@ -1292,15 +1293,15 @@ internal fun MainActivity.showStreamSearchDialog(
                     "magnet:",
                     ignoreCase = true
                 ) -> {
-                score += 4500
+                score += 1400
             }
 
             entry.resolver == "torrent" -> {
-                score += 4000
+                score += 1200
             }
 
             entry.resolver == "direct" -> {
-                score += 300
+                score += 5000
             }
         }
 
@@ -1315,7 +1316,7 @@ internal fun MainActivity.showStreamSearchDialog(
             "elfhosted" in source ||
             "elf hosted" in source
         ) {
-            score -= 2000
+            score -= 400
         }
 
         // Prefer normal English/multi-audio releases.
