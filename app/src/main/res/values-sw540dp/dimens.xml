@@ -232,4 +232,5 @@
     <dimen name="search_chip_gap">10dp</dimen>
 
     <dimen name="home_search_bar_width">560dp</dimen>
+    <dimen name="dashboard_name_text">@dimen/text_subhead</dimen>
 </resources>

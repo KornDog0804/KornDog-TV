@@ -40,11 +40,12 @@
             android:fontFamily="@font/inter_medium"
             android:gravity="center"
             android:minHeight="@dimen/shelf_action_min_height"
-            android:paddingHorizontal="@dimen/shelf_action_padding_h"
+            android:paddingHorizontal="14dp"
             android:paddingVertical="@dimen/shelf_action_padding_v"
             android:stateListAnimator="@animator/focus_scale"
-            android:text="@string/see_all"
-            android:textAllCaps="true"
+            android:text="›"
+            android:contentDescription="@string/see_all"
+            android:textAllCaps="false"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/shelf_action_text" />
 

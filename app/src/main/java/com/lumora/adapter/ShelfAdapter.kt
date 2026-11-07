@@ -152,11 +152,11 @@ private class ShelfPosterAdapter(
                 posterImage.setImageResource(R.drawable.ic_launcher_foreground)
                 return
             }
-            PosterLoader.getCached(url)?.let { posterImage.setImageBitmap(it); return }
+            PosterLoader.getCached(url)?.let { posterImage.setImageBitmap(trimBars(url, it)); return }
 
             scope.launch {
                 val bitmap = PosterLoader.fetch(url)
-                if (bitmap != null && current === channel) posterImage.setImageBitmap(bitmap)
+                if (bitmap != null && current === channel) posterImage.setImageBitmap(trimBars(url, bitmap))
             }
         }
     }
@@ -165,4 +165,14 @@ private class ShelfPosterAdapter(
         override fun areItemsTheSame(old: Channel, new: Channel): Boolean = old.url == new.url || (old.id.isNotBlank() && old.id == new.id)
         override fun areContentsTheSame(old: Channel, new: Channel): Boolean = old == new
     }
+}
+
+/** YouTube hqdefault thumbnails are 4:3 with black bars baked into the top and bottom
+ *  eighth; cut them off so the picture fills the poster frame. Other art is untouched. */
+private fun trimBars(url: String, src: android.graphics.Bitmap): android.graphics.Bitmap {
+    if (!url.contains("ytimg.com") || !url.contains("hqdefault") || src.height < 16) return src
+    val bar = src.height / 8
+    return try {
+        android.graphics.Bitmap.createBitmap(src, 0, bar, src.width, src.height - bar * 2)
+    } catch (e: Exception) { src }
 }
