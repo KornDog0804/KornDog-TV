@@ -10,7 +10,7 @@ import org.json.JSONObject
 
 class RealDebridClient(
     private val apiKey: String,
-    private val client: OkHttpClient = OkHttpClient()
+    private val client: OkHttpClient = OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build()
 ) {
 
     data class TorrentFile(

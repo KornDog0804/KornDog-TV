@@ -99,6 +99,7 @@ class StremioAddonClient {
     }
 
     private val http = OkHttpClient.Builder()
+        .dns(com.lumora.net.Ipv4FirstDns)
         .connectTimeout(12, TimeUnit.SECONDS)
         .readTimeout(25, TimeUnit.SECONDS)
         .build()

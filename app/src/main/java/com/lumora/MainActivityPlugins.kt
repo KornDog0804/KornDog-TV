@@ -2930,7 +2930,7 @@ internal fun MainActivity.wirePluginsPane(dialogView: View, onProviderAdded: () 
             val text: String? = try {
                 withContext(Dispatchers.IO) {
                     val request = Request.Builder().url(url).build()
-                    OkHttpClient().newCall(request).execute().use { resp ->
+                    OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build().newCall(request).execute().use { resp ->
                         if (resp.isSuccessful) resp.body?.string() else null
                     }
                 }

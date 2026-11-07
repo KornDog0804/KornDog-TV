@@ -9,7 +9,7 @@ import org.json.JSONObject
 
 class PremiumizeClient(
     private val apiKey: String,
-    private val client: OkHttpClient = OkHttpClient()
+    private val client: OkHttpClient = OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build()
 ) {
     data class PremiumizeFile(
         val path: String,

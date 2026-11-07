@@ -37,6 +37,7 @@ class CastManager(private val context: Context) {
 
 
     private val relayClient = OkHttpClient.Builder()
+        .dns(com.lumora.net.Ipv4FirstDns)
         // Cast VOD is a long-lived streaming request. A normal OkHttp read
         // timeout can kill an otherwise healthy movie during a CDN pause.
         .connectTimeout(20, java.util.concurrent.TimeUnit.SECONDS)

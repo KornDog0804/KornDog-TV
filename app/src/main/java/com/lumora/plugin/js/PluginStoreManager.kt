@@ -33,7 +33,7 @@ import okhttp3.Request
  */
 class PluginStoreManager(
     private val prefs: SharedPreferences,
-    private val httpClient: OkHttpClient = OkHttpClient(),
+    private val httpClient: OkHttpClient = OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build(),
 ) {
     fun storeUrls(): List<PluginStore> {
         val custom = customStoreUrls()

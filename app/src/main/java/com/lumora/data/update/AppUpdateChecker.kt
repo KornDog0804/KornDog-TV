@@ -16,6 +16,7 @@ class AppUpdateChecker(private val context: Context) {
     private val TAG = "AppUpdate"
     private val GITHUB_REPO = "KornDog0804/KornDog-TV"
     private val client = OkHttpClient.Builder()
+        .dns(com.lumora.net.Ipv4FirstDns)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()

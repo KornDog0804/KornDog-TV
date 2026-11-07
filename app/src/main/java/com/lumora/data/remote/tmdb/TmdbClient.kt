@@ -22,6 +22,7 @@ import java.util.concurrent.TimeUnit
 class TmdbClient {
 
     private val http = OkHttpClient.Builder()
+        .dns(com.lumora.net.Ipv4FirstDns)
         .connectTimeout(10, TimeUnit.SECONDS)
         .readTimeout(15, TimeUnit.SECONDS)
         .build()

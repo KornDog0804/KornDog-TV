@@ -33,6 +33,7 @@ object KornDogUrlResolver {
 
     private val http =
         OkHttpClient.Builder()
+            .dns(com.lumora.net.Ipv4FirstDns)
             .followRedirects(true)
             .followSslRedirects(true)
             .connectTimeout(4, TimeUnit.SECONDS)

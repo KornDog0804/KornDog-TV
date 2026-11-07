@@ -64,7 +64,7 @@ class BaseApplication : Application() {
             .followRedirects(true)
             .followSslRedirects(true)
             .connectionPool(okhttp3.ConnectionPool(4, 30, TimeUnit.SECONDS))
-            .dns(okhttp3.internal.platform.Platform.get().let { okhttp3.Dns.SYSTEM })
+            .dns(com.lumora.net.Ipv4FirstDns)
             .addInterceptor(JellyfinAuthInterceptor())
             .cache(Cache(File(cacheDir, "okhttp_cache"), 50L * 1024 * 1024))  // 50MB disk cache
             .build()

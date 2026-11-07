@@ -17,7 +17,7 @@ data class ConcertCatalogResult(
 )
 
 class ConcertCatalogClient(
-    private val http: OkHttpClient = OkHttpClient()
+    private val http: OkHttpClient = OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build()
 ) {
     suspend fun loadCatalog(): Result<ConcertCatalogResult> =
         withContext(Dispatchers.IO) {

@@ -24,7 +24,7 @@ import okhttp3.OkHttpClient
  * per-operation Messenger bind, so there's no state to leak between runs and no pool to reason
  * about. See [JsPluginContract] for the script-facing contract this drives.
  */
-class JsPluginEngine(private val httpClient: OkHttpClient = OkHttpClient()) {
+class JsPluginEngine(private val httpClient: OkHttpClient = OkHttpClient.Builder().dns(com.lumora.net.Ipv4FirstDns).build()) {
 
     /**
      * `onProgress`/`onCandidate`/`onResult` are called from [runScript]'s dedicated background

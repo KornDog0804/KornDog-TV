@@ -26,6 +26,7 @@ class RecordingCaptureEngine(private val context: Context) {
     private val activeJobs = ConcurrentHashMap<String, Job>()
     private val TAG = "RecordingCapture"
     private val client = OkHttpClient.Builder()
+        .dns(com.lumora.net.Ipv4FirstDns)
         .connectTimeout(15, java.util.concurrent.TimeUnit.SECONDS)
         .readTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS) // No read timeout for streaming
         .writeTimeout(0, java.util.concurrent.TimeUnit.MILLISECONDS)
