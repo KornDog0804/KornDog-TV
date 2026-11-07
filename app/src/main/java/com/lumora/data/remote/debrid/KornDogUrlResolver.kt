@@ -209,18 +209,67 @@ object KornDogUrlResolver {
             return null
         }
 
+        /*
+         * Hosts such as ElfHosted answer a failed debrid request ("Couldn't start this
+         * download") with a tiny placeholder video served as a normal 200/206 response.
+         * A real episode or movie is far larger than that, so a progressive file with a
+         * known size under MIN_PLAYABLE_BYTES is a placeholder, not a source.
+         * Streaming manifests (HLS / DASH) are exempt because their size is not the video.
+         */
+        val totalBytes = totalBytes(response)
+
+        if (
+            !isManifest(contentType, finalUrl) &&
+            totalBytes != null &&
+            totalBytes < MIN_PLAYABLE_BYTES
+        ) {
+            Log.w(
+                "KornDogUrlResolver",
+                "Rejected placeholder-sized stream bytes=$totalBytes url=$finalUrl"
+            )
+            return null
+        }
+
         Log.i(
             "KornDogUrlResolver",
-            "Verified direct stream type=$contentType final=$finalUrl"
+            "Verified direct stream type=$contentType final=$finalUrl bytes=$totalBytes"
         )
 
         return Resolved(
             url = finalUrl,
             headers = headers,
             contentType = contentType,
-            contentLength = contentLength,
+            contentLength = totalBytes ?: contentLength,
             redirected = !sameUrl(originalUrl, finalUrl)
         )
+    }
+
+    /** Anything smaller than this cannot be a real episode or movie. */
+    private const val MIN_PLAYABLE_BYTES = 15L * 1024 * 1024
+
+    /**
+     * Real size of the file. The probe asks for bytes 0-1, so a 206 reply carries the total in
+     * Content-Range ("bytes 0-1/123456"); a plain 200 or HEAD reply carries it in Content-Length.
+     */
+    private fun totalBytes(response: Response): Long? {
+        val range = response.header("Content-Range")
+        if (range != null) {
+            return range.substringAfter('/', "").trim().toLongOrNull()
+        }
+        if (response.code == 206) {
+            return null
+        }
+        return response.header("Content-Length")?.toLongOrNull()
+    }
+
+    private fun isManifest(contentType: String?, finalUrl: String): Boolean {
+        val path = finalUrl.substringBefore('?').substringBefore('#').lowercase()
+        return path.endsWith(".m3u8") ||
+            path.endsWith(".mpd") ||
+            contentType == "application/vnd.apple.mpegurl" ||
+            contentType == "application/x-mpegurl" ||
+            contentType == "application/mpegurl" ||
+            contentType == "application/dash+xml"
     }
 
     private fun isClearlyWrapper(
