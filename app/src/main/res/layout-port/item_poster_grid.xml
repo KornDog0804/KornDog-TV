@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_poster_glass"
+    android:layout_margin="4dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:padding="4dp"
+    android:stateListAnimator="@animator/focus_scale">
+
+    <ImageView
+        android:id="@+id/itemPoster"
+        android:layout_width="match_parent"
+        android:layout_height="150dp"
+        android:background="@color/surface"
+        android:scaleType="centerCrop" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="72dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/grad_poster_scrim" />
+
+    <TextView
+        android:id="@+id/itemTypeBadge"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|start"
+        android:layout_margin="6dp"
+        android:background="@drawable/pill_live"
+        android:fontFamily="@font/inter_semibold"
+        android:paddingHorizontal="6dp"
+        android:paddingVertical="2dp"
+        android:textAllCaps="true"
+        android:textColor="@android:color/white"
+        android:textSize="@dimen/poster_badge_text"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/itemFavoriteBadge"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="6dp"
+        android:background="@drawable/bg_toolbar_button"
+        android:fontFamily="@font/inter_semibold"
+        android:gravity="center"
+        android:text="★"
+        android:textColor="@color/primary"
+        android:textSize="18sp"
+        android:visibility="gone" />
+
+    <com.lumora.ui.OutlineTextView
+        android:id="@+id/itemTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom"
+        android:padding="8dp"
+        android:autoSizeMaxTextSize="@dimen/poster_title_text"
+        android:autoSizeMinTextSize="11sp"
+        android:autoSizeStepGranularity="1sp"
+        android:autoSizeTextType="uniform"
+        android:breakStrategy="simple"
+        android:ellipsize="end"
+        android:fontFamily="@font/inter_medium"
+        android:lineSpacingExtra="1dp"
+        android:maxLines="3"
+        android:shadowColor="#B3000000"
+        android:shadowDx="0"
+        android:shadowDy="1"
+        android:shadowRadius="4"
+        android:textColor="@color/text_primary"
+        android:textSize="@dimen/poster_title_text"
+        app:outlineColor="@color/poster_title_outline"
+        app:outlineWidth="@dimen/poster_title_outline_width" />
+</FrameLayout>

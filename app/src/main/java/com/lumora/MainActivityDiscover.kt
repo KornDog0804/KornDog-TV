@@ -75,6 +75,17 @@ internal fun MainActivity.selectApps() {
     binding.concertContent.visibility = View.GONE
 
     updateTabStyles(binding.tabDiscover)
+    if (binding.dashboardShelves.layoutManager == null) {
+        binding.dashboardShelves.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+    }
+    if (binding.dashboardShelves.adapter !== dashboardShelfAdapter) {
+        binding.dashboardShelves.adapter = dashboardShelfAdapter
+    }
+    val continueItems = seriesContinueItems()
+    dashboardShelfAdapter.submitList(
+        if (continueItems.isEmpty()) emptyList()
+        else listOf(com.lumora.model.ContentShelf("Continue Watching", continueItems))
+    )
     applyStatus()
 }
 

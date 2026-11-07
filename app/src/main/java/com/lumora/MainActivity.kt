@@ -744,6 +744,14 @@ class MainActivity : AppCompatActivity() {
         onSeeAllClick = { shelf -> showHomeSeeAll(shelf) },
         showPinButton = false
     )
+    // Continue Watching under the streaming apps (Discover tab). Same behaviour as Home's shelves.
+    internal val dashboardShelfAdapter = ShelfAdapter(
+        onItemClick = { item -> onHomeItemClick(item) },
+        onItemLongClick = { item -> toggleFavoriteVodItem(item) },
+        onHideClick = { shelf -> if (shelf.title == "Continue Watching") clearContinueWatching() else toggleHiddenHomeShelf(shelf.title) },
+        onSeeAllClick = { shelf -> showHomeSeeAll(shelf) },
+        showPinButton = false
+    )
     // Single-category selection swaps to these - a vertical, scrollable grid instead of
     // the shelves' horizontal strip, since one category's whole catalog doesn't fit a
     // single row.

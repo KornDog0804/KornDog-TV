@@ -31,7 +31,7 @@
         android:layout_gravity="bottom"
         android:padding="8dp"
         android:autoSizeMaxTextSize="@dimen/shelf_poster_title_text"
-        android:autoSizeMinTextSize="8sp"
+        android:autoSizeMinTextSize="11sp"
         android:autoSizeStepGranularity="1sp"
         android:autoSizeTextType="uniform"
         android:breakStrategy="simple"
