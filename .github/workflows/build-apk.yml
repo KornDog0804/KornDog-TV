@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - korndog-tv
+      - redesign-preview
   workflow_dispatch:
 
 concurrency:
@@ -89,8 +90,8 @@ jobs:
       - name: Publish/refresh "latest" release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: latest-korndog-tv
-          name: KornDog TV (latest, run ${{ github.run_number }})
+          tag_name: ${{ github.ref_name == 'korndog-tv' && 'latest-korndog-tv' || 'redesign-preview' }}
+          name: KornDog TV (${{ github.ref_name }}, run ${{ github.run_number }})
           body: |
             Automatically rebuilt from the latest push to korndog-tv (commit ${{ github.sha }}).
             This release is overwritten on every push - use the stable download link below on

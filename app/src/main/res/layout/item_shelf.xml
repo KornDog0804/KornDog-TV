@@ -22,8 +22,10 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:ellipsize="end"
-            android:fontFamily="@font/inter_semibold"
+            android:fontFamily="@font/inter_bold"
+            android:letterSpacing="0.06"
             android:maxLines="1"
+            android:textAllCaps="true"
             android:textColor="@color/text_primary"
             android:textSize="@dimen/shelf_title_text" />
 
