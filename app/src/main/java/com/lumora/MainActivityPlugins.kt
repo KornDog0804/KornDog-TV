@@ -2463,9 +2463,25 @@ internal fun MainActivity.showStreamSearchDialog(
             }
 
             launch {
-                val addons = StremioAddonStore
+                val enabledAddons = StremioAddonStore
                     .load(prefs)
                     .filter { it.enabled }
+
+                // AIOStreams-first: when an AIOStreams addon is enabled, search only it
+                // (it already aggregates the other sources, so Torrentio/MediaFusion/etc.
+                // just add duplicate and slower lookups). With no AIOStreams addon enabled
+                // - or with the pref switched off - every enabled addon is searched as before.
+                val aioAddons = enabledAddons.filter {
+                    it.name.contains("aiostreams", ignoreCase = true) ||
+                        it.manifestUrl.contains("aiostreams", ignoreCase = true)
+                }
+
+                val addons =
+                    if (prefs.getBoolean("source_search_aio_first", true) && aioAddons.isNotEmpty()) {
+                        aioAddons
+                    } else {
+                        enabledAddons
+                    }
 
                 if (addons.isEmpty()) {
                     return@launch
