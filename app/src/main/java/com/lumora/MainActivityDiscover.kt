@@ -500,6 +500,15 @@ internal fun MainActivity.setDiscoverStatus(text: String?) {
 /** Discover pick opens an info screen: overview + poster, then either play a matching catalog
  *  item (if this title is already served by a provider) or find a torrent stream for it. */
 internal fun MainActivity.onDiscoverItemClick(item: Channel) {
+    // Same poster-style detail page library items use: one FIND STREAM button that runs the
+    // auto-pick loader ("Finding your stream") and plays the best source, instead of the old
+    // pop-up dialog whose Find stream opened the manual source chooser.
+    showContentDetail(item)
+}
+
+/** The previous Discover pop-up (small dialog + manual chooser). Kept for reference. */
+@Suppress("unused")
+internal fun MainActivity.onDiscoverItemClickLegacyDialog(item: Channel) {
     val match = findCatalogMatch(item)
 
     val density = resources.displayMetrics.density
@@ -520,16 +529,16 @@ internal fun MainActivity.onDiscoverItemClick(item: Channel) {
 
     fun label(text: String) = TextView(this).apply {
         this.text = text
-        setTextColor(ContextCompat.getColor(this@onDiscoverItemClick, R.color.text_secondary))
+        setTextColor(ContextCompat.getColor(this@onDiscoverItemClickLegacyDialog, R.color.text_secondary))
         setPadding(0, (6 * density).toInt(), 0, 0)
     }
 
     val content = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
         setPadding(pad, pad / 2, pad, 0)
-        addView(TextView(this@onDiscoverItemClick).apply {
+        addView(TextView(this@onDiscoverItemClickLegacyDialog).apply {
             text = item.name
-            setTextColor(ContextCompat.getColor(this@onDiscoverItemClick, R.color.text_primary))
+            setTextColor(ContextCompat.getColor(this@onDiscoverItemClickLegacyDialog, R.color.text_primary))
             textSize = 20f
             setTypeface(null, android.graphics.Typeface.BOLD)
         })
