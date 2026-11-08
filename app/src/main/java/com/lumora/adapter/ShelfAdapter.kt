@@ -170,7 +170,7 @@ private class ShelfPosterAdapter(
 /** YouTube hqdefault thumbnails are 4:3 with black bars baked into the top and bottom
  *  eighth; cut them off so the picture fills the poster frame. Other art is untouched. */
 private fun trimBars(url: String, src: android.graphics.Bitmap): android.graphics.Bitmap {
-    if (!url.contains("ytimg.com") || !url.contains("hqdefault") || src.height < 16) return src
+    if (!(url.contains("ytimg.com") || url.contains("youtube.com/vi/")) || !url.contains("hqdefault") || src.height < 16) return src
     val bar = src.height / 8
     return try {
         android.graphics.Bitmap.createBitmap(src, 0, bar, src.width, src.height - bar * 2)
