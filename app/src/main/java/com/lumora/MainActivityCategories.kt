@@ -1401,30 +1401,34 @@ internal fun MainActivity.setupTabs() {
     // Discover's old top-nav slot is now KornDog Apps.
     binding.tabDiscoverLabel.text = "Apps"
 
-    binding.tabHome.setOnClickListener { selectHome() }
+    binding.tabHome.setOnClickListener { closeDetailIfOpen(); selectHome() }
     binding.tabFavorites.setOnClickListener {
+        closeDetailIfOpen()
         showingHome = false
         selectFavorites()
     }
 
     binding.bottomNavLive.setOnClickListener {
+        closeDetailIfOpen()
         showingHome = false
         selectTab(0)
     }
 
     binding.bottomNavMovies.setOnClickListener {
+        closeDetailIfOpen()
         showingHome = false
         selectTab(2)
     }
 
     binding.bottomNavSeries.setOnClickListener {
+        closeDetailIfOpen()
         showingHome = false
         selectTab(1)
     }
-    binding.bottomNavSearch.setOnClickListener { showSearchDialog() }
-    binding.bottomNavDiscover.setOnClickListener { showingHome = false; selectApps() }
-    binding.bottomNavConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
-    binding.bottomNavMore.setOnClickListener { binding.btnSettings.performClick() }
+    binding.bottomNavSearch.setOnClickListener { closeDetailIfOpen(); showSearchDialog() }
+    binding.bottomNavDiscover.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectApps() }
+    binding.bottomNavConcerts.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectConcertCorner() }
+    binding.bottomNavMore.setOnClickListener { closeDetailIfOpen(); binding.btnSettings.performClick() }
 
     fun launchStreamingApp(
         packageName: String,
@@ -1565,13 +1569,13 @@ internal fun MainActivity.setupTabs() {
             "YouTube Music"
         )
     }
-    binding.tabLive.setOnClickListener { selectTab(0) }
-    binding.tabCatchup.setOnClickListener { showingHome = false; selectCatchup() }
-    binding.tabSeries.setOnClickListener { selectTab(1) }
-    binding.tabFilms.setOnClickListener { selectTab(2) }
-    binding.tabDiscover.setOnClickListener { showingHome = false; selectApps() }
-    binding.tabConcerts.setOnClickListener { showingHome = false; selectConcertCorner() }
-    binding.tabDownloads.setOnClickListener { showingHome = false; selectDownloads() }
+    binding.tabLive.setOnClickListener { closeDetailIfOpen(); selectTab(0) }
+    binding.tabCatchup.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectCatchup() }
+    binding.tabSeries.setOnClickListener { closeDetailIfOpen(); selectTab(1) }
+    binding.tabFilms.setOnClickListener { closeDetailIfOpen(); selectTab(2) }
+    binding.tabDiscover.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectApps() }
+    binding.tabConcerts.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectConcertCorner() }
+    binding.tabDownloads.setOnClickListener { closeDetailIfOpen(); showingHome = false; selectDownloads() }
     setupDiscover()
     // D-pad focus moving between tabs leaves a stale sliver of the previous tab's
     // rounded-border background behind on some TV-stick GPUs - the view's own

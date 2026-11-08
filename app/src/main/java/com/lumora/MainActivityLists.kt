@@ -1062,6 +1062,13 @@ internal fun MainActivity.showContentDetail(item: Channel, versionGroup: List<Ch
     nowShowingDetailId = item.id
 }
 
+/** Tapping a tab / bottom-bar button while the poster page is open used to do nothing
+ *  visible: the tab switched underneath, but mainContent stays hidden while the detail
+ *  layer is up, so the page looked frozen until you hit X. Close the page first. */
+internal fun MainActivity.closeDetailIfOpen() {
+    if (isContentDetailVisible) hideContentDetail()
+}
+
 internal fun MainActivity.hideContentDetail() {
     isContentDetailVisible = false
     applyStatus()
