@@ -306,7 +306,15 @@ internal fun MainActivity.buildGuideHeader() {
 internal fun MainActivity.setupChannelList() {
     binding.liveContent.layoutManager = LinearLayoutManager(this)
     binding.liveContent.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) { updateGuideRowWrap() }
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            updateGuideRowWrap()
+            // Phone only: tuck the bottom bar away while scrolling down through channels so
+            // it stops covering the last rows; it returns on scroll up or at the top.
+            if (isPhoneLayout() && !isPlayerVisible) {
+                if (dy > 6) binding.bottomNavBar.visibility = View.GONE
+                else if (dy < -6 || !recyclerView.canScrollVertically(-1)) binding.bottomNavBar.visibility = View.VISIBLE
+            }
+        }
     })
     binding.liveContent.addOnChildAttachStateChangeListener(object : RecyclerView.OnChildAttachStateChangeListener {
         override fun onChildViewAttachedToWindow(view: View) { binding.liveContent.post { updateGuideRowWrap() } }

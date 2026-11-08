@@ -585,4 +585,8 @@ internal fun MainActivity.applyPhoneLivePreviewLayout() {
         }
     }
     binding.livePreviewGutter.requestLayout()
+    // The guide below was measured while the pane was still its old height; re-measure
+    // once the pane has its new size so rows never sit under the video.
+    binding.liveGuideColumn.post { binding.liveGuideColumn.requestLayout() }
+    binding.liveGuideColumn.postDelayed({ binding.liveGuideColumn.requestLayout() }, 200)
 }

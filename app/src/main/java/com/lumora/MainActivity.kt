@@ -332,6 +332,8 @@ class MainActivity : AppCompatActivity() {
     // The channel the user last committed to the preview pane (first OK press, or any
     // auto-load). A second OK on the same channel opens it fullscreen.
     internal var previewTargetChannel: Channel? = null
+    /** Preview channel to bring back when the app returns from the background. */
+    internal var resumePreviewChannel: Channel? = null
     internal var previewLoadRunnable: Runnable? = null
     internal var previewVersionGroup: List<Channel> = emptyList()
     internal var previewVersionIndex = 0
@@ -1049,6 +1051,16 @@ class MainActivity : AppCompatActivity() {
         ) {
             playerManager.play()
         }
+
+        // onPause tears the Live preview down; without this the pane came back black until
+        // the user tapped another channel.
+        if (activeTab == 0 && !isPlayerVisible && isLivePaneActuallyVisible()) {
+            val resumeChannel = resumePreviewChannel ?: lastFocusedLiveChannel
+            if (resumeChannel != null) {
+                showLivePreviewPane()
+                requestPreviewLoad(resumeChannel)
+            }
+        }
     }
 
     override fun onPause() {
@@ -1064,6 +1076,7 @@ class MainActivity : AppCompatActivity() {
                 // current if the process is killed while backgrounded and no stop ever lands.
                 reportJellyfinProgress()
             }
+            resumePreviewChannel = previewTargetChannel ?: lastFocusedLiveChannel
             releaseLivePreview()
         }
     }
