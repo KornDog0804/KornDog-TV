@@ -434,7 +434,7 @@ class StremioAddonClient {
                 directUrl = stream.url,
                 headers = stream.requestHeaders,
                 provider = manifest.name,
-                quality = qualityFrom(stream.title),
+                quality = qualityFrom(stream.filename ?: stream.title),
                 language = stream.audioLanguage
             )
         }
@@ -454,7 +454,7 @@ class StremioAddonClient {
                 token = token,
                 seeders = null,
                 size = null,
-                quality = qualityFrom(stream.title),
+                quality = qualityFrom(stream.filename ?: stream.title),
                 source = stream.source,
                 audio = null,
                 language = stream.audioLanguage
