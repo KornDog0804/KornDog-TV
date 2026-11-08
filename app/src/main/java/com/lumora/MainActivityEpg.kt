@@ -573,12 +573,16 @@ internal fun MainActivity.applyPhoneLivePreviewLayout() {
         it.marginStart = 0
         it.topMargin = (6 * resources.displayMetrics.density).toInt()
     }
-    pane.post {
-        val w = pane.width - pane.paddingLeft - pane.paddingRight
-        if (w <= 0) return@post
+    // Size synchronously from the screen width, before the first layout pass. Doing it in a
+    // post{} left the parent measured for the old small thumbnail, so the taller video
+    // overlapped the time ruler and pushed the last channel row off-screen.
+    val d = resources.displayMetrics.density
+    val w = (resources.displayMetrics.widthPixels - (10 + 12 + 8 + 8) * d).toInt()
+    if (w > 0) {
         binding.livePreviewFrame.layoutParams = binding.livePreviewFrame.layoutParams.also {
             it.width = w
             it.height = w * 9 / 16
         }
     }
+    binding.livePreviewGutter.requestLayout()
 }
