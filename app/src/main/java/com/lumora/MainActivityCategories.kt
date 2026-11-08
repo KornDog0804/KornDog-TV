@@ -379,8 +379,22 @@ internal fun MainActivity.submitCategories(categories: List<CategoryFilter>) {
 }
 
 /** Whether the category rail is collapsed on this device: a persisted pref. */
+internal fun MainActivity.isPhoneLayout(): Boolean =
+    resources.configuration.smallestScreenWidthDp < 540
+
+/** Phones start with the category rail tucked away (it eats a third of a narrow screen);
+ *  the expand pill brings it back. TVs keep it open. */
 internal fun MainActivity.isSidebarCollapsed(): Boolean =
-    prefs.getBoolean(PREF_CATEGORY_SIDEBAR_COLLAPSED, false)
+    prefs.getBoolean(PREF_CATEGORY_SIDEBAR_COLLAPSED, isPhoneLayout())
+
+/** After picking a category on a phone, hide the rail again so the channel list gets the
+ *  full width. Quiet version of [collapseCategorySidebar]: no toast, no focus jump. */
+internal fun MainActivity.autoHideCategoryRailOnPhone() {
+    if (!isPhoneLayout()) return
+    if (binding.categorySidebar.visibility != View.VISIBLE) return
+    prefs.edit().putBoolean(PREF_CATEGORY_SIDEBAR_COLLAPSED, true).apply()
+    applySidebarVisibility(tabWantsSidebar = true)
+}
 
 /** Base (XML) paddingTop of each content view, recorded the first time this device
  *  touches it - so the reserve added below can be undone exactly rather than guessed. */

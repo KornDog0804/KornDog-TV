@@ -228,7 +228,7 @@ internal const val COLLAPSE_CATEGORIES_TOGGLE_ID = "__collapse_categories__"
  *  Search operates on the loaded liveChannels catalog, so even very large
  *  Eternal/Xtream lineups do not require another provider fetch. */
 internal const val LIVE_SEARCH_CATEGORY_ID = "__live_search__"
-internal const val PREF_CATEGORY_SIDEBAR_COLLAPSED = "category_sidebar_collapsed"
+internal const val PREF_CATEGORY_SIDEBAR_COLLAPSED = "category_sidebar_collapsed_v2"
 /** Rows that act on the rail itself rather than filtering it. They must never be hideable:
  *  hiding one is unrecoverable, since the only way to unhide a row is the context menu on
  *  that same row. The hidden-id filter in buildCategoryRows skips these too, so anyone who
@@ -809,7 +809,7 @@ class MainActivity : AppCompatActivity() {
     internal var discoverCurrentQuery: String? = null
     internal var providerLoadJob: Job? = null
     internal val categoryAdapter = CategoryAdapter(
-        onCategoryClick = { category -> onCategorySelected(category) },
+        onCategoryClick = { category -> onCategorySelected(category); autoHideCategoryRailOnPhone() },
         onCategoryStarClick = { category -> togglePinCategory(category) },
         onCategoryLongClick = { category ->
             // Category-level pin/hide menu is available on every tab now - Live TV's
