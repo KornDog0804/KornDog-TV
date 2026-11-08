@@ -1664,6 +1664,7 @@
                                 android:padding="8dp">
 
                                 <FrameLayout
+                                    android:id="@+id/livePreviewFrame"
                                     android:layout_width="@dimen/live_preview_width"
                                     android:layout_height="@dimen/live_preview_height"
                                     android:background="@drawable/bg_live_video_frame"
@@ -1685,6 +1686,7 @@
                                 </FrameLayout>
 
                                 <LinearLayout
+                                    android:id="@+id/livePreviewInfo"
                                     android:layout_width="0dp"
                                     android:layout_height="match_parent"
                                     android:layout_marginStart="12dp"

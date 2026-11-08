@@ -289,6 +289,7 @@ internal fun MainActivity.showLivePreviewPane() {
     if (liveChannels.isEmpty()) return
     binding.livePreviewGutter.visibility = View.VISIBLE
     binding.livePreviewPane.visibility = View.VISIBLE
+    applyPhoneLivePreviewLayout()
     // releaseLivePreview() hides this surface (not just its parent) to stop a stale
     // frame compositing; nothing brought it back, so the pane reopened permanently
     // blank after the first time the preview was ever torn down. Un-hide it here, where
@@ -554,4 +555,30 @@ internal fun MainActivity.hideControls() {
 
 internal fun MainActivity.toggleControls() {
     if (binding.controlsOverlay.visibility == View.VISIBLE) hideControls() else showControls()
+}
+
+
+/** Marvey-style Live on a portrait phone: the preview video spans the full width at 16:9
+ *  with the channel name stacked under it, instead of a thumbnail beside the text.
+ *  TVs and landscape keep the side-by-side hero. */
+internal fun MainActivity.applyPhoneLivePreviewLayout() {
+    val portrait = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_PORTRAIT
+    if (!isPhoneLayout() || !portrait) return
+    val pane = binding.livePreviewPane
+    pane.orientation = android.widget.LinearLayout.VERTICAL
+    binding.livePreviewInfo.layoutParams = (binding.livePreviewInfo.layoutParams as android.widget.LinearLayout.LayoutParams).also {
+        it.width = android.view.ViewGroup.LayoutParams.MATCH_PARENT
+        it.height = android.view.ViewGroup.LayoutParams.WRAP_CONTENT
+        it.weight = 0f
+        it.marginStart = 0
+        it.topMargin = (6 * resources.displayMetrics.density).toInt()
+    }
+    pane.post {
+        val w = pane.width - pane.paddingLeft - pane.paddingRight
+        if (w <= 0) return@post
+        binding.livePreviewFrame.layoutParams = binding.livePreviewFrame.layoutParams.also {
+            it.width = w
+            it.height = w * 9 / 16
+        }
+    }
 }
