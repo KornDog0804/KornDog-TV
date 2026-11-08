@@ -1686,6 +1686,11 @@ internal fun MainActivity.saveCurrentPlaybackPosition() {
 }
 
 internal fun MainActivity.hidePlayer() {
+    // The user is leaving the player: drop the Find Stream failover chain. Left armed, a late
+    // player error (e.g. from a glitchy source winding down) or the no-picture watchdog could
+    // resolve and start another source, or re-open the chooser, on top of the screen we are
+    // returning to.
+    streamSearchFailover = null
     saveCurrentPlaybackPosition()
     // Watched state may have moved during playback - the Home up-next memo is stale.
     clearUpNextMemo()
