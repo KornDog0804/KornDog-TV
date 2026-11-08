@@ -51,6 +51,12 @@ import java.util.Locale
 //
 // Extracted from MainActivity.kt; see that file's header.
 /** Parses a Discover [Channel.id] of the form "tmdb:movie:123" / "tmdb:tv:123". */
+// Compiled-pattern cache for the Find Stream hot path (see streamRank / addResult).
+private val cachedRegexes = java.util.concurrent.ConcurrentHashMap<String, Regex>()
+
+private fun cachedRegex(pattern: String): Regex =
+    cachedRegexes.getOrPut(pattern) { Regex(pattern, RegexOption.IGNORE_CASE) }
+
 internal fun MainActivity.tmdbTypeAndId(id: String): Pair<String, Int>? {
     val parts = id.split(":")
     if (parts.size != 3 || parts[0] != "tmdb") return null
@@ -1263,7 +1269,11 @@ internal fun MainActivity.showStreamSearchDialog(
      * Nothing is discarded here. This only changes ordering, and therefore
      * also improves the order used by automatic source failover.
      */
-    fun streamRank(entry: StreamEntry): Int {
+    // Ranking is pure per entry, so compute it once. Re-ranking every existing result on
+    // each insertion was O(n^2) regex work on the main thread (151 results -> ANR).
+    val rankCache = java.util.IdentityHashMap<StreamEntry, Int>()
+
+    fun computeStreamRank(entry: StreamEntry): Int {
         val title = entry.result.title.lowercase()
         val source = entry.result.source.orEmpty().lowercase()
 
@@ -1321,24 +1331,15 @@ internal fun MainActivity.showStreamSearchDialog(
 
         // Prefer normal English/multi-audio releases.
         if (
-            Regex(
-                """\b(english|eng|multi(?:[- ]?audio)?|dual[- ]?audio)\b""",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(title)
+            cachedRegex("""\b(english|eng|multi(?:[- ]?audio)?|dual[- ]?audio)\b""").containsMatchIn(title)
         ) {
             score += 700
         }
 
         // Push clearly foreign-only releases down.
         if (
-            Regex(
-                """\b(french|fre|fra|german|ger|deu|russian|rus|italian|ita|spanish|spa|latino|hindi|hin)\b""",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(title) &&
-            !Regex(
-                """\b(english|eng|multi|dual[- ]?audio)\b""",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(title)
+            cachedRegex("""\b(french|fre|fra|german|ger|deu|russian|rus|italian|ita|spanish|spa|latino|hindi|hin)\b""").containsMatchIn(title) &&
+            !cachedRegex("""\b(english|eng|multi|dual[- ]?audio)\b""").containsMatchIn(title)
         ) {
             score -= 2500
         }
@@ -1347,7 +1348,7 @@ internal fun MainActivity.showStreamSearchDialog(
         // then 4K, then 720p.
         when {
             "1080p" in title -> score += 600
-            "2160p" in title || Regex("""\b4k\b""").containsMatchIn(title) ->
+            "2160p" in title || cachedRegex("""\b4k\b""").containsMatchIn(title) ->
                 score += 500
             "720p" in title -> score += 350
             "480p" in title -> score += 100
@@ -1357,6 +1358,8 @@ internal fun MainActivity.showStreamSearchDialog(
 
         return score
     }
+
+    fun streamRank(entry: StreamEntry): Int = rankCache.getOrPut(entry) { computeStreamRank(entry) }
 
     fun playResult(entry: StreamEntry) {
         val result = entry.result
@@ -2210,83 +2213,41 @@ internal fun MainActivity.showStreamSearchDialog(
 
         val derivedQuality =
             entry.result.quality
-                ?: Regex(
-                    "(2160p|4k|1080p|720p|480p)",
-                    RegexOption.IGNORE_CASE
-                ).find(displayTitle)?.value
+                ?: cachedRegex("(2160p|4k|1080p|720p|480p)").find(displayTitle)?.value
 
         val codec =
-            Regex(
-                "(HEVC|H\\.?265|H\\.?264|AV1|x265|x264)",
-                RegexOption.IGNORE_CASE
-            ).find(displayTitle)?.value
+            cachedRegex("(HEVC|H\\.?265|H\\.?264|AV1|x265|x264)").find(displayTitle)?.value
 
         val hdr =
-            Regex(
-                "(HDR10\\+?|HDR|DV|Dolby Vision)",
-                RegexOption.IGNORE_CASE
-            ).find(displayTitle)?.value
+            cachedRegex("(HDR10\\+?|HDR|DV|Dolby Vision)").find(displayTitle)?.value
 
         val audio =
-            Regex(
-                "(Atmos|Dolby Digital Plus|DDP?\\+?|AAC|DTS(?:-HD)?|TrueHD)",
-                RegexOption.IGNORE_CASE
-            ).find(displayTitle)?.value
+            cachedRegex("(Atmos|Dolby Digital Plus|DDP?\\+?|AAC|DTS(?:-HD)?|TrueHD)").find(displayTitle)?.value
 
         val sizeFromTitle =
-            Regex(
-                "(\\d+(?:\\.\\d+)?\\s?(?:GB|MB))",
-                RegexOption.IGNORE_CASE
-            ).find(displayTitle)?.value
+            cachedRegex("(\\d+(?:\\.\\d+)?\\s?(?:GB|MB))").find(displayTitle)?.value
 
         // Surface audio/language hints directly in Find Stream.
         // Stremio add-ons commonly encode these in the stream title rather
         // than a dedicated field, so keep this display-only and conservative.
         val language = entry.result.language ?: when {
-            Regex(
-                "\\b(english|eng|en)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "English"
+            cachedRegex("\\b(english|eng|en)\\b").containsMatchIn(displayTitle) -> "English"
 
-            Regex(
-                "\\b(japanese|jpn|ja)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Japanese"
+            cachedRegex("\\b(japanese|jpn|ja)\\b").containsMatchIn(displayTitle) -> "Japanese"
 
-            Regex(
-                "\\b(spanish|spa|es)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Spanish"
+            cachedRegex("\\b(spanish|spa|es)\\b").containsMatchIn(displayTitle) -> "Spanish"
 
-            Regex(
-                "\\b(french|fre|fra|fr)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "French"
+            cachedRegex("\\b(french|fre|fra|fr)\\b").containsMatchIn(displayTitle) -> "French"
 
-            Regex(
-                "\\b(german|ger|deu|de)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "German"
+            cachedRegex("\\b(german|ger|deu|de)\\b").containsMatchIn(displayTitle) -> "German"
 
-            Regex(
-                "\\b(italian|ita|it)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Italian"
+            cachedRegex("\\b(italian|ita|it)\\b").containsMatchIn(displayTitle) -> "Italian"
 
-            Regex(
-                "\\b(korean|kor|ko)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Korean"
+            cachedRegex("\\b(korean|kor|ko)\\b").containsMatchIn(displayTitle) -> "Korean"
 
-            Regex(
-                "\\b(chinese|chi|zho|zh)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Chinese"
+            cachedRegex("\\b(chinese|chi|zho|zh)\\b").containsMatchIn(displayTitle) -> "Chinese"
 
-            Regex(
-                "\\b(multi(?:[- ]?audio)?|dual[- ]?audio|multi[- ]?lang)\\b",
-                RegexOption.IGNORE_CASE
-            ).containsMatchIn(displayTitle) -> "Multi"
+            cachedRegex("\\b(multi(?:[- ]?audio)?|dual[- ]?audio|multi[- ]?lang)\\b").containsMatchIn(displayTitle) -> "Multi"
 
             entry.result.audio.equals("dub", true) -> "Dub"
             entry.result.audio.equals("sub", true) -> "Sub"
