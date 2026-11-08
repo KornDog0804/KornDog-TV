@@ -1354,6 +1354,30 @@ internal fun MainActivity.showStreamSearchDialog(
             "480p" in title -> score += 100
         }
 
+        // Codec/container sanity for phones and TV boxes. VC-1 video has no hardware or
+        // software decoder on almost every Android device (Media3 plays the audio and draws a
+        // black picture), and full Remux discs are huge and slow to start. H.264 plays
+        // everywhere; HEVC plays on most. Penalties only reorder - nothing is removed.
+        if (cachedRegex("""\bvc-?1\b""").containsMatchIn(title)) {
+            score -= 4000
+        }
+
+        if (cachedRegex("""\bremux\b""").containsMatchIn(title)) {
+            score -= 900
+        }
+
+        if (cachedRegex("""\b(x264|h\.?264|avc)\b""").containsMatchIn(title)) {
+            score += 300
+        } else if (cachedRegex("""\b(x265|h\.?265|hevc)\b""").containsMatchIn(title)) {
+            score += 100
+        }
+
+        // Dolby Vision / HDR10 profiles often show a black or washed-out picture on
+        // non-HDR displays.
+        if (cachedRegex("""\b(dv|dovi|dolby[ .-]?vision|hdr10\+?)\b""").containsMatchIn(title)) {
+            score -= 600
+        }
+
         // Provider brand intentionally does not affect native ranking.
 
         return score

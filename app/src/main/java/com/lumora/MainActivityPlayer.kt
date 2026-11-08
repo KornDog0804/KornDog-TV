@@ -521,6 +521,52 @@ internal fun MainActivity.setupPlayerControls() {
     }
 
     playerManager.addListener(object : Player.Listener {
+        // No-picture watchdog (Find Stream only). A source can report READY and run the
+        // clock while the decoder draws nothing (e.g. VC-1 remux on a phone) - Media3 raises
+        // no error, so error-based failover never fires. If no first frame arrives within
+        // NO_PICTURE_MS of READY, walk to the next source.
+        private var frameUri: String? = null
+        private var watchdogUri: String? = null
+
+        override fun onRenderedFirstFrame() {
+            frameUri = playerManager.currentMediaUri()
+        }
+
+        private fun armNoPictureWatchdog() {
+            val uri = playerManager.currentMediaUri() ?: return
+
+            if (streamSearchFailover == null || uri == frameUri || uri == watchdogUri) return
+
+            watchdogUri = uri
+
+            mainHandler.postDelayed({
+                if (
+                    playerManager.currentMediaUri() == uri &&
+                    frameUri != uri &&
+                    streamSearchFailover != null
+                ) {
+                    android.util.Log.w(
+                        "LumoraPlayback",
+                        "No first video frame after ${NO_PICTURE_MS}ms; trying next Find Stream source"
+                    )
+
+                    playerManager.stop()
+                    binding.bufferingSpinner.visibility = View.VISIBLE
+
+                    Toast.makeText(
+                        this@setupPlayerControls,
+                        "No picture from this source - trying the next one",
+                        Toast.LENGTH_SHORT
+                    ).show()
+
+                    if (streamSearchFailover?.invoke() != true) {
+                        streamSearchFailover = null
+                        binding.bufferingSpinner.visibility = View.GONE
+                    }
+                }
+            }, NO_PICTURE_MS)
+        }
+
         override fun onPlaybackStateChanged(state: Int) {
             val stateName = when (state) {
                 Player.STATE_IDLE -> "IDLE"
@@ -544,6 +590,8 @@ internal fun MainActivity.setupPlayerControls() {
                     // eligible to ask about a previously saved resume position.
                     val firstReadyForThisAttempt = !currentStreamPlayed
                     currentStreamPlayed = true
+
+                    armNoPictureWatchdog()
 
                     if (firstReadyForThisAttempt) {
                         maybeShowResumePrompt()
@@ -735,6 +783,8 @@ internal fun MainActivity.setupPlayerControls() {
 }
 
 // ── Aspect ratio / zoom ─────────────────────────
+
+private const val NO_PICTURE_MS = 8000L
 
 internal fun MainActivity.loadSavedAspectMode(): VideoAspectFrameLayout.Mode =
     runCatching { VideoAspectFrameLayout.Mode.valueOf(prefs.getString(PREF_ASPECT_MODE, null) ?: "") }
